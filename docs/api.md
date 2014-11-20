@@ -24,19 +24,39 @@ Every operation (both modification and read-only operations), will return a Vers
 ## Futures ##
 Every function in the basic API returns a `Future<T>` to some type `T` (the advanced API has a few more options). While this may seem antithetical to the ease-of-use approach, it more accurately represents the behavior of the API functions. For example, typical write calls to the local filesystem are generally not written to the underlying hard-disk when the function returns, and instead are cached at various levels. The client has to make additional function calls to ensure that data reaches disk, and if a disk write fails - which write calls made it to disk? The SAFE API returning a `Future<T>` therefore better represents the behavior - the function stored the necessary information to complete the operation at some later point in time, and the `Future<T>` object will notify the client when that operation completed. In the SAFE API, clients can assume that a requested operation has completed to the SAFE network when the value T can be retrieved from the `Future<T>`.
 
-Signalling errors in Futures (whether Boost or std) is done with exceptions. Since SAFE network will have a high probability of failure (lack of storage space for user, version error, etc.), the SAFE API will only use the exceptions in the futures for *fatal errors*. Fatal errors can (but are not limited to), out-of-memory issues when trying to set the future value, a Future that can never be set due to an internal bug (broken promise). Instead, the SAFE API will return an object that contains the result of the operation or a non-fatal error, but never both (see [Expected](#Expected)). Separating between fatal and non-fatal errors allows clients of the SAFE API to choose whether they want to use exceptions for common errors (unlikely), or throw exceptions in either case.
+Signalling errors in Futures (whether Boost or std) is done with exceptions. Since SAFE network will have a high probability of failure (lack of storage space for user, version error, etc.), the SAFE API will only use the exceptions in the futures for *fatal errors*. Fatal errors can (but are not limited to), out-of-memory issues when trying to set the future value, a Future that can never be set due to an internal bug (broken promise). Instead, the SAFE API will return an object that contains the result of the operation or a non-fatal error, but never both (see [Expected](#expected)). Separating between fatal and non-fatal errors allows clients of the SAFE API to choose whether they want to use exceptions for common errors (unlikely), or throw exceptions.
 
 ### Example Future Usage ###
 ```c++
 void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
   // get() blocks until operation is complete
-  const auto retrieval_result = storage.Get(std::move(path)).get(); 
+  const auto retrieval_result = storage.Get(path).get(); 
   // ... continued throughout tutorial
 }
 ```
 Since the future only uses exceptions for fatal errors, its usage is quite easy. Calling .get() on the Future<T> will block until the operation completes. The function will only throw in fatal conditions, otherwise retrieval_result will contain the result of the operation or a non-fatal error, but never both.
 
 ## Expected ##
+Every operation in the NFS API (basic or advanced) will provide an `Expected<T>` object when complete. If a non-fatal error ocurred during the operation, the Expected object will have an `maidsafe::nfs::Error` object instead of an object of type `T`. If the operation succeeded it will have an object of type `T`, and no `maidsafe::nfs::Error` object. Using this object, instead of exceptions with the `Future<T>` interface, allows for non-fatal errors to be checked in a functional way. 
+
+### Example Expected Usage ###
+```c++
+void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
+  // get() blocks until operation is complete
+  const auto retrieval_result = storage.Get(path).get(); 
+  if (retrieval_result) {
+    std::cout << "Contents of " << path << " : " << 
+                 retrieval_result->value() << std::endl;
+  }
+  else {
+    std::cerr << "Could not retrieve " << path << " : " << 
+                 retrieval_result.error() << std::endl;
+  }
+}
+```
+The object has a conversion to bool operator for use with conditional statements, and overloads `operator*` and `operator->`. The easiest way to use the object is like a pointer, but advanced users are encouraged to [read information](https://github.com/ptal/std-expected-proposal) about this object being proposed for a future revision of C++.
+
+Note: the example above used `retrieval_result->value()` instead of `*retrieval_result` because every operation returns an [Expected Operation ](#operation).
 
 ## Operation ##
 
