@@ -3,13 +3,13 @@ The Maidsafe API strives to be easy to use, consistent, and flexible for advance
 
 ## Storage Abstractions ##
 ### File ###
-Data on the SAFE network is stored in Files. A File can contain text or binary data, and the SAFE network has no upward limit on size. However, local system contraints may apply to maximum File size. Every File also has a name, which is represented by a string of UTF-8 characters.
+Data on the SAFE network is stored in Files. A File can contain text or binary data, and the SAFE network has no upward limit on File size. However, local system contraints may apply to maximum File size. Every File also has a name, which is represented by a string of UTF-8 characters.
 
 ### Directory ###
-A directory is a virtual object containing other Directories or Files, and must contain at least one Directory or File (a Directory must have 1 File or Directory, and can have 0-∞ Files and 0-∞ Directories). Every Directory has a name, which is represented by a string of UTF-8 characters.
+A Directory is a virtual object containing other Directories or Files, and must contain at least one Directory or File (a Directory must have 1 File or Directory, and can have 0-∞ Files and 0-∞ Directories). Every Directory has a name, which is represented by a string of UTF-8 characters.
 
 ### Path ###
-The SAFE network uses the same concept as Posix filesystems to specify directories and files. A file or directory in the SAFE network is referenced by a string that corresponds to a virtual location on the network. Directories are separated `/` and the group of characters after the last `/` represents the filename. For example: `/file1` references a file named `file1` in the top-level (unnamed root) directory, whereas `/directory1/file1` references a file named `file1` in the directory `directory1`. Despite having the same name, these two files are **not** the same because they are in different directories.
+The SAFE network uses the same concept as Posix filesystems to specify Directories and Files. A Directory or File in the SAFE network is referenced by a string that corresponds to a virtual location on the network. Directories are separated `/` and the group of characters after the last `/` represents the filename. For example: `/file1` references a file named `file1` in the top-level (unnamed root) directory, whereas `/directory1/file1` references a file named `file1` in the directory `directory1`. Despite having the same name, these two files are **not** the same because they are in different directories.
 
 Every SAFE identity has its own unique unnamed root. For example `/directory/file1` in the identity representing `user1` is **not** the same file as `/directory/file1` in the identity representing `user2`. This allows users to store data securely and separately from other users on the network. Developers *should* be aware that different SAFE Apps using the same identity can see the files stored by other SAFE Apps. Until otherwise stated, if a user wants to keep files hidden from a specific SAFE App, a different identity will have to be used.
 
@@ -22,13 +22,28 @@ Every file and directory in the SAFE network is stored as a revision, so that co
 Every operation (both modification and read-only operations), will return a Version object which will be the most-up-to-date version known to the SAFE API.
 
 ## Futures ##
+Every function in the basic API returns a `Future<T>` to some type `T` (the advanced API has a few more options). While this may seem antithetical to the ease-of-use approach, it more accurately represents the behavior of the API functions. For example, typical write calls to the local filesystem are generally not written to the underlying hard-disk when the function returns, and instead are cached at various levels. The client has to make additional function calls to ensure that data reaches disk, and if a disk write fails - which write calls made it to disk? The SAFE API returning a `Future<T>` therefore better represents the behavior - the function stored the necessary information to complete the operation at some later point in time, and the `Future<T>` object will notify the client when that operation completed. In the SAFE API, clients can assume that a requested operation has completed to the SAFE network when the value T can be retrieved from the `Future<T>`.
 
+Signalling errors in Futures (whether Boost or std) is done with exceptions. Since SAFE network will have a high probability of failure (lack of storage space for user, version error, etc.), the SAFE API will only use the exceptions in the futures for *fatal errors*. Fatal errors can (but are not limited to), out-of-memory issues when trying to set the future value, a Future that can never be set due to an internal bug (broken promise). Instead, the SAFE API will return an object that contains the result of the operation or a non-fatal error, but never both (see [Expected](#Expected)). Separating between fatal and non-fatal errors allows clients of the SAFE API to choose whether they want to use exceptions for common errors (unlikely), or throw exceptions in either case.
+
+### Example Future Usage ###
+```c++
+void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
+  // get() blocks until operation is complete
+  const auto retrieval_result = storage.Get(std::move(path)).get(); 
+  // ... continued throughout tutorial
+}
+```
+Since the future only uses exceptions for fatal errors, its usage is quite easy. Calling .get() on the Future<T> will block until the operation completes. The function will only throw in fatal conditions, otherwise retrieval_result will contain the result of the operation or a non-fatal error, but never both.
 
 ## Expected ##
 
 ## Operation ##
 
-## Basic Usage ##
+## Basic API Usage ##
+### Put ###
+### Get ###
+### Delete ###
 
 ## Classes ##
 ### maidsafe::nfs::Error ###
