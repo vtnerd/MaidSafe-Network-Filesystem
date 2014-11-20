@@ -37,7 +37,7 @@ void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
 Since the future only uses exceptions for fatal errors, its usage is quite easy. Calling .get() on the Future<T> will block until the operation completes. The function will only throw in fatal conditions, otherwise retrieval_result will contain the result of the operation or a non-fatal error, but never both.
 
 ## Expected ##
-Every operation in the NFS API (basic or advanced) will provide an `Expected<Operation<T>>` object when complete (see [operation](#operation) section below). If a non-fatal error ocurred during the operation, the Expected object will have an `Operation<Error>` object instead of an object of type `Operation<T>`. Using the `Expected<T>` object, instead of exceptions with the `Future<T>` interface, allows for non-fatal errors to be checked in a functional way. 
+Every operation in the NFS API (basic or advanced) will provide an `Expected<Operation<T>>` object when complete (see [operation](#operation) section below). If a non-fatal error ocurred during the operation, the Expected object will have an `Operation<Error>` object instead of an object of type `Operation<T>`. Using `Expected<T>`, instead of exceptions with the `Future<T>`, allows for non-fatal errors to be checked in a functional way. 
 
 ### Example Expected Usage ###
 ```c++
@@ -54,7 +54,7 @@ void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
   }
 }
 ```
-The object has a conversion to bool operator for use with conditional statements, and overloads `operator*` and `operator->`. The easiest way to use the object is like a pointer, but advanced users are encouraged to [read information](https://github.com/ptal/std-expected-proposal) about this object being proposed for a future revision of C++.
+The `Expected<T>` object has a conversion to bool operator for use with conditional statements, and overloads `operator*` and `operator->`. The easiest way to use the object is like a pointer, but advanced users are encouraged to [read information](https://github.com/ptal/std-expected-proposal) about this object being proposed for a future revision of C++.
 
 Note: the example above used `retrieval_result->result()` instead of `*retrieval_result` because every operation returns an [Expected Operation ](#operation).
 
@@ -92,7 +92,7 @@ void PrintFileThenDelete(maidsafe::nfs::Storage& storage, boost::filesystem::pat
 Alias for maidsafe::NfsErrors, which is an enum.
 ```c++
 enum class Error {
-  timed_out = 0,
+  timed_out,
   version_error,
   insufficient_por,
   insufficient_space
@@ -123,15 +123,15 @@ class Operation {
 ```
 
 ### maidsafe::nfs::FutureExpectedOperation<T> ###
-This is an alias for `maidsafe::nfs::Future<maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>>`. Returned by every function in the basic API (with different `T`), and every function in the advanced API when `maidsafe::nfs::use_future` is provided instead of a callback.
+This is an alias for `maidsafe::nfs::Future<maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>>`. Returned by every function in the basic API, and every function in the advanced API when `maidsafe::nfs::use_future` is provided instead of a callback.
 
 ### maidsafe::nfs::Storage ###
 
 
 ### maidsafe::nfs::File ###
-Represents a file stored at the path given to the `Storage` object. A file can only represent a single Version at a time, and cannot be changed through the interface directly. All write calls (`Write`, and `Truncate`) use the Version the file represents as the Version for the modification. If the write call succeeds, the document is automatically "updated" to the newest version (this File object performed the last successful write). If the write call fails, the document remains at the current revision and is read-only for the remainder of its lifetime. All subsequent write calls will fail, and the File must be re-opened with the latest version for writes to continue.
+Represents a file stored at a path in the identity of the associated `Storage` object. A file can only represent a single Version at a time, and cannot be changed through the interface directly. All write calls (`Write`, and `Truncate`) use the Version the file represents as the Version for the modification. If the write call succeeds, the document is automatically "updated" to the newest version (this File object performed the last successful write). If the write call fails, the document remains at the current revision and is read-only for the remainder of its lifetime. All subsequent write calls will fail, and the File must be re-opened with the latest version for writes to continue.
 
-If multiple File objects are opened within the same process, they are treated no differently than Files open across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the Files succeeding. All other files become read-only.
+If multiple File objects are opened within the same process, they are treated no differently than Files opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the Files succeeding. All other files become read-only.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback that accepts `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`; return type is void
@@ -153,8 +153,8 @@ class File {
   void set_offset(std::uint64_t);
   
   // Offset is implied through setters above.
-  unspecified Read(boost::asio::buffer, AsyncResult<T>);
-  unspecified Write(boost::asio::buffer, AsyncResult<T>);
-  unspecified Truncate(std::uint64_t, AsyncResult<T>);
+  unspecified Read(boost::asio::buffer, AsyncResult<std::uint64_t>);
+  unspecified Write(boost::asio::buffer, AsyncResult<>);
+  unspecified Truncate(std::uint64_t, AsyncResult<>);
 };
 ```
