@@ -37,7 +37,7 @@ void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
 Since the future only uses exceptions for fatal errors, its usage is quite easy. Calling .get() on the Future<T> will block until the operation completes. The function will only throw in fatal conditions, otherwise retrieval_result will contain the result of the operation or a non-fatal error, but never both.
 
 ## Expected ##
-Every operation in the NFS API (basic or advanced) will provide an `Expected<Operation<T>>` object when complete (see [operation](#operation) section below). If a non-fatal error ocurred during the operation, the Expected object will have an `maidsafe::nfs::Error` object instead of an object of type `T`. If the operation succeeded it will have an object of type `T`, and no `maidsafe::nfs::Error` object. Using this object, instead of exceptions with the `Future<T>` interface, allows for non-fatal errors to be checked in a functional way. 
+Every operation in the NFS API (basic or advanced) will provide an `Expected<Operation<T>>` object when complete (see [operation](#operation) section below). If a non-fatal error ocurred during the operation, the Expected object will have an `Operation<Error>` object instead of an object of type `Operation<T>`. Using the `Expected<T>` object, instead of exceptions with the `Future<T>` interface, allows for non-fatal errors to be checked in a functional way. 
 
 ### Example Expected Usage ###
 ```c++
@@ -50,7 +50,7 @@ void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
   }
   else {
     std::cerr << "Could not retrieve " << path << " : " << 
-                 retrieval_result.error() << std::endl;
+                 retrieval_result.error().result() << std::endl;
   }
 }
 ```
@@ -59,7 +59,7 @@ The object has a conversion to bool operator for use with conditional statements
 Note: the example above used `retrieval_result->result()` instead of `*retrieval_result` because every operation returns an [Expected Operation ](#operation).
 
 ## Operation ##
-Every *successful* operation in the NFS API (basic or advanced) will provide an `Operation<T>` object when complete. The `Operation<T>` contains the most up-to-date `Version` for the File or Directory, and the result of the operation, `T`. If the operation had no type to return, `Operation<>` is returned, and no result is available.
+Every operation (failed and successful) in the NFS API (basic or advanced) will provide an `Operation<T>` object when complete (`Operation<Error>` on error). The `Operation<T>` contains the most up-to-date `Version` for the File or Directory, and the result of the operation, `T`. If the operation had no type to return, `Operation<>` is returned, and no result is available.
 
 ### Example Operation Usage ###
 ```c++
@@ -72,12 +72,12 @@ void PrintFileThenDelete(maidsafe::nfs::Storage& storage, boost::filesystem::pat
     const auto deletion_result = storage.Delete(path, retrieval_result->version()).get();
     if (!deletion_result) {
       std::cerr << "Could not delete " << path << " : " << 
-                   deletion_result.error() << std::endl;
+                   deletion_result.error().result() << std::endl;
     }
   }
   else {
     std::cerr << "Could not retrieve " << path << " : " << 
-                 retrieval_result.error() << std::endl;
+                 retrieval_result.error().result() << std::endl;
   }
 }
 ```
@@ -89,29 +89,72 @@ void PrintFileThenDelete(maidsafe::nfs::Storage& storage, boost::filesystem::pat
 
 ## Classes ##
 ### maidsafe::nfs::Error ###
+Alias for maidsafe::NfsErrors, which is an enum.
+```c++
+enum class Error {
+  timed_out = 0,
+  version_error,
+  insufficient_por,
+  insufficient_space
+};
+```
+
 ### maidsafe::nfs::Version ###
+Currently an alias for StructuredDataVersions::VersionName in common. The user should never have to manipulate this object (except for copying or moving), so no API for this class is listed.
 
 
 ### maidsafe::nfs::Future<T> ###
+A type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually. Extensions in the `boost::future<T>` implementation are **not** guaranteed to be available in future releases, so use at your own risk. Additionally, non-member extension functions are **not** guaranteed to be available in future releases. It is therefore recommended to only use `maidsafe::nfs::Future<T>` as-if it were a C++11 `std::future<T>` object.
 
 
 ### maidsafe::nfs::Expected<T> ###
-Expect object T, but on failure maidsafe::nfs::Error is provided instead.
+A type conforming to the proposed [expected<T>](https://github.com/ptal/std-expected-proposal) interface. All functionality listed in [N4109](http://isocpp.org/blog/2014/07/n4109) can be assumed to be available in future releases.
 
 ### maidsafe::nfs::Operation<T> ###
-All requests to the SAFE network, if successful, will yield an Operation<T> object. Every Operation object will have a version, and a result value (which can be void).
+All requests to the SAFE network will yield an Operation<T> object. Every Operation object will have a version, and a result value (which can be void).
 
 ```c++
 template<typename T = void>
 class Operation {
+ public:
   const Version& version() const;
   const T& result() const; // if T != void
 };
 ```
 
 ### maidsafe::nfs::FutureExpectedOperation<T> ###
-This is an alias for `maidsafe::nfs::Future<maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>>`.
+This is an alias for `maidsafe::nfs::Future<maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>>`. Returned by every function in the basic API (with different `T`), and every function in the advanced API when `maidsafe::nfs::use_future` is provided instead of a callback.
 
 ### maidsafe::nfs::Storage ###
 
+
 ### maidsafe::nfs::File ###
+Represents a file stored at the path given to the `Storage` object. A file can only represent a single Version at a time, and cannot be changed through the interface directly. All write calls (`Write`, and `Truncate`) use the Version the file represents as the Version for the modification. If the write call succeeds, the document is automatically "updated" to the newest version (this File object performed the last successful write). If the write call fails, the document remains at the current revision and is read-only for the remainder of its lifetime. All subsequent write calls will fail, and the File must be re-opened with the latest version for writes to continue.
+
+If multiple File objects are opened within the same process, they are treated no differently than Files open across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the Files succeeding. All other files become read-only.
+
+Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
+- A callback that accepts `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`; return type is void
+- A boost::asio::yield_context object; return type is `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`.
+- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::FutureExpectedOperation<T>`.
+
+```C++
+class File {
+ public:
+  typedef detail::MetaData::TimePoint TimePoint;
+  
+  const Version& version() const;
+  const boost::filesystem::path& name() const; // full-path name
+  std::uint64_t file_size() const;
+  TimePoint creation_time() const;
+  TimePoint write_time() const; // write time of this revision
+  
+  std::uint64_t get_offset() const;
+  void set_offset(std::uint64_t);
+  
+  // Offset is implied through setters above.
+  unspecified Read(boost::asio::buffer, AsyncResult<T>);
+  unspecified Write(boost::asio::buffer, AsyncResult<T>);
+  unspecified Truncate(std::uint64_t, AsyncResult<T>);
+};
+```
