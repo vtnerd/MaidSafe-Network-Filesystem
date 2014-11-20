@@ -37,7 +37,7 @@ void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
 Since the future only uses exceptions for fatal errors, its usage is quite easy. Calling .get() on the Future<T> will block until the operation completes. The function will only throw in fatal conditions, otherwise retrieval_result will contain the result of the operation or a non-fatal error, but never both.
 
 ## Expected ##
-Every operation in the NFS API (basic or advanced) will provide an `Expected<T>` object when complete. If a non-fatal error ocurred during the operation, the Expected object will have an `maidsafe::nfs::Error` object instead of an object of type `T`. If the operation succeeded it will have an object of type `T`, and no `maidsafe::nfs::Error` object. Using this object, instead of exceptions with the `Future<T>` interface, allows for non-fatal errors to be checked in a functional way. 
+Every operation in the NFS API (basic or advanced) will provide an `Expected<Operation<T>>` object when complete (see [operation](#operation) section below). If a non-fatal error ocurred during the operation, the Expected object will have an `maidsafe::nfs::Error` object instead of an object of type `T`. If the operation succeeded it will have an object of type `T`, and no `maidsafe::nfs::Error` object. Using this object, instead of exceptions with the `Future<T>` interface, allows for non-fatal errors to be checked in a functional way. 
 
 ### Example Expected Usage ###
 ```c++
@@ -46,7 +46,7 @@ void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
   const auto retrieval_result = storage.Get(path).get(); 
   if (retrieval_result) {
     std::cout << "Contents of " << path << " : " << 
-                 retrieval_result->value() << std::endl;
+                 retrieval_result->result() << std::endl;
   }
   else {
     std::cerr << "Could not retrieve " << path << " : " << 
@@ -56,9 +56,31 @@ void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
 ```
 The object has a conversion to bool operator for use with conditional statements, and overloads `operator*` and `operator->`. The easiest way to use the object is like a pointer, but advanced users are encouraged to [read information](https://github.com/ptal/std-expected-proposal) about this object being proposed for a future revision of C++.
 
-Note: the example above used `retrieval_result->value()` instead of `*retrieval_result` because every operation returns an [Expected Operation ](#operation).
+Note: the example above used `retrieval_result->result()` instead of `*retrieval_result` because every operation returns an [Expected Operation ](#operation).
 
 ## Operation ##
+Every *successful* operation in the NFS API (basic or advanced) will provide an `Operation<T>` object when complete. The `Operation<T>` contains the most up-to-date `Version` for the File or Directory, and the result of the operation, `T`. If the operation had no type to return, `Operation<>` is returned, and no result is available.
+
+### Example Operation Usage ###
+```c++
+void PrintFileThenDelete(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
+  // get() blocks until operation is complete
+  const auto retrieval_result = storage.Get(path).get(); 
+  if (retrieval_result) {
+    std::cout << "Contents of " << path << " : " << 
+                 retrieval_result->result() << std::endl;
+    const auto deletion_result = storage.Delete(path, retrieval_result->version()).get();
+    if (!deletion_result) {
+      std::cerr << "Could not delete " << path << " : " << 
+                   deletion_result.error() << std::endl;
+    }
+  }
+  else {
+    std::cerr << "Could not retrieve " << path << " : " << 
+                 retrieval_result.error() << std::endl;
+  }
+}
+```
 
 ## Basic API Usage ##
 ### Put ###
