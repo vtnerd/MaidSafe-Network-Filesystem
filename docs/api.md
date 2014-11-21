@@ -129,9 +129,19 @@ This is an alias for `maidsafe::nfs::Future<maidsafe::nfs::Expected<maidsafe::nf
 
 
 ### maidsafe::nfs::File ###
-Represents a file stored at a path in the identity of the associated `Storage` object. A file can only represent a single Version at a time, and cannot be changed through the interface directly. All write calls (`Write`, and `Truncate`) use the Version the file represents as the Version for the modification. If the write call succeeds, the document is automatically "updated" to the newest version (this File object performed the last successful write). If the write call fails, the document remains at the current revision and is read-only for the remainder of its lifetime. All subsequent write calls will fail, and the File must be re-opened with the latest version for writes to continue.
+Represents a file stored at a path in the identity of the associated `Storage` object. A `File` can only represent a single Version at a time, and cannot be changed through the interface directly. All write calls (`Write`, and `Truncate`) use the Version the file represents as the Version for the modification. If the write call succeeds, the `File` is automatically "updated" to the newest version (this File object performed the last successful write). If the write call fails, the `File` remains at the current revision and is read-only for the remainder of its lifetime. All subsequent write calls will fail, and the `File` must be re-opened with the latest version for writes to continue.
 
-If multiple File objects are opened within the same process, they are treated no differently than Files opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the Files succeeding. All other files become read-only.
+Write calls will always post immediately to the `File` object, UNLESS the function throws an exception (which is to be considered a fatal exception). This allows programmers to treat the asynchronous Write events has having occurred, when dealing with the same `File` object. For example, `Create(); Write(10); Write(10); Read(20);` will have a successful read call of 20 even if both Write calls have not completed, because the local File object has the contents of the Writes. This design allows clients to fire multiple events at a File object, and upon failure use the same object for recovery against the most recent version. `File::version()` returns an empty `boost::optional<Version>` if the local File has contents not yet stored to the network because the local modifications have not yet received a Version number from the network.
+
+ -----------------------------------------------------------------------------------------
+| State           |  State after Write Call  | Will Writes Succeed                        |
+ -----------------|--------------------------|--------------------------------------------|
+| Current Version |   Unversioned            | Always                                     |
+| Old Version     |   Unversioned            | Never                                      |
+| Unversioned     |   Unversioned            | Only if previous state was Current Version |
+ -----------------------------------------------------------------------------------------
+
+If multiple `File` objects are opened within the same process, they are treated no differently than `File` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `File` objects succeeding. All other `File` objects become read-only.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback that accepts `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`; return type is void
@@ -143,7 +153,11 @@ class File {
  public:
   typedef detail::MetaData::TimePoint TimePoint;
   
-  const Version& version() const;
+  // If document is modified locally, but not yet stored to
+  // network, empty optional is returned (no _actual_ version
+  // currently exists).
+  boost::optional<Version> version() const;
+
   const boost::filesystem::path& name() const; // full-path name
   std::uint64_t file_size() const;
   TimePoint creation_time() const;
