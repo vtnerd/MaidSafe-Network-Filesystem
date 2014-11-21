@@ -31,7 +31,7 @@ Signalling errors in Futures (whether Boost or std) is done with exceptions. Sin
 void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
   // get() blocks until operation is complete
   const auto retrieval_result = storage.Get(
-      path, maidsafe::nfs::Retrievalversion::Latest()).get(); 
+      path, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
   // ... continued throughout tutorial
 }
 ```
