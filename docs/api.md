@@ -9,7 +9,7 @@ Data on the SAFE network is stored in Files. A File can contain text or binary d
 A Directory is a virtual object containing other Directories or Files, and must contain at least one Directory or File (a Directory must have 1 File or Directory, and can have 0-∞ Files and 0-∞ Directories). Every Directory has a name, which is represented by a string of UTF-8 characters.
 
 ### Path ###
-The SAFE network uses the same concept as Posix filesystems to specify Directories and Files. A Directory or File in the SAFE network is referenced by a string that corresponds to a virtual location on the network. Directories are separated `/` and the group of characters after the last `/` represents the filename. For example: `/file1` references a file named `file1` in the top-level (unnamed root) directory, whereas `/directory1/file1` references a file named `file1` in the directory `directory1`. Despite having the same name, these two files are **not** the same because they are in different directories.
+The SAFE network uses the same concept as Posix filesystems to specify Directories and Files. A Directory or File in the SAFE network is referenced by a string that corresponds to a virtual location on the network. Directories are separated by `/`, and the group of characters after the last `/` represents the filename. For example: `/file1` references a file named `file1` in the top-level (unnamed root) directory, whereas `/directory1/file1` references a file named `file1` in the directory `directory1`. Despite having the same name, these two files are **not** the same because they are in different directories.
 
 Every SAFE identity has its own unique unnamed root. For example `/directory/file1` in the identity representing `user1` is **not** the same file as `/directory/file1` in the identity representing `user2`. This allows users to store data securely and separately from other users on the network. Developers *should* be aware that different SAFE Apps using the same identity can see the files stored by other SAFE Apps. Until otherwise stated, if a user wants to keep files hidden from a specific SAFE App, a different identity will have to be used.
 
@@ -30,7 +30,8 @@ Signalling errors in Futures (whether Boost or std) is done with exceptions. Sin
 ```c++
 void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
   // get() blocks until operation is complete
-  const auto retrieval_result = storage.Get(path).get(); 
+  const auto retrieval_result = storage.Get(
+      path, maidsafe::nfs::Retrievalversion::Latest()).get(); 
   // ... continued throughout tutorial
 }
 ```
@@ -43,7 +44,8 @@ Every operation in the NFS API (basic or advanced) will provide an `Expected<Ope
 ```c++
 void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
   // get() blocks until operation is complete
-  const auto retrieval_result = storage.Get(path).get(); 
+  const auto retrieval_result = storage.Get(
+      path, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
   if (retrieval_result) {
     std::cout << "Contents of " << path << " : " << 
                  retrieval_result->result() << std::endl;
@@ -67,7 +69,8 @@ Every operation (failed and successful) in the NFS API (basic or advanced) will 
 ```c++
 void PrintFileThenDelete(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
   // get() blocks until operation is complete
-  const auto retrieval_result = storage.Get(path).get(); 
+  const auto retrieval_result = storage.Get(
+      path, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
   if (retrieval_result) {
     std::cout << "Contents of " << path << " : " << 
                  retrieval_result->result() << std::endl;
