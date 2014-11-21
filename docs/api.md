@@ -14,7 +14,7 @@ The SAFE network uses the same concept as Posix filesystems to specify Directori
 Every SAFE identity has its own unique unnamed root. For example `/directory/file1` in the identity representing `user1` is **not** the same file as `/directory/file1` in the identity representing `user2`. This allows users to store data securely and separately from other users on the network. Developers *should* be aware that different SAFE Apps using the same identity can see the files stored by other SAFE Apps. Until otherwise stated, if a user wants to keep files hidden from a specific SAFE App, a different identity will have to be used.
 
 #### Network Path Auto-Creation and Deletion ####
-The SAFE API has no functions for creating directories, instead the directories are created as-needed in an `Open` or `Put` call. Directories are also automatically deleted when they contain no files or folders. The Delete function in the API will work with files or directories; in the latter case all child directories and files are removed from the directory and then the directory is removed.
+The SAFE API has no functions for creating directories, instead the directories are created as-needed in a `Create` or `Put` call. Directories are also automatically deleted when they contain no files or folders. The Delete function in the API will work with files or directories; in the latter case all child directories and files are removed from the directory and then the directory is removed.
 
 ## Versioning ##
 Every file and directory in the SAFE network is stored as a revision, so that conflicts between SAFE Apps (or multiple instances of the same SAFE App) can be detected. Every SAFE storage operation that modifies data (file or directory contents) requires a Version object, and the operation will fail if the Version object represents an outdated Version from the one currently on the network. SAFE App developers will be responsible for handling version conflicts, no generic solution exists.
@@ -54,9 +54,11 @@ void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
   }
 }
 ```
-The `Expected<T>` object has a conversion to bool operator for use with conditional statements, and overloads `operator*` and `operator->`. The easiest way to use the object is like a pointer, but advanced users are encouraged to [read information](https://github.com/ptal/std-expected-proposal) about this object being proposed for a future revision of C++.
+- Note: the example above used `retrieval_result->result()` and `retrieval_result.error().result()` because the `Expected` class wraps an [Operation ](#operation) on success or failure.
 
-Note: the example above used `retrieval_result->result()` instead of `*retrieval_result` because every operation returns an [Expected Operation ](#operation).
+The `Expected<T>` object has a conversion to bool operator for use with conditional statements, and overloads `operator*` and `operator->`. The easiest way to use the object is like a pointer, but advanced users are encouraged to [read information](https://github.com/ptal/std-expected-proposal) about this object being proposed for a future revision of C++. The `E` in `expected<T,E>` will **always** be `Operation<Error>`, thus `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>` is shorthand for `expected<maidsafe::nfs::Operation<T>, maidsafe::nfs::Operation<madisafe::nfs::Error>>`. A `Operation<T>` is provided in success or error so the user can grab the latest `Version` of the file.
+
+
 
 ## Operation ##
 Every operation (failed and successful) in the NFS API (basic or advanced) will provide an `Operation<T>` object when complete (`Operation<Error>` on error). The `Operation<T>` contains the most up-to-date `Version` for the File or Directory, and the result of the operation, `T`. If the operation had no type to return, `Operation<>` is returned, and no result is available.
