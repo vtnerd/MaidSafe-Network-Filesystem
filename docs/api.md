@@ -273,6 +273,11 @@ The `Storage` class represents a virtual filesystem on the SAFE network. Constru
 
 The `Put` and `Get` methods will move the std::string to the `Future<T>` upon success. This allows advanced users to re-use buffers (and explains why the `Put` method returns a std::string as a result). The `Get` overload that does not accept a std::string as a parameter will create a new std::string as needed.
 
+Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
+- A callback that accepts `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`; return type is void
+- A boost::asio::yield_context object; return type is `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`.
+- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::FutureExpectedOperation<T>`.
+
 ```c++
 class Storage {
 public:
@@ -300,14 +305,15 @@ public:
   //
   FutureExpectedOperation<std::string> Get(boost::filesystem::path, std::string, RetrieveVersion);
   
-  FutureExpectedOperation<std::shared_ptr<File>> CreateFile(boost::filesystem::path);
-  FutureExpectedOperation<std::shared_ptr<File>> OpenFile(boost::filesystem::path, RetrieveVersion);
+  unspecified CreateFile(boost::filesystem::path, AsyncResult<std::shared_ptr<File>>);
+  unspecified OpenFile(boost::filesystem::path, AsyncResult<std::shared_ptr<File>>);
   
   // The File object can be from a different Storage object,
   // allowing copying between identities
-  FutureExpectedOperation<> Copy(
+  unspecified Copy(
       std::shared_ptr<File> from,
-      boost::filesystem::path to, ModifyVersion);
+      boost::filesystem::path to, ModifyVersion,
+      AsyncResult<>);
 };
 ```
 
