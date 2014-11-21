@@ -187,7 +187,7 @@ int main() {
         "/split_example/part2", put_part2_result->version());
         
     const auto get_part1_result = get_part1.get();
-    const auto get_part2_result = put_part2.get();
+    const auto get_part2_result = get_part2.get();
     
     if (get_part1_result && get_part2_result) {
       std::cout << get_part1_result->result() << get_part2_result->result() << std::endl;
@@ -198,7 +198,7 @@ int main() {
   return EXIT_FAILURE;
 }
 ```
-In this example, both `Put` calls are done in parrallel, and both `Get` calls are done in parrallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call.
+In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call.
 
 ## Advanced Information ##
 ### maidsafe::nfs::Error ###
