@@ -84,12 +84,78 @@ void PrintFileThenDelete(maidsafe::nfs::Storage& storage, boost::filesystem::pat
 }
 ```
 
-## Basic API Usage ##
-### Put ###
-### Get ###
-### Delete ###
+## Basic API ##
+```c++
 
-## Classes ##
+template<typename T>
+using Future = boost::future<T>;
+
+template<typename T>
+using Expected = boost::expected<Operation<T>, Operation<Error>>;
+
+template<typename T>
+using FutureExpectedOperation = Future<Expected<Operation<T>>>
+
+template<typename T = void>
+struct Operation {
+  const Version& version() const;
+  const T& result() const; // iff T != void
+};
+
+struct ModifyVersion {
+  ModifyVersion(Version);
+  static ModifyVersion New();
+};
+
+struct RetrieveVersion {
+  RetrieveVersion(Version);
+  static RetrieveVersion Latest();
+};
+
+class Storage {
+ public:
+  // SAFE network storage under fob
+  template<typename Fob>
+  Storage(const Fob& fob)
+  
+  // Local filesystem test storage
+  Storage(boost::filesystem::path, MaxDiskUsage)
+  
+  FutureExpectedOperation<std::string> Put(boost::filesystem::path, std::string, ModifyVersion);
+  FutureExpectedOperation<std::string> Get(boost::filesystem::path, RetrieveVersion);
+  FutureExpectedOperation<>            Delete(boost::filesystem::path, Version);
+  
+  FutureExpectedOperation<> Copy(
+      boost::filesystem::path from, RetrieveVersion,
+      boost::filesystem::path to, ModifyVersion);
+};
+```
+This isn't as daunting as it looks! Lets go over a quick example, that uses the local filesystem first.
+
+### Local Filesystem Hello World ###
+```c++
+int main() {
+  maidsafe::nfs::Storage test_storage(
+      "/home/user/test_safe_storage", MaxDiskUsage(10485760));
+  
+  const auto put_result = test_storage.Put(
+      "/test_example", "hello world", ModifyVersion::New()).get();
+      
+  if (put_result) {
+    const auto get_result = test_storage.Get("/test_example", put_result->version()).get();
+    if (get_result) {
+      std::cout << get_result->result() << std::endl;
+      return EXIT_SUCCESS;
+    }
+  }
+  return EXIT_FAILURE;
+}
+```
+The `test_storage` object is created with a `boost::filesystem::path` object - meaning writes through this object will be stored at that local path (in 3 encrypted chunks). After running this example, you should see files in the directory given to the constructor of `Storage`. The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and storing a new file. If an existing file exists at `test_storage:/test_example`, then `if (put_result)` will return false because `put_result` contains an error (so after running this program once, all subsequent runs should fail). The `Get` call uses the `Version` returned by the `Put`, guaranteeing that the contents from the original `Put` ("hello world"), are retrieved. Alternatively, `RetrieveVersion::Latest()` could've been used instead, but if another process or thread updated the file, the new contents would be returned, which may not be "hello world" as desired.
+
+The `.get()` calls after the `Put` and `Get` indicate that the process should wait until the SAFE network (in this example, the local filesystem), successfully completes the requested operation. The `Future<T>` object allows a process to make additional requests before prior requests have completed. If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
+
+## Advanced Information ##
 ### maidsafe::nfs::Error ###
 Alias for maidsafe::NfsErrors, which is an enum.
 ```c++
@@ -103,6 +169,12 @@ enum class Error {
 
 ### maidsafe::nfs::Version ###
 Currently an alias for StructuredDataVersions::VersionName in common. The user should never have to manipulate this object (except for copying or moving), so no API for this class is listed.
+
+```c++
+struct Version {
+  static Version Create();
+};
+```
 
 
 ### maidsafe::nfs::Future<T> ###
@@ -131,7 +203,7 @@ This is an alias for `maidsafe::nfs::Future<maidsafe::nfs::Expected<maidsafe::nf
 
 
 ### maidsafe::nfs::File ###
-Represents a file stored at a path in the identity of the associated `Storage` object. Read operations on a `File` are never complete until the `AsyncResult<T>` (discussed below) object provided in the read call is notified. Write operations on a `File` are reflected in the local `File` object immediately, but are not stored on the network until the `AsyncResult<T>` object provided in the write call is notified. If a `File` object has write calls pending network confirmation, the `File` object is in an unversioned state. Once all pending write calls succeed in network storage, the `File` is "updated" to the new version (it is the newest version). If one or more pending write calls fails in network storage, the `File` remains unversioned and can never store data on the network again. Additional write calls *can* be done on an object permanently in the unversioned state, but they will only be reflected locally. The `Copy` methods in the `Storage` class **do** work on `File` objects in the permanently unversioned state, so writing to a failed `File` is not useless. Since `File` objects cannot be downgraded or upgraded in version manually, the `Storage` class will have to be used to retrieve alternate stored versions of the `File`.
+Represents a file stored at a path in the root of the associated `Storage` object. Read operations on a `File` are never complete until the `AsyncResult<T>` (discussed below) object provided in the read call is notified. Write operations on a `File` are reflected in the local `File` object immediately, but are not stored on the network until the `AsyncResult<T>` object provided in the write call is notified. If a `File` object has write calls pending network confirmation, the `File` object is in an unversioned state. Once all pending write calls succeed in network storage, the `File` is "updated" to the new version (it is the newest version). If one or more pending write calls fails in network storage, the `File` remains unversioned and can never store data on the network again. Additional write calls *can* be done on an object permanently in the unversioned state, but they will only be reflected locally. The `Copy` methods in the `Storage` class **do** work on `File` objects in the permanently unversioned state, so writing to a failed `File` is not useless. Since `File` objects cannot be downgraded or upgraded in version manually, the `Storage` class will have to be used to retrieve alternate stored versions of the `File`.
 
  State           |  State after Write Call  | Will Writes Succeed                        
  ----------------|--------------------------|--------------------------------------------
