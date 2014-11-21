@@ -151,9 +151,7 @@ class File {
  public:
   typedef detail::MetaData::TimePoint TimePoint;
   
-  // If document is modified locally, but not yet stored to
-  // network, empty optional is returned (no _actual_ version
-  // currently exists).
+  // Version of File, or unversioned if empty
   boost::optional<Version> version() const;
 
   const boost::filesystem::path& name() const; // full-path name
