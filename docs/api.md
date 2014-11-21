@@ -102,6 +102,13 @@ struct Operation {
   const T& result() const; // iff T != void
 };
 
+enum class Error {
+  timed_out,
+  version_error,
+  insufficient_por,
+  insufficient_space
+};
+
 struct ModifyVersion {
   ModifyVersion(Version);
   static ModifyVersion New();
