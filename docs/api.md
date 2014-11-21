@@ -129,19 +129,17 @@ This is an alias for `maidsafe::nfs::Future<maidsafe::nfs::Expected<maidsafe::nf
 
 
 ### maidsafe::nfs::File ###
-Represents a file stored at a path in the identity of the associated `Storage` object. A `File` can only represent a single Version at a time, and cannot be changed through the interface directly. All write calls (`Write`, and `Truncate`) use the Version the file represents as the Version for the modification. If the write call succeeds, the `File` is automatically "updated" to the newest version (this File object performed the last successful write). If the write call fails, the `File` remains at the current revision and is read-only for the remainder of its lifetime. All subsequent write calls will fail, and the `File` must be re-opened with the latest version for writes to continue.
+Represents a file stored at a path in the identity of the associated `Storage` object. Read operations on a `File` are never complete until the `AsyncResult<T>` (discussed below) object provided in the read call is notified. Write operations on a `File` are reflected in the local `File` object immediately, but are not stored on the network until the `AsyncResult<T>` object provided in the write call is notified. If a `File` object has write calls pending network confirmation, the `File` object is in an unversioned state. Once all pending write calls succeed in network storage, the `File` is "updated" to the new version (it is the newest version). If one or more pending write calls fails in network storage, the `File` remains unversioned and can never store data on the network again. Additional write calls *can* be done on an object permanently in the unversioned state, but they will only be reflected locally. The `Copy` methods in the `Storage` class **do** work on `File` objects in the permanently unversioned state, so writing to a failed `File` is not useless. Since `File` objects cannot be downgraded or upgraded in version manually, the `Storage` class will have to be used to retrieve alternate stored versions of the `File`.
 
-Write calls will always post immediately to the `File` object, UNLESS the function throws an exception (which is to be considered a fatal exception). This allows programmers to treat the asynchronous Write events has having occurred, when dealing with the same `File` object. For example, `Create(); Write(10); Write(10); Read(20);` will have a successful read call of 20 even if both Write calls have not completed, because the local File object has the contents of the Writes. This design allows clients to fire multiple events at a File object, and upon failure use the same object for recovery against the most recent version. `File::version()` returns an empty `boost::optional<Version>` if the local File has contents not yet stored to the network because the local modifications have not yet received a Version number from the network.
-
- -----------------------------------------------------------------------------------------
-| State           |  State after Write Call  | Will Writes Succeed                        |
- -----------------|--------------------------|--------------------------------------------|
-| Current Version |   Unversioned            | Always                                     |
-| Old Version     |   Unversioned            | Never                                      |
-| Unversioned     |   Unversioned            | Only if previous state was Current Version |
- -----------------------------------------------------------------------------------------
-
-If multiple `File` objects are opened within the same process, they are treated no differently than `File` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `File` objects succeeding. All other `File` objects become read-only.
+ State           |  State after Write Call  | Will Writes Succeed                        
+ ----------------|--------------------------|--------------------------------------------
+ Current Version |   Unversioned            | Always
+ Old Version     |   Unversioned            | Never
+ Unversioned     |   Unversioned            | Only if previous state was Current Version
+ 
+Since write operations are reflected immediately in the local `File` object, users do not have to wait for the previous operation to complete to make additional read or write calls. Internally, the class will automatically group writes together if possible, and will otherwise wait if some writes are in-progress. Since subsequent writes fail, a user can use the overloads that do not take an `AsyncResult<T>` object (no notification of network storage) on all but the last write. The last `AsyncResult<T>` will indicate whether all previous writes are successfully stored on the network. However, this style of implementation loses some granular error reporting; writes after the first failure will return a more generic error code.
+ 
+If multiple `File` objects are opened within the same process, they are treated no differently than `File` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `File` objects successfully writing to the network. All other `File` objects become permanently unversioned.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback that accepts `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`; return type is void
@@ -170,5 +168,8 @@ class File {
   unspecified Read(boost::asio::buffer, AsyncResult<std::uint64_t>);
   unspecified Write(boost::asio::buffer, AsyncResult<>);
   unspecified Truncate(std::uint64_t, AsyncResult<>);
+  
+  void Write(boost::asio::buffer);
+  void Truncate(std::uint64_t);
 };
 ```
