@@ -98,6 +98,7 @@ using FutureExpectedOperation = Future<Expected<Operation<T>>>
 
 template<typename T = void>
 struct Operation {
+  const boost::filesytem::path& path() const;
   const Version& version() const;
   const T& result() const; // iff T != void
 };
@@ -146,10 +147,10 @@ int main() {
       "/home/user/test_safe_storage", MaxDiskUsage(10485760));
   
   const auto put_result = test_storage.Put(
-      "/test_example", "hello world", ModifyVersion::New()).get();
+      "/simple_example", "hello world", maidsafe::nfs::ModifyVersion::New()).get();
       
   if (put_result) {
-    const auto get_result = test_storage.Get("/test_example", put_result->version()).get();
+    const auto get_result = test_storage.Get("/simple_example", put_result->version()).get();
     if (get_result) {
       std::cout << get_result->result() << std::endl;
       return EXIT_SUCCESS;
@@ -161,6 +162,70 @@ int main() {
 The `test_storage` object is created with a `boost::filesystem::path` object - meaning writes through this object will be stored at that local path (in 3 encrypted chunks). After running this example, you should see files in the directory given to the constructor of `Storage`. The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and storing a new file. If an existing file exists at `test_storage:/test_example`, then `if (put_result)` will return false because `put_result` contains an error (so after running this program once, all subsequent runs should fail). The `Get` call uses the `Version` returned by the `Put`, guaranteeing that the contents from the original `Put` ("hello world"), are retrieved. Alternatively, `RetrieveVersion::Latest()` could've been used instead, but if another process or thread updated the file, the new contents would be returned, which may not be "hello world" as desired.
 
 The `.get()` calls after the `Put` and `Get` indicate that the process should wait until the SAFE network (in this example, the local filesystem), successfully completes the requested operation. The `Future<T>` object allows a process to make additional requests before prior requests have completed. If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
+
+### Local Filesystem Hello World Concatenation ###
+```c++
+int main() {
+  maidsafe::nfs::Storage test_storage(
+      "/home/user/test_safe_storage", MaxDiskUsage(10485760));
+      
+  const auto put_part1 = test_storage.Put(
+      "/split_example/part1", "hello ", maidsafe::nfs::ModifyVersion::New());
+  const auto put_part2 = test_storage.Put(
+      "/split_example/part2", "world", maidsafe::nfs::ModifyVersion::New());
+      
+  const auto put_part1_result = put_part1.get();
+  const auto put_part2_result = put_part2.get();
+  
+  if (put_part1_result && put_part2_result) {
+    const auto get_part1 = test_storage.Get(
+        "/split_example/part1", put_part1_result->version());
+    const auto get_part2 = test_storage.Get(
+        "/split_example/part2", put_part2_result->version());
+        
+    const auto get_part1_result = get_part1.get();
+    const auto get_part2_result = put_part2.get();
+    
+    if (get_part1_result && get_part2_result) {
+      std::cout << get_part1_result->result() << get_part2_result->result() << std::endl;
+      return EXIT_SUCCESS;
+    }
+  }
+
+  return EXIT_FAILURE;
+}
+```
+In this example, both `Put` calls are done in parrallel, and both `Get` calls are done in parrallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call. Extensions in the `boost::future` interface allow for quicker processing:
+
+```c++
+int main() {
+  maidsafe::nfs::Storage test_storage(
+      "/home/user/test_safe_storage", MaxDiskUsage(10485760));
+
+  const auto retrieve_part = [&test_storage] (FutureExpectedOperation<std::string> put) {
+    put.get().then([](const Operation<std::string>& result) {
+      return test_storage.Get(result->path(), result->version()).then(
+          [](FutureExpectedOperation<std::string> get) {
+        return get.get();  
+      });
+    });
+  };
+  
+  const auto part1 = test_storage.Put(
+      "/split_example/part1", "hello ", maidsafe::nfs::ModifyVersion::New()).then(retrieve_part);
+  const auto part2 = test_storage.Put(
+      "/split_example/part2", "world", maidsafe::nfs::ModifyVersion::New()).then(retrieve_part);
+    
+    if (part1 && part2) {
+      std::cout << part1->result() << part2->result() << std::endl;
+      return EXIT_SUCCESS;
+    }
+  }
+
+  return EXIT_FAILURE;
+}
+```
+- The above probably doesn't compile, WIP!
 
 ## Advanced Information ##
 ### maidsafe::nfs::Error ###
