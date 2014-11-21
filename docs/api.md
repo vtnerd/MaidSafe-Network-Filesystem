@@ -195,37 +195,7 @@ int main() {
   return EXIT_FAILURE;
 }
 ```
-In this example, both `Put` calls are done in parrallel, and both `Get` calls are done in parrallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call. Extensions in the `boost::future` interface allow for quicker processing:
-
-```c++
-int main() {
-  maidsafe::nfs::Storage test_storage(
-      "/home/user/test_safe_storage", MaxDiskUsage(10485760));
-
-  const auto retrieve_part = [&test_storage] (FutureExpectedOperation<std::string> put) {
-    put.get().then([](const Operation<std::string>& result) {
-      return test_storage.Get(result->path(), result->version()).then(
-          [](FutureExpectedOperation<std::string> get) {
-        return get.get();  
-      });
-    });
-  };
-  
-  const auto part1 = test_storage.Put(
-      "/split_example/part1", "hello ", maidsafe::nfs::ModifyVersion::New()).then(retrieve_part);
-  const auto part2 = test_storage.Put(
-      "/split_example/part2", "world", maidsafe::nfs::ModifyVersion::New()).then(retrieve_part);
-    
-    if (part1 && part2) {
-      std::cout << part1->result() << part2->result() << std::endl;
-      return EXIT_SUCCESS;
-    }
-  }
-
-  return EXIT_FAILURE;
-}
-```
-- The above probably doesn't compile, WIP!
+In this example, both `Put` calls are done in parrallel, and both `Get` calls are done in parrallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call.
 
 ## Advanced Information ##
 ### maidsafe::nfs::Error ###
@@ -242,12 +212,33 @@ enum class Error {
 ### maidsafe::nfs::Version ###
 Currently an alias for StructuredDataVersions::VersionName in common. The user should never have to manipulate this object (except for copying or moving), so no API for this class is listed.
 
+### maidsafe::nfs::RetrieveVersion ###
+A Version that has a special state to indicate latest version. Allows `Get`, `Copy`, or `Open` calls to retrieve a specific version, or just the newest one.
+
 ```c++
-struct Version {
-  static Version Create();
+class RetrieveVersion {
+ public:
+  static RetrieveVersion Latest();
+  RetrieveVersion(Version);
+  
+  bool is_latest() const; // True if constructed with Latest();
+  const Version& version() const; // throw if is_latest();
 };
 ```
 
+### maidsafe::nfs::ModifyVersion ###
+A Version that has a special state to indicate initial version. Allows `Put`, or `Copy` calls to overwrite a specific version, or create a new one.
+
+```c++
+class ModifyVersion {
+ public:
+  static ModifyVersion New();
+  ModifyVersion(Version);
+  
+  bool is_new() const; // True if constructed with New();
+  const Version& version() const; // throw if is_new();
+};
+```
 
 ### maidsafe::nfs::Future<T> ###
 A type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually. Extensions in the `boost::future<T>` implementation are **not** guaranteed to be available in future releases, so use at your own risk. Additionally, non-member extension functions are **not** guaranteed to be available in future releases. It is therefore recommended to only use `maidsafe::nfs::Future<T>` as-if it were a C++11 `std::future<T>` object.
@@ -257,14 +248,20 @@ A type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/fu
 A type conforming to the proposed [expected<T>](https://github.com/ptal/std-expected-proposal) interface. All functionality listed in [N4109](http://isocpp.org/blog/2014/07/n4109) can be assumed to be available in future releases.
 
 ### maidsafe::nfs::Operation<T> ###
-All requests to the SAFE network will yield an Operation<T> object. Every Operation object will have a version, and a result value (which can be void).
+All requests to the SAFE network will yield an Operation<T> object. Every Operation object will have a path, version, and a result value (which can be void).
 
 ```c++
 template<typename T = void>
 class Operation {
  public:
-  const Version& version() const;
-  const T& result() const; // if T != void
+  const boost::filesystem::path& path() & const;
+  boost::filesystem::path path() &&;
+  
+  const Version& version() & const;
+  Version version() &&;
+  
+  const T& result() & const; // if T != void
+  T result() &&; // if T != void
 };
 ```
 
@@ -272,7 +269,47 @@ class Operation {
 This is an alias for `maidsafe::nfs::Future<maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>>`. Returned by every function in the basic API, and every function in the advanced API when `maidsafe::nfs::use_future` is provided instead of a callback.
 
 ### maidsafe::nfs::Storage ###
+The `Storage` class represents a virtual filesystem on the SAFE network. Construction of a `Storage` object requires a FOB object for identifying an identity on the network. There is an additional constructor for test purposes only - it takes a local filesystem path for storing data. A Storage object constructed in that mode will never store data on the SAFE network.
 
+The `Put` and `Get` methods will move the std::string to the `Future<T>` upon success. This allows advanced users to re-use buffers (and explains why the `Put` method returns a std::string as a result). The `Get` overload that does not accept a std::string as a parameter will create a new std::string as needed.
+
+```c++
+class Storage {
+public:
+  //
+  // Basic API
+  //
+
+  // SAFE network storage under fob
+  template<typename Fob>
+  Storage(const Fob& fob)
+  
+  // Local filesystem test storage
+  Storage(boost::filesystem::path, MaxDiskUsage)
+  
+  FutureExpectedOperation<std::string> Put(boost::filesystem::path, std::string, ModifyVersion);
+  FutureExpectedOperation<std::string> Get(boost::filesystem::path, RetrieveVersion);
+  FutureExpectedOperation<>            Delete(boost::filesystem::path, Version);
+  
+  FutureExpectedOperation<> Copy(
+      boost::filesystem::path from, RetrieveVersion,
+      boost::filesystem::path to, ModifyVersion);
+      
+  //
+  // Advanced API
+  //
+  FutureExpectedOperation<std::string> Get(boost::filesystem::path, std::string, RetrieveVersion);
+  
+  FutureExpectedOperation<std::shared_ptr<File>> CreateFile(boost::filesystem::path);
+  FutureExpectedOperation<std::shared_ptr<File>> OpenFile(boost::filesystem::path, RetrieveVersion);
+  
+  // The File object can be from a different Storage object,
+  // allowing copying between identities
+  FutureExpectedOperation<> Copy(
+      std::shared_ptr<File> from,
+      boost::filesystem::path to, ModifyVersion);
+};
+```
 
 ### maidsafe::nfs::File ###
 Represents a file stored at a path in the root of the associated `Storage` object. Read operations on a `File` are never complete until the `AsyncResult<T>` (discussed below) object provided in the read call is notified. Write operations on a `File` are reflected in the local `File` object immediately, but are not stored on the network until the `AsyncResult<T>` object provided in the write call is notified. If a `File` object has write calls pending network confirmation, the `File` object is in an unversioned state. Once all pending write calls succeed in network storage, the `File` is "updated" to the new version (it is the newest version). If one or more pending write calls fails in network storage, the `File` remains unversioned and can never store data on the network again. Additional write calls *can* be done on an object permanently in the unversioned state, but they will only be reflected locally. The `Copy` methods in the `Storage` class **do** work on `File` objects in the permanently unversioned state, so writing to a failed `File` is not useless. Since `File` objects cannot be downgraded or upgraded in version manually, the `Storage` class will have to be used to retrieve alternate stored versions of the `File`.
