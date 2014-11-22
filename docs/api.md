@@ -127,10 +127,10 @@ class Storage {
  public:
   // SAFE network storage under fob
   template<typename Fob>
-  Storage(const Fob& fob)
+  explicit Storage(const Fob& fob)
   
   // Local filesystem test storage
-  Storage(boost::filesystem::path, MaxDiskUsage)
+  explicit Storage(boost::filesystem::path, MaxDiskUsage)
   
   FutureExpectedOperation<std::string> Put(boost::filesystem::path, std::string, ModifyVersion);
   FutureExpectedOperation<std::string> Get(boost::filesystem::path, RetrieveVersion);
@@ -290,10 +290,10 @@ public:
 
   // SAFE network storage under fob
   template<typename Fob>
-  Storage(const Fob& fob)
+  explicit Storage(const Fob& fob)
   
   // Local filesystem test storage
-  Storage(boost::filesystem::path, MaxDiskUsage)
+  explicit Storage(boost::filesystem::path, MaxDiskUsage)
   
   FutureExpectedOperation<std::string> Put(boost::filesystem::path, std::string, ModifyVersion);
   FutureExpectedOperation<std::string> Get(boost::filesystem::path, RetrieveVersion);
