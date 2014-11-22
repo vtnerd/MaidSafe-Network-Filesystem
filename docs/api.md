@@ -24,7 +24,7 @@ Every operation (both modification and read-only operations), will return a Vers
 ## Futures ##
 Every function in the basic API returns a `Future<T>` to some type `T` (the advanced API has a few more options). While this may seem antithetical to the ease-of-use approach, it more accurately represents the behavior of the API functions. For example, typical write calls to the local filesystem are generally not written to the underlying hard-disk when the function returns, and instead are cached at various levels. The client has to make additional function calls to ensure that data reaches disk, and if a disk write fails - which write calls made it to disk? The SAFE API returning a `Future<T>` therefore better represents the behavior - the function stored the necessary information to complete the operation at some later point in time, and the `Future<T>` object will notify the client when that operation completed. In the SAFE API, clients can assume that a requested operation has completed to the SAFE network when the value T can be retrieved from the `Future<T>`.
 
-Signalling errors in Futures (whether Boost or std) is done with exceptions. Since SAFE network will have a high probability of failure (lack of storage space for user, version error, etc.), the SAFE API will only use the exceptions in the futures for *fatal errors*. Fatal errors can (but are not limited to), out-of-memory issues when trying to set the future value, a Future that can never be set due to an internal bug (broken promise). Instead, the SAFE API will return an object that contains the result of the operation or a non-fatal error, but never both (see [Expected](#expected)). Separating between fatal and non-fatal errors allows clients of the SAFE API to choose whether they want to use exceptions for common errors (unlikely), or throw exceptions.
+Signalling errors in Futures (whether Boost or std) is done with exceptions. Since SAFE network will have a high probability of failure (lack of storage space for user, version error, etc.), the SAFE API will indicate network failures in the `Expected<T>` object (see [Expected](#expected)). System/programming errors (out-of-memory, broken promise) will use the exceptions feature in the `Future<T>`. Signalling network errors in the `Expected<T>` means clients of the API can safely assume that exceptions in the API are a rare event (most can assume that an exception is a fatal event that should stop the process).
 
 ### Example Future Usage ###
 ```c++
@@ -261,10 +261,10 @@ class Operation {
   boost::filesystem::path path() &&;
   
   const Version& version() & const;
-  Version version() &&;
+  Version&& version() &&;
   
   const T& result() & const; // if T != void
-  T result() &&; // if T != void
+  T&& result() &&; // if T != void
 };
 ```
 
