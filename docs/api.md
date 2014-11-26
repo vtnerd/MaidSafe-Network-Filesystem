@@ -2,24 +2,34 @@
 The Maidsafe API strives to be easy to use, consistent, and flexible for advanced users requiring performance. Some of the design choices may seem to oppose the ease of use goal, so the rational behind their use is discussed.
 
 ## Storage Abstractions ##
-### File ###
-Data on the SAFE network is stored in Files. A File can contain text or binary data, and the SAFE network has no upward limit on File size. However, local system contraints may apply to maximum File size. Every File also has a name, which is represented by a string of UTF-8 characters.
+### Blobs ###
+Data on the SAFE network is stored in `Blob`s. A `Blob` can contain text or binary data, and the SAFE network has no upward limit on size. However, local system contraints may apply to maximum size. Each Blob is immutable, once it is stored it cannot be modified. `Blob`s are stored in a versioned structure, `Container`, so the appearance of mutability can be achieved (new versions).
 
-### Directory ###
-A Directory is a virtual object containing other Directories or Files, and must contain at least one Directory or File (a Directory must have 1 File or Directory, and can have 0-∞ Files and 0-∞ Directories). Every Directory has a name, which is represented by a string of UTF-8 characters.
+### Container ###
+A `Container` stores `Blobs` or a pointer to another `Container`, at keys that uniquely identify the object. The key has no restrictions (any sequence of bytes are valid). The value stored at each key is versioned, so past `Blob`s or `Container` pointers can be retrieved. Most users should **not** use nested `Container`ers, see [nested containers](#nested-containers-and-blob-forks). The API prevents cycles or self-referential `Container`s.
 
-### Path ###
-The SAFE network uses the same concept as Posix filesystems to specify Directories and Files. A Directory or File in the SAFE network is referenced by a string that corresponds to a virtual location on the network. Directories are separated by `/`, and the group of characters after the last `/` represents the filename. For example: `/file1` references a file named `file1` in the top-level (unnamed root) directory, whereas `/directory1/file1` references a file named `file1` in the directory `directory1`. Despite having the same name, these two files are **not** the same because they are in different directories.
+#### Root-Level Container ####
+The top-most `Container`ers are stored in a special object that does not store `Blob`s. This special object is versioned, so the history of `Container` pointers at the top-most level can be reviewed.
 
-Every SAFE identity has its own unique unnamed root. For example `/directory/file1` in the identity representing `user1` is **not** the same file as `/directory/file1` in the identity representing `user2`. This allows users to store data securely and separately from other users on the network. Developers *should* be aware that different SAFE Apps using the same identity can see the files stored by other SAFE Apps. Until otherwise stated, if a user wants to keep files hidden from a specific SAFE App, a different identity will have to be used.
+#### Nested Containers and Blob Forks ####
+Nested `Container` objects are only recommended for advanced users. A `Container` pointer can be deleted, and then a new `Container` pointer with the same key can be created. If an application is treating a `Container` like a directory, this can give the appearance of a "forked" Blob. For example, given the sequence:
 
-#### Network Path Auto-Creation and Deletion ####
-The SAFE API has no functions for creating directories, instead the directories are created as-needed in a `Create` or `Put` call. Directories are also automatically deleted when they contain no files or folders. The Delete function in the API will work with files or directories; in the latter case all child directories and files are removed from the directory and then the directory is removed.
+```
+CREATE TOP-MOST "example" -> CONTAINER(1)
+STORE ["dir1"->CONTAINER(2)] in CONTAINER(1)
+STORE ["file1"->"BLAH"] in CONTAINER(2)
+STORE ["dir1"->CONTAINER(3)] in CONTAINER(1)
+STORE [file1"->"NO_BLAH"] in CONTAINER(3)
+```
+An application could write to CONTAINER(2)["file1"] and not be aware that CONTAINER(1) no longer pointed to CONTAINER(2). If an application were to treat this like a directory structure, it would not be aware of the "fork" consequences. In other words, CONTAINER(1) has two pointers for "dir1" in its versioned history, so clients can see two different histories for "dir1"/"file1". Thus, containers shall not be treated like directories.
+
+#### Container Keys != Filesystem Paths ####
+Containers are nested, but they cannot be used like paths. You cannot open "/container1/container2/document"; a "/" character has no special meaning in a `Container` key. This is intentional, [nested containers are complicated](#nested-containers-and-blob-forks), and should generally be avoided.
 
 ## Versioning ##
-Every file and directory in the SAFE network is stored as a revision, so that conflicts between SAFE Apps (or multiple instances of the same SAFE App) can be detected. Every SAFE storage operation that modifies data (file or directory contents) requires a Version object, and the operation will fail if the Version object represents an outdated Version from the one currently on the network. SAFE App developers will be responsible for handling version conflicts, no generic solution exists.
+Every key in a `Container` is stored as a revision, so that conflicts between SAFE Apps (or multiple instances of the same SAFE App) can be detected. Every SAFE storage operation that modifies the contents stored at a key requires a `Version` object, and the operation will fail if the `Version` object represents an outdated `Version` from the one currently stored in the `Container`. SAFE App developers will be responsible for handling version conflicts, no generic solution exists.
 
-Every operation (both modification and read-only operations), will return a Version object which will be the most-up-to-date version known to the SAFE API.
+Every operation will return a `Version` object which will be the most-up-to-date version known to the SAFE API.
 
 ## Futures ##
 Every function in the basic API returns a `Future<T>` to some type `T` (the advanced API has a few more options). While this may seem antithetical to the ease-of-use approach, it more accurately represents the behavior of the API functions. For example, typical write calls to the local filesystem are generally not written to the underlying hard-disk when the function returns, and instead are cached at various levels. The client has to make additional function calls to ensure that data reaches disk, and if a disk write fails - which write calls made it to disk? The SAFE API returning a `Future<T>` therefore better represents the behavior - the function stored the necessary information to complete the operation at some later point in time, and the `Future<T>` object will notify the client when that operation completed. In the SAFE API, clients can assume that a requested operation has completed to the SAFE network when the value T can be retrieved from the `Future<T>`.
@@ -28,10 +38,10 @@ Signalling errors in Futures (whether Boost or std) is done with exceptions. Sin
 
 ### Example Future Usage ###
 ```c++
-void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
+void PrintFile(maidsafe::nfs::Container& container, std::string key) {
   // get() blocks until operation is complete
   const auto retrieval_result = storage.Get(
-      path, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
+      key, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
   // ... continued throughout tutorial
 }
 ```
@@ -42,16 +52,16 @@ Every operation in the NFS API (basic or advanced) will provide an `Expected<Ope
 
 ### Example Expected Usage ###
 ```c++
-void PrintFile(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
+void PrintFile(maidsafe::nfs::Container& container, std::string key) {
   // get() blocks until operation is complete
-  const auto retrieval_result = storage.Get(
-      path, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
+  const auto retrieval_result = container.Get(
+      key, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
   if (retrieval_result) {
-    std::cout << "Contents of " << path << " : " << 
+    std::cout << "Contents of " << key << " : " << 
                  retrieval_result->result() << std::endl;
   }
   else {
-    std::cerr << "Could not retrieve " << path << " : " << 
+    std::cerr << "Could not retrieve " << key << " : " << 
                  retrieval_result.error().result() << std::endl;
   }
 }
@@ -63,25 +73,25 @@ The `Expected<T>` object has a conversion to bool operator for use with conditio
 
 
 ## Operation ##
-Every operation (failed and successful) in the NFS API (basic or advanced) will provide an `Operation<T>` object when complete (`Operation<Error>` on error). The `Operation<T>` contains the most up-to-date `Version` for the File or Directory, and the result of the operation, `T`. If the operation had no type to return, `Operation<>` is returned, and no result is available.
+Every operation (failed and successful) in the NFS API (basic or advanced) will provide an `Operation<T>` object when complete (`Operation<Error>` on error). The `Operation<T>` contains the key for the operation, the most up-to-date `Version` for the `Container` key, and the result of the operation, `T`. If the operation had no type to return, `Operation<>` is returned, and no result is available.
 
 ### Example Operation Usage ###
 ```c++
-void PrintFileThenDelete(maidsafe::nfs::Storage& storage, boost::filesystem::path path) {
+void PrintFileThenDelete(maidsafe::nfs::Container& container, std::string key) {
   // get() blocks until operation is complete
-  const auto retrieval_result = storage.Get(
-      path, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
+  const auto retrieval_result = container.Get(
+      key, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
   if (retrieval_result) {
-    std::cout << "Contents of " << path << " : " << 
+    std::cout << "Contents of " << key << " : " << 
                  retrieval_result->result() << std::endl;
-    const auto deletion_result = storage.Delete(path, retrieval_result->version()).get();
+    const auto deletion_result = container.Delete(key, retrieval_result->version()).get();
     if (!deletion_result) {
-      std::cerr << "Could not delete " << path << " : " << 
+      std::cerr << "Could not delete " << key << " : " << 
                    deletion_result.error().result() << std::endl;
     }
   }
   else {
-    std::cerr << "Could not retrieve " << path << " : " << 
+    std::cerr << "Could not retrieve " << key << " : " << 
                  retrieval_result.error().result() << std::endl;
   }
 }
@@ -94,23 +104,17 @@ template<typename T>
 using Future = boost::future<T>;
 
 template<typename T>
-using Expected = boost::expected<Operation<T>, Operation<Error>>;
+using Expected = boost::expected<Operation<T>, Operation<std::error_code>>;
 
 template<typename T>
 using FutureExpectedOperation = Future<Expected<Operation<T>>>
 
 template<typename T = void>
 struct Operation {
-  const boost::filesytem::path& path() const;
+  std::shared_ptr<Container> container() const;
+  const std::string& key() const;
   const Version& version() const;
   const T& result() const; // iff T != void
-};
-
-enum class Error {
-  timed_out,
-  version_error,
-  insufficient_por,
-  insufficient_space
 };
 
 struct ModifyVersion {
@@ -123,22 +127,21 @@ struct RetrieveVersion {
   static RetrieveVersion Latest();
 };
 
-class Storage {
+class Container {
  public:
   // SAFE network storage under fob
   template<typename Fob>
-  explicit Storage(const Fob& fob)
+  explicit Container(const Fob& fob)
   
   // Local filesystem test storage
-  explicit Storage(boost::filesystem::path, MaxDiskUsage)
+  explicit Container(boost::filesystem::path, MaxDiskUsage);
   
-  FutureExpectedOperation<std::string> Put(boost::filesystem::path, std::string, ModifyVersion);
-  FutureExpectedOperation<std::string> Get(boost::filesystem::path, RetrieveVersion);
-  FutureExpectedOperation<>            Delete(boost::filesystem::path, Version);
+  FutureExpectedOperation<std::string> Put(std::string key, std::string, ModifyVersion);
+  FutureExpectedOperation<std::string> Get(std::string key, RetrieveVersion);
+  FutureExpectedOperation<>            Delete(std::string key, Version);
   
   FutureExpectedOperation<> Copy(
-      boost::filesystem::path from, RetrieveVersion,
-      boost::filesystem::path to, ModifyVersion);
+      std::string from, RetrieveVersion, std::string to, ModifyVersion);
 };
 ```
 This isn't as daunting as it looks! Lets go over a quick example, that uses the local filesystem first.
@@ -146,14 +149,14 @@ This isn't as daunting as it looks! Lets go over a quick example, that uses the 
 ### Local Filesystem Hello World ###
 ```c++
 int main() {
-  maidsafe::nfs::Storage test_storage(
+  maidsafe::nfs::Container test_storage(
       "/home/user/test_safe_storage", MaxDiskUsage(10485760));
   
   const auto put_result = test_storage.Put(
       "/simple_example", "hello world", maidsafe::nfs::ModifyVersion::New()).get();
       
   if (put_result) {
-    const auto get_result = test_storage.Get("/simple_example", put_result->version()).get();
+    const auto get_result = test_storage.Get("simple_example", put_result->version()).get();
     if (get_result) {
       std::cout << get_result->result() << std::endl;
       return EXIT_SUCCESS;
@@ -162,29 +165,29 @@ int main() {
   return EXIT_FAILURE;
 }
 ```
-The `test_storage` object is created with a `boost::filesystem::path` object - meaning writes through this object will be stored at that local path (in 3 encrypted chunks). After running this example, you should see files in the directory given to the constructor of `Storage`. The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and storing a new file. If an existing file exists at `test_storage:/test_example`, then `if (put_result)` will return false because `put_result` contains an error (so after running this program once, all subsequent runs should fail). The `Get` call uses the `Version` returned by the `Put`, guaranteeing that the contents from the original `Put` ("hello world"), are retrieved. Alternatively, `RetrieveVersion::Latest()` could've been used instead, but if another process or thread updated the file, the new contents would be returned, which may not be "hello world" as desired.
+The `test_storage` object is created with a `boost::filesystem::path` object - meaning writes through this object will be stored at that local path (in 3 encrypted chunks). After running this example, you should see files in the directory given to the constructor of `Container`. The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and storing a new file. If an existing file exists at `test_storage:/test_example`, then `if (put_result)` will return false because `put_result` contains an error (so after running this program once, all subsequent runs should fail). The `Get` call uses the `Version` returned by the `Put`, guaranteeing that the contents from the original `Put` ("hello world"), are retrieved. Alternatively, `RetrieveVersion::Latest()` could've been used instead, but if another process or thread updated the file, the new contents would be returned, which may not be "hello world" as desired.
 
 The `.get()` calls after the `Put` and `Get` indicate that the process should wait until the SAFE network (in this example, the local filesystem), successfully completes the requested operation. The `Future<T>` object allows a process to make additional requests before prior requests have completed. If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
 
 ### Local Filesystem Hello World Concatenation ###
 ```c++
 int main() {
-  maidsafe::nfs::Storage test_storage(
+  maidsafe::nfs::Container test_storage(
       "/home/user/test_safe_storage", MaxDiskUsage(10485760));
       
   const auto put_part1 = test_storage.Put(
-      "/split_example/part1", "hello ", maidsafe::nfs::ModifyVersion::New());
+      "split_example/part1", "hello ", maidsafe::nfs::ModifyVersion::New());
   const auto put_part2 = test_storage.Put(
-      "/split_example/part2", "world", maidsafe::nfs::ModifyVersion::New());
+      "split_example/part2", "world", maidsafe::nfs::ModifyVersion::New());
       
   const auto put_part1_result = put_part1.get();
   const auto put_part2_result = put_part2.get();
   
   if (put_part1_result && put_part2_result) {
     const auto get_part1 = test_storage.Get(
-        "/split_example/part1", put_part1_result->version());
+        "split_example/part1", put_part1_result->version());
     const auto get_part2 = test_storage.Get(
-        "/split_example/part2", put_part2_result->version());
+        "split_example/part2", put_part2_result->version());
         
     const auto get_part1_result = get_part1.get();
     const auto get_part2_result = get_part2.get();
@@ -198,20 +201,9 @@ int main() {
   return EXIT_FAILURE;
 }
 ```
-In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call.
+In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the "test_storage" `Container`, under the keys "split_example/part1" and "split_example/part2".
 
 ## Advanced Information ##
-### maidsafe::nfs::Error ###
-Alias for maidsafe::NfsErrors, which is an enum.
-```c++
-enum class Error {
-  timed_out,
-  version_error,
-  insufficient_por,
-  insufficient_space
-};
-```
-
 ### maidsafe::nfs::Version ###
 Currently an alias for StructuredDataVersions::VersionName in common. The user should never have to manipulate this object (except for copying or moving), so no API for this class is listed.
 
@@ -257,8 +249,10 @@ All requests to the SAFE network will yield an Operation<T> object. Every Operat
 template<typename T = void>
 class Operation {
  public:
-  const boost::filesystem::path& path() & const;
-  boost::filesystem::path path() &&;
+  std::shared_ptr<Container> container() const;
+ 
+  const std::string& key() & const;
+  std::string key() &&;
   
   const Version& version() & const;
   Version&& version() &&;
@@ -271,10 +265,10 @@ class Operation {
 ### maidsafe::nfs::FutureExpectedOperation<T> ###
 This is an alias for `maidsafe::nfs::Future<maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>>`. Returned by every function in the basic API, and every function in the advanced API when `maidsafe::nfs::use_future` is provided instead of a callback.
 
-### maidsafe::nfs::Storage ###
-The `Storage` class represents a virtual filesystem on the SAFE network. Construction of a `Storage` object requires a FOB object for identifying an identity on the network. There is an additional constructor for test purposes only - it takes a local filesystem path for storing data. A Storage object constructed in that mode will never store data on the SAFE network.
+### maidsafe::nfs::Container ###
+The `Container` class stores `Blob` objects or pointers to a `Container` at SAFE network. Construction of a `Container` object requires a FOB object for identifying an identity on the network, or a parent `Container`. There is an additional constructor for test purposes only - it takes a local filesystem path for storing data. A `Container` object constructed in that mode will never store data on the SAFE network.
 
-The `Put` and `Get` methods will move the std::string to the `Future<T>` upon success. This allows advanced users to re-use buffers (and explains why the `Put` method returns a std::string as a result). The `Get` overload that does not accept a std::string as a parameter will create a new std::string as needed.
+The `Put` and `Get` methods will move the content `std::string` to the `Future<T>` upon success. This allows advanced users to re-use buffers (and explains why the `Put` method returns a std::string as a result). The `Get` overload that does not accept a std::string as a parameter will create a new std::string as needed.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback that accepts `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`; return type is void
@@ -282,7 +276,7 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 - A maidsafe::nfs::use_future; return type is `maidsafe::nfs::FutureExpectedOperation<T>`.
 
 ```c++
-class Storage {
+class Container {
 public:
   //
   // Basic API
@@ -290,38 +284,37 @@ public:
 
   // SAFE network storage under fob
   template<typename Fob>
-  explicit Storage(const Fob& fob)
+  explicit Container(const Fob& fob)
   
   // Local filesystem test storage
-  explicit Storage(boost::filesystem::path, MaxDiskUsage)
+  explicit Container(boost::filesystem::path, MaxDiskUsage);
   
-  FutureExpectedOperation<std::string> Put(boost::filesystem::path, std::string, ModifyVersion);
-  FutureExpectedOperation<std::string> Get(boost::filesystem::path, RetrieveVersion);
-  FutureExpectedOperation<>            Delete(boost::filesystem::path, Version);
+  FutureExpectedOperation<Container> GetContainer(std::string key, ModifyVersion);
+  
+  FutureExpectedOperation<std::string> Put(std::string, std::string, ModifyVersion);
+  FutureExpectedOperation<std::string> Get(std::string, RetrieveVersion);
+  FutureExpectedOperation<>            Delete(std::string, Version);
   
   FutureExpectedOperation<> Copy(
-      boost::filesystem::path from, RetrieveVersion,
-      boost::filesystem::path to, ModifyVersion);
+      std::string from, RetrieveVersion, std::string to, ModifyVersion);
       
   //
   // Advanced API
   //
-  FutureExpectedOperation<std::string> Get(boost::filesystem::path, std::string, RetrieveVersion);
+  FutureExpectedOperation<std::string> Get(std::string, std::string, RetrieveVersion);
   
-  unspecified CreateFile(boost::filesystem::path, AsyncResult<std::shared_ptr<File>>);
-  unspecified OpenFile(boost::filesystem::path, AsyncResult<std::shared_ptr<File>>);
+  unspecified CreateFile(std::string, AsyncResult<std::shared_ptr<File>>);
+  unspecified OpenFile(std::string, AsyncResult<std::shared_ptr<File>>);
   
   // The File object can be from a different Storage object,
   // allowing copying between identities
   unspecified Copy(
-      std::shared_ptr<File> from,
-      boost::filesystem::path to, ModifyVersion,
-      AsyncResult<>);
+      std::shared_ptr<File> from, std::string to, ModifyVersion, AsyncResult<>);
 };
 ```
 
-### maidsafe::nfs::File ###
-Represents a file stored at a path in the root of the associated `Storage` object. Read operations on a `File` are never complete until the `AsyncResult<T>` (discussed below) object provided in the read call is notified. Write operations on a `File` are reflected in the local `File` object immediately, but are not stored on the network until the `AsyncResult<T>` object provided in the write call is notified. If a `File` object has write calls pending network confirmation, the `File` object is in an unversioned state. Once all pending write calls succeed in network storage, the `File` is "updated" to the new version (it is the newest version). If one or more pending write calls fails in network storage, the `File` remains unversioned and can never store data on the network again. Additional write calls *can* be done on an object permanently in the unversioned state, but they will only be reflected locally. The `Copy` methods in the `Storage` class **do** work on `File` objects in the permanently unversioned state, so writing to a failed `File` is not useless. Since `File` objects cannot be downgraded or upgraded in version manually, the `Storage` class will have to be used to retrieve alternate stored versions of the `File`.
+### maidsafe::nfs::Blob ###
+Represents a `Blob` stored at a path in the associated `Container` object. Read operations on a `Blob` are never complete until the `AsyncResult<T>` (discussed below) object provided in the read call is notified. Write operations on a `Blob` are reflected in the local `Blob` object immediately, but are not stored on the network until the `AsyncResult<T>` object provided in the write call is notified. Since `Blob`s are immutable, a `Blob` object that has write calls pending network confirmation is in an unversioned state. Once all pending write calls succeed in network storage, the `Blob` is "updated" to the new version (it is the newest version), thereby storing the new `Blob`. If one or more pending write calls fails in network storage, the `Blob` remains unversioned and can never store data on the network again. Additional write calls *can* be done on a `Blob` permanently in the unversioned state, but they will only be reflected locally. The `Copy` methods in the `Container` class **do** work on `Blob` objects in the permanently unversioned state, so writing to a failed `Container` is not useless. Since `Blob` objects cannot be downgraded or upgraded in version manually, the `Container` class will have to be used to retrieve alternate stored versions of the `Blob`. `Blob` objects open in one `Container` can be copied to any other `Container` (even `Container`s on another client identity).
 
  State           |  State after Write Call  | Will Writes Succeed                        
  ----------------|--------------------------|--------------------------------------------
@@ -329,9 +322,9 @@ Represents a file stored at a path in the root of the associated `Storage` objec
  Old Version     |   Unversioned            | Never
  Unversioned     |   Unversioned            | Only if previous state was Current Version
  
-Since write operations are reflected immediately in the local `File` object, users do not have to wait for the previous operation to complete to make additional read or write calls. Internally, the class will automatically group writes together if possible, and will otherwise wait if some writes are in-progress. Since subsequent writes fail, a user can use the overloads that do not take an `AsyncResult<T>` object (no notification of network storage) on all but the last write. The last `AsyncResult<T>` will indicate whether all previous writes are successfully stored on the network. However, this style of implementation loses some granular error reporting; writes after the first failure will return a more generic error code.
+Since write operations are reflected immediately in the local `Blob` object, users do not have to wait for the previous operation to complete to make additional read or write calls. Internally, the class will automatically group writes together if possible, and will otherwise wait if some writes are in-progress. Since subsequent writes fail, a user can use the overloads that do not take an `AsyncResult<T>` object (no notification of network storage) on all but the last write. The last `AsyncResult<T>` will indicate whether all previous writes are successfully stored on the network. However, this style of implementation loses some granular error reporting; writes after the first failure will return a more generic error code.
  
-If multiple `File` objects are opened within the same process, they are treated no differently than `File` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `File` objects successfully writing to the network. All other `File` objects become permanently unversioned.
+If multiple `Blob` objects are opened within the same process, they are treated no differently than `Blob` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `Blob` objects successfully writing to the network. All other `Blob` objects become permanently unversioned.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback that accepts `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`; return type is void
@@ -339,11 +332,11 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 - A maidsafe::nfs::use_future; return type is `maidsafe::nfs::FutureExpectedOperation<T>`.
 
 ```C++
-class File {
+class Blob {
  public:
   typedef detail::MetaData::TimePoint TimePoint;
   
-  // Version of File, or unversioned if empty
+  // Version of Blob, or unversioned if empty
   boost::optional<Version> version() const;
 
   const boost::filesystem::path& name() const; // full-path name
