@@ -317,7 +317,7 @@ public:
 Upon initial creation, `LocalBlob` represents a `Blob` stored at a key/version in the associated `Container` object. Calls to `LocalBlob::Write` are reflected immediately in that object, but the `LocalBlob` becomes unversioned because it does not represent a `Blob` on the network. The current `LocalBlob` can be saved to the network with a call to a `LocalBlob::Commit`, whose success indicates that the `LocalBlob` now represents the new version returned. `LocalBlob` provides the strong-exception guarantee for all public methods.
 
 Function |  State After Throw  | State After Return |State after Successful Async Operation
----------|---------------------|------------------------------------
+---------|---------------------|--------------------|---------------
 Read     | Valid and Unchanged | Unchanged          | Unchanged (buffer has requested contents from LocalBlob).
 Write    | Valid and Unchanged | Unversioned        | Buffer is stored on network, but not visible to remote Blobs.
 Truncate | Valid and Unchanged | Unversioned        | Data change is stored on network, but not visible to remote. Blobs
