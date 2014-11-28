@@ -316,12 +316,12 @@ public:
 ### maidsafe::nfs::LocalBlob ###
 Upon initial creation, `LocalBlob` represents a `Blob` stored at a key/version in the associated `Container` object. Calls to `LocalBlob::Write` are reflected immediately in that object, but the `LocalBlob` becomes unversioned because it does not represent a `Blob` on the network. The current `LocalBlob` can be saved to the network with a call to a `LocalBlob::Commit`, and success of the async operation indicates that the `LocalBlob` now represents the new version returned. `LocalBlob` provides the strong-exception guarantee for all public methods.
 
-Function |  State After Throw  | State After Return |State after Successful Async Operation
----------|---------------------|--------------------|---------------
-Read     | Valid and Unchanged | Unchanged          | Unchanged (buffer has requested contents from LocalBlob).
-Write    | Valid and Unchanged | Unversioned        | Buffer is stored on network, but not visible to remote `Blob`s.
-Truncate | Valid and Unchanged | Unversioned        | Data change is stored on network, but not visible to remote `Blob`s
-Commit   | Valid and Unchanged | Unchanged          | Local changes are visible to remote `Blob`s. Version matches remote version.
+Function |  State After Throw   | State After Return |State after Successful Async Operation
+---------|----------------------|--------------------------------------------|-------------------------------
+Read     | Valid and Unchanged. | Unchanged.                                 | Unchanged (buffer has requested contents from LocalBlob).
+Write    | Valid and Unchanged. | Unversioned. Buffer is stored in LocalBlob.| Buffer is stored on network, but not visible to remote `Blob`s.
+Truncate | Valid and Unchanged. | Unversioned. Data is stored in LocalBlob.  | Data change is stored on network, but not visible to remote `Blob`s
+Commit   | Valid and Unchanged. | Unchanged.                                 | Local changes are visible to remote `Blob`s. Version matches remote version.
 
 Calls to `LocalBlob::Read` are never complete until the `AsyncResult<T>` (discused below) object provided is notified. Calls to `LocalBlob::Write` and `LocalBlob::Truncate` are reflected immediately in that object iff those functions do not throw an exception, and make the `LocalBlob` unversioned. Since write operations are reflected immediately in the local `Blob` object, users do not have to wait for the previous operation to complete to make additional read or write calls. In the rare situation that `LocalBlob::Write` or `LocalBlob::Truncate` throw an exception, the contents of the write call are not reflected in the local object, but the local object is still in a valid state since `LocalBlob` provides the strong-exception guarantee. The `SimpleAsyncResult` object provided to `LocalBlob::Write` or `LocalBlob::Truncate` calls is notified when the data has been stored to the network. Writes stored on the network are hidden from other clients until the `AsyncResult<>` given to a `LocalBlob::Commit` is notified. If the async operation for `LocalBlob::Commit` fails, subsequent `LocalBlob:Write` or `LocalBlob::Truncate` async operations can succeed because they indicate when the data has been stored to the network.
 
