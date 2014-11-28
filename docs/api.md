@@ -303,28 +303,33 @@ public:
   //
   FutureExpectedOperation<std::string> Get(std::string, std::string, RetrieveVersion);
   
-  unspecified CreateFile(std::string, AsyncResult<std::shared_ptr<File>>);
-  unspecified OpenFile(std::string, AsyncResult<std::shared_ptr<File>>);
+  unspecified CreateFile(std::string, AsyncResult<std::shared_ptr<LocalBlob>>);
+  unspecified OpenFile(std::string, AsyncResult<std::shared_ptr<LocalBlob>>);
   
   // The File object can be from a different Storage object,
   // allowing copying between identities
   unspecified Copy(
-      std::shared_ptr<File> from, std::string to, ModifyVersion, AsyncResult<>);
+      std::shared_ptr<LocalBlob> from, std::string to, ModifyVersion, AsyncResult<>);
 };
 ```
 
-### maidsafe::nfs::Blob ###
-Represents a `Blob` stored at a path in the associated `Container` object. Read operations on a `Blob` are never complete until the `AsyncResult<T>` (discussed below) object provided in the read call is notified. Write operations on a `Blob` are reflected in the local `Blob` object immediately, but are not stored on the network until the `AsyncResult<T>` object provided in the write call is notified. Since `Blob`s are immutable, a `Blob` object that has write calls pending network confirmation is in an unversioned state. Once all pending write calls succeed in network storage, the `Blob` is "updated" to the new version (it is the newest version), thereby storing the new `Blob`. If one or more pending write calls fails in network storage, the `Blob` remains unversioned and can never store data on the network again. Additional write calls *can* be done on a `Blob` permanently in the unversioned state, but they will only be reflected locally. The `Copy` methods in the `Container` class **do** work on `Blob` objects in the permanently unversioned state, so writing to a failed `Container` is not useless. Since `Blob` objects cannot be downgraded or upgraded in version manually, the `Container` class will have to be used to retrieve alternate stored versions of the `Blob`. `Blob` objects open in one `Container` can be copied to any other `Container` (even `Container`s on another client identity).
+### maidsafe::nfs::LocalBlob ###
+Upon initial creation, `LocalBlob` represents a `Blob` stored at a key/version in the associated `Container` object. Calls to `LocalBlob::Write` are reflected immediately in that object, but the `LocalBlob` becomes unversioned because it does not represent a `Blob` on the network. The current `LocalBlob` can be saved to the network with a call to a `LocalBlob::Commit`, whose success indicates that the `LocalBlob` now represents the new version returned. `LocalBlob` provides the strong-exception guarantee for all public methods.
 
- State           |  State after Write Call  | Will Writes Succeed                        
- ----------------|--------------------------|--------------------------------------------
- Current Version |   Unversioned            | Always
- Old Version     |   Unversioned            | Never
- Unversioned     |   Unversioned            | Only if previous state was Current Version
- 
-Since write operations are reflected immediately in the local `Blob` object, users do not have to wait for the previous operation to complete to make additional read or write calls. Internally, the class will automatically group writes together if possible, and will otherwise wait if some writes are in-progress. Since subsequent writes fail, a user can use the overloads that do not take an `AsyncResult<T>` object (no notification of network storage) on all but the last write. The last `AsyncResult<T>` will indicate whether all previous writes are successfully stored on the network. However, this style of implementation loses some granular error reporting; writes after the first failure will return a more generic error code.
+Calls to `LocalBlob::Read` are never complete until the `AsyncResult<T>` (discused below) object provided is notified (the data could need network retrieval). Since `LocalBlob::Write` and `LocalBlob::Truncate` are reflected immediately in the local object, `LocalBlob::Read` will retrieve the content from those calls, even if they return failure (see [writing](#writing) for more information).
+
+Calls to `LocalBlob::Write` and `LocalBlob::Truncate` are reflected immediately in that object iff those functions do not throw an exception, and make the `LocalBlob` unversioned. Since write operations are reflected immediately in the local `Blob` object, users do not have to wait for the previous operation to complete to make additional read or write calls. In the rare situation that those functions throw an exception, the write call is not reflected in the local object, but the local object is still in a valid state since `LocalBlob` provides the strong-exception guarantee. The `SimpleAsyncResult` object provided to these calls is notified when the data has been stored to the network. Writes stored on the network cannot be seen by other clients until `LocalBlob:Commit` signals completion in the `AsyncResult<>`. If a call to `LocalBlob::Commit` fails, subsequent calls to `LocalBlob:Write` or `LocalBlob::Truncate` can succeed because they indicate when the data has been stored to the network.
+
+- Need to specify when write calls will be sent to network - generally not until Commit or Copy call, but there needs to be a sized based event too.
+
+If a `LocalBlob` is unversioned, calling `LocalBlob::Commit` will force wait for all uncompleted `LocalBlob::Write` or `LocalBlob::Truncate` calls to complete, and then try to store the new Blob version. In the rare event that `LocalBlob::Commit` throws an exception, the commit was never attempted, but the `LocalBlob` is still in a valid state since `LocalBlob` provides the strong-exception guarantee. If `LocalBlob::Commit` returns failure in the `AsyncResult<>`, all subsequent calls to `LocalBlob::Commit` will continue to fail. The `LocalBlob` object can still be used in a call to `Container:Copy`, which will try to upload the remaining pieces, and commit a new version.
  
 If multiple `Blob` objects are opened within the same process, they are treated no differently than `Blob` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `Blob` objects successfully writing to the network. All other `Blob` objects become permanently unversioned.
+
+Parameters labeled as `SimpleAsyncResult` affect the return type of the function, and valid values are:
+- A callback that accepts `maidsafe::nfs::Expected<>`; return type is void
+- A boost::asio::yield_context object; return type is `maidsafe::nfs::Expected<>`.
+- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::Future<maidsafe::nfs::Expected<>>`.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback that accepts `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`; return type is void
@@ -349,10 +354,9 @@ class Blob {
   
   // Offset is implied through setters above.
   unspecified Read(boost::asio::buffer, AsyncResult<std::uint64_t>);
-  unspecified Write(boost::asio::buffer, AsyncResult<>);
-  unspecified Truncate(std::uint64_t, AsyncResult<>);
+  unspecified Write(boost::asio::buffer, SimpleAsyncResult<>);
+  unspecified Truncate(std::uint64_t, SimpleAsyncResult<>);
   
-  void Write(boost::asio::buffer);
-  void Truncate(std::uint64_t);
+  unspecified commit(AsyncResult<>);
 };
 ```
