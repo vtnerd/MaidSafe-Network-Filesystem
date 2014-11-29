@@ -99,52 +99,64 @@ void PrintFileThenDelete(maidsafe::nfs::Container& container, std::string key) {
 
 ## Basic API ##
 ```c++
+struct BlobVersion { /* all private */ };
+
+template<typename T = void>
+class Operation {
+  const Version& version() const; // LEE NOTE: Now screwed with multiple Version types
+  const T& result() const; // iff T != void
+};
 
 template<typename T>
 using Future = boost::future<T>;
 
-template<typename T>
+template<typename T = void>
 using Expected = boost::expected<Operation<T>, Operation<std::error_code>>;
 
 template<typename T>
 using FutureExpectedOperation = Future<Expected<Operation<T>>>
 
-template<typename T = void>
-struct Operation {
-  std::shared_ptr<Container> container() const;
-  const std::string& key() const;
-  const Version& version() const;
-  const T& result() const; // iff T != void
+class ModifyBlobVersion {
+  ModifyBlobVersion(BlobVersion);
+  static ModifyBlobVersion New();
 };
 
-struct ModifyVersion {
-  ModifyVersion(Version);
-  static ModifyVersion New();
+class RetrieveBlobVersion {
+  RetrieveBlobVersion(BlobVersion);
+  static RetrieveBlobVersion Latest();
 };
 
-struct RetrieveVersion {
-  RetrieveVersion(Version);
-  static RetrieveVersion Latest();
+template<typename Result>
+class Pagination {
+  FutureExpectedOperation<std::vector<Result>> GetNextRange(std::size_t);
+};
+
+class Account {
+  template<typename Fob>
+  explicit Account(const Fob& fob);
+  
+  FutureExpectedOperation<std::vector<std::string>> ListAllContainers();
+  Pagination<std::string>              ListContainers();
+  FutureExpectedOperation<Container>   OpenContainer(std::string);
+  FutureExpectedOperation<>            DeleteContainer(std::string);
 };
 
 class Container {
- public:
-  // SAFE network storage under fob
-  template<typename Fob>
-  explicit Container(const Fob& fob)
+  FutureExpectedOperation<std::vector<std::pair<std::string, BlobVersion>>> ListAllBlobs();
+  Pagination<std::pair<std::string, BlobVersion>>> ListBlobs();
+
+  FutureExpectedOperation<>            Put(std::string key, std::string, ModifyBlobVersion);
+  FutureExpectedOperation<std::string> Get(std::string key, RetrieveBlobVersion);
+  FutureExpectedOperation<>            Delete(std::string key, BlobVersion);
   
-  // Local filesystem test storage
-  explicit Container(boost::filesystem::path, MaxDiskUsage);
-  
-  FutureExpectedOperation<std::string> Put(std::string key, std::string, ModifyVersion);
-  FutureExpectedOperation<std::string> Get(std::string key, RetrieveVersion);
-  FutureExpectedOperation<>            Delete(std::string key, Version);
-  
+  FutureExpectedOperation<std::string> GetRange(
+      std::string key, std::uint64_t offset, std::size_t length, RetrieveBlobVersion);
+
   FutureExpectedOperation<> Copy(
-      std::string from, RetrieveVersion, std::string to, ModifyVersion);
+      std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
 };
 ```
-This isn't as daunting as it looks! Lets go over a quick example, that uses the local filesystem first.
+This isn't as daunting as it looks! Lets go over a quick example, that uses the local filesystem first (**now outdated -- update!**)
 
 ### Local Filesystem Hello World ###
 ```c++
@@ -289,9 +301,9 @@ public:
   // Local filesystem test storage
   explicit Container(boost::filesystem::path, MaxDiskUsage);
   
-  FutureExpectedOperation<Container> GetContainer(std::string key, ModifyVersion);
+  FutureExpectedOperation<Container> GetContainer(std::string, ModifyVersion);
   
-  FutureExpectedOperation<std::string> Put(std::string, std::string, ModifyVersion);
+  FutureExpectedOperation<> Put(std::string, std::string, ModifyVersion);
   FutureExpectedOperation<std::string> Get(std::string, RetrieveVersion);
   FutureExpectedOperation<>            Delete(std::string, Version);
   
@@ -346,22 +358,28 @@ class Blob {
  public:
   typedef detail::MetaData::TimePoint TimePoint;
   
-  // Version of Blob, or unversioned if empty
-  boost::optional<Version> version() const;
-
-  const boost::filesystem::path& name() const; // full-path name
+  const boost::filesystem::path& key() const; // key associated with Blob
   std::uint64_t file_size() const;
   TimePoint creation_time() const;
   TimePoint write_time() const; // write time of this revision
-  
+
+  // Version at open/last successful commit
+  BlobVersion head_version() const;
+
+  // Version of Blob, or unversioned if empty
+  boost::optional<BlobVersion> version() const;
+
+  unspecified ListVersions(AsyncResult<>);
+
+
   std::uint64_t get_offset() const;
   void set_offset(std::uint64_t);
-  
+
   // Offset is implied through setters above.
   unspecified Read(boost::asio::buffer, AsyncResult<std::uint64_t>);
   unspecified Write(boost::asio::buffer, SimpleAsyncResult<>);
   unspecified Truncate(std::uint64_t, SimpleAsyncResult<>);
-  
+
   unspecified commit(AsyncResult<>);
 };
 ```
