@@ -99,11 +99,20 @@ void PrintFileThenDelete(maidsafe::nfs::Container& container, std::string key) {
 
 ## Basic API ##
 ```c++
+struct ContainerVersion { /* all private */ };
 struct BlobVersion { /* all private */ };
 
 template<typename T = void>
-class Operation {
-  const Version& version() const; // LEE NOTE: Now screwed with multiple Version types
+class ContainerOperation {
+  const std::string& key() const;
+  const ContainerVersion& version() const;
+  const T& result() const; // iff T != void
+};
+
+template<typename T = void>
+class BlobOperation {
+  const std::string& key() const;
+  const BlobVersion& version() const;
   const T& result() const; // iff T != void
 };
 
@@ -111,14 +120,23 @@ template<typename T>
 using Future = boost::future<T>;
 
 template<typename T = void>
-using Expected = boost::expected<Operation<T>, Operation<std::error_code>>;
+using ExpectedContainerOperation = 
+    boost::expected<ContainerOperation<T>, ContainerOperation<std::error_code>>;
+
+template<typename T = void>
+using ExpectedBlobOperation =
+    boost::expected<BlobOperation<T>, BlobOperation<std::error_code>>;
 
 template<typename T>
-using FutureExpectedOperation = Future<Expected<Operation<T>>>
+using FutureExpectedContainerOperation = Future<ExpectedContainerOperation<T>>;
+
+template<typename T>
+using FutureExpectedBlobOperation = Future<ExpectedBlobOperation<T>>;
 
 class ModifyBlobVersion {
   ModifyBlobVersion(BlobVersion);
   static ModifyBlobVersion New();
+  static ModifyBlobVersion Latest();
 };
 
 class RetrieveBlobVersion {
@@ -126,33 +144,39 @@ class RetrieveBlobVersion {
   static RetrieveBlobVersion Latest();
 };
 
-template<typename Result>
-class Pagination {
-  FutureExpectedOperation<std::vector<Result>> GetNextRange(std::size_t);
+class ContainerPagination {
+  FutureExpectedContainerOperation<std::vector<std::string>> GetNext(std::size_t);
+  FutureExpectedContainerOperation<std::vector<std::string>> GetRemaining();
+};
+
+class BlobPagination {
+  FutureExpectedBlobOperation<std::vector<std::pair<std::string, BlobVersion>>> GetNext(std::size_t);
+  FutureExpectedBlobOperation<std::vector<std::pair<std::string, BlobVersion>>> GetRemaining();
 };
 
 class Account {
   template<typename Fob>
   explicit Account(const Fob& fob);
   
-  FutureExpectedOperation<std::vector<std::string>> ListAllContainers();
-  Pagination<std::string>              ListContainers();
-  FutureExpectedOperation<Container>   OpenContainer(std::string);
-  FutureExpectedOperation<>            DeleteContainer(std::string);
+  ContainerPagination ListContainers();
+  ContainerPagination ListContainers(std::regex filter);
+
+  FutureExpectedContainerOperation<std::shared_ptr<Container>> OpenContainer(std::string);
+  FutureExpectedContainerOperation<>                           DeleteContainer(std::string);
 };
 
 class Container {
-  FutureExpectedOperation<std::vector<std::pair<std::string, BlobVersion>>> ListAllBlobs();
-  Pagination<std::pair<std::string, BlobVersion>>> ListBlobs();
+  BlobPagination ListBlobs();
+  BlobPagination ListBlobs(std::regex filter);
 
-  FutureExpectedOperation<>            Put(std::string key, std::string, ModifyBlobVersion);
-  FutureExpectedOperation<std::string> Get(std::string key, RetrieveBlobVersion);
-  FutureExpectedOperation<>            Delete(std::string key, BlobVersion);
+  FutureExpectedBlobOperation<>            Put(std::string key, std::string, ModifyBlobVersion);
+  FutureExpectedBlobOperation<std::string> Get(std::string key, RetrieveBlobVersion);
+  FutureExpectedBlobOperation<>            Delete(std::string key, RetrieveBlobVersion);
   
-  FutureExpectedOperation<std::string> GetRange(
+  FutureExpectedBlobOperation<std::string> GetRange(
       std::string key, std::uint64_t offset, std::size_t length, RetrieveBlobVersion);
 
-  FutureExpectedOperation<> Copy(
+  FutureExpectedBlobOperation<> Copy(
       std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
 };
 ```
@@ -216,53 +240,58 @@ int main() {
 In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the "test_storage" `Container`, under the keys "split_example/part1" and "split_example/part2".
 
 ## Advanced Information ##
-### maidsafe::nfs::Version ###
+### maidsafe::nfs::ContainerVersion ###
 Currently an alias for StructuredDataVersions::VersionName in common. The user should never have to manipulate this object (except for copying or moving), so no API for this class is listed.
 
+### maidsafe::nfs::BlobVersion ###
+References a specific version of a `Blob`. Hash of data map chunks (so `BlobVersion` is a hash of the contents). `Blob`s with identical content will have same version, even if their key differs.
+
 ### maidsafe::nfs::RetrieveVersion ###
-A Version that has a special state to indicate latest version. Allows `Get`, `Copy`, or `Open` calls to retrieve a specific version, or just the newest one.
+A template that has a special state to indicate latest version. Allows `Get`, `Copy`, or `Open` calls to retrieve a specific version, or just the newest one.
 
 ```c++
+template<typename Version>
 class RetrieveVersion {
- public:
   static RetrieveVersion Latest();
   RetrieveVersion(Version);
   
   bool is_latest() const; // True if constructed with Latest();
   const Version& version() const; // throw if is_latest();
 };
+
+using RetrieveContainerVersion = RetrieveVersion<ContainerVersion>;
+using RetrieveBlobVersion = RetrieveVersion<BlobVersion>;
 ```
 
 ### maidsafe::nfs::ModifyVersion ###
-A Version that has a special state to indicate initial version. Allows `Put`, or `Copy` calls to overwrite a specific version, or create a new one.
+A template that has special states to indicate initial, and latest version. Allows `Put`, or `Copy` calls to overwrite a specific version, create a new one, or blindly overwrite data.
 
 ```c++
+template<typename Version
 class ModifyVersion {
- public:
+  enum class Instruction {
+    kSpecific = 0,
+    kNew,
+    kOverwrite
+  };
+
   static ModifyVersion New();
   ModifyVersion(Version);
   
-  bool is_new() const; // True if constructed with New();
-  const Version& version() const; // throw if is_new();
+  Instruction instruction() const;
+  const Version& version() const; // throw if instruction() != Instruction::kSpecific;
 };
+
+using ModifyContainerVersion = ModifyVersion<ContainerVersion>;
+using ModifyBlobVersion = ModifyVersion<BlobVersion>;
 ```
-
-### maidsafe::nfs::Future<T> ###
-A type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually. Extensions in the `boost::future<T>` implementation are **not** guaranteed to be available in future releases, so use at your own risk. Additionally, non-member extension functions are **not** guaranteed to be available in future releases. It is therefore recommended to only use `maidsafe::nfs::Future<T>` as-if it were a C++11 `std::future<T>` object.
-
-
-### maidsafe::nfs::Expected<T> ###
-A type conforming to the proposed [expected<T>](https://github.com/ptal/std-expected-proposal) interface. All functionality listed in [N4109](http://isocpp.org/blog/2014/07/n4109) can be assumed to be available in future releases.
 
 ### maidsafe::nfs::Operation<T> ###
 All requests to the SAFE network will yield an Operation<T> object. Every Operation object will have a path, version, and a result value (which can be void).
 
 ```c++
-template<typename T = void>
+template<typename Version, typename T>
 class Operation {
- public:
-  std::shared_ptr<Container> container() const;
- 
   const std::string& key() & const;
   std::string key() &&;
   
@@ -272,10 +301,92 @@ class Operation {
   const T& result() & const; // if T != void
   T&& result() &&; // if T != void
 };
+
+template<typename T = void>
+using ContainerOperation = Operation<ContainerVersion, T>;
+
+template<typename T = void>
+using BlobOperation = Operation<BlobVersion, T>;
 ```
 
-### maidsafe::nfs::FutureExpectedOperation<T> ###
-This is an alias for `maidsafe::nfs::Future<maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>>`. Returned by every function in the basic API, and every function in the advanced API when `maidsafe::nfs::use_future` is provided instead of a callback.
+### maidsafe::nfs::ExpectedContainerOperation<T> ###
+A type conforming to the proposed [expected](https://github.com/ptal/std-expected-proposal) interface. All functionality listed in [N4109](http://isocpp.org/blog/2014/07/n4109) can be assumed to be available in future releases.
+
+```c++
+template<typename T = void>
+using ExpectedContainerOperation = 
+    boost::expected<ContainerOperation<T>, ContainerOperation<std::error_code>>;
+```
+
+### maidsafe::nfs::ExpectedBlobOperation<T> ###
+A type conforming to the proposed [expected](https://github.com/ptal/std-expected-proposal) interface. All functionality listed in [N4109](http://isocpp.org/blog/2014/07/n4109) can be assumed to be available in future releases.
+
+```c++
+template<typename T = void>
+using ExpectedBlobOperation = boost::expected<BlobOperation<T>, BlobOperation<std::error_code>>;
+```
+
+### maidsafe::nfs::Future<T> ###
+A type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually. Extensions in the `boost::future<T>` implementation are **not** guaranteed to be available in future releases, so use at your own risk. Additionally, non-member extension functions are **not** guaranteed to be available in future releases. It is therefore recommended to only use `maidsafe::nfs::Future<T>` as-if it were a C++11 `std::future<T>` object.
+
+```c++
+template<typename T>
+using Future = boost::future<T>;
+
+template<typename T = void>
+using FutureExpectedContainerOperation = Future<ExpectedContainerOperation<T>>;
+
+template<typename T = void>
+using FutureExpectedBlobOperation = Future<ExpectedBlobOperation<T>>;
+```
+
+### maidsafe::nfs::Pagination ###
+```c++
+template<typename T>
+class Pagination {
+  T GetNext(std::size_t);
+  T GetRemaining();
+};
+
+using ContainerPagination = 
+    Pagination<FutureExpectedContainerOperation<std::vector<std::string>>>;
+using BlobPagination =
+    Pagination<FutureExpectedBlobOperation<std::vector<std::pair<std::string, BlobVersion>>>>;
+```
+
+### maidsafe::nfs::Account ###
+An `Acccount` object is tied to an identity on the SAFE network. It only has `Container`s, and also supports versioning. This allows for multiple `Container`s to be mapped to the same name (in different versions).
+
+```c++
+class Account {
+  //
+  // Basic API
+  //
+  template<typename Fob>
+  explicit Account(const Fob& fob);
+  
+  ContainerPagination ListContainers();
+  ContainerPagination ListContainers(std::regex filter);
+
+  FutureExpectedContainerOperation<std::shared_ptr<Container>> OpenContainer(std::string);
+  FutureExpectedContainerOperation<>                           DeleteContainer(std::string);
+      
+  //
+  // Advanced API
+  //
+  unspecified ListVersions(AsyncResult<std::vector<ContainerVersion>>);
+  
+  unspecified ListContainers(
+      RetrieveContainerVersion, AsyncResult<std::vector<std::string>>);
+  unspecified ListContainers(
+      RetrieveContainerVersion, std::regex filter, AsyncResult<std::vector<std::string>>);
+
+  unspecified OpenContainer(
+      RetreiveContainerVersion, std::string, AsyncResult<std::shared_ptr<Container>>);
+  unspecified DeleteContainer(
+      RetrieveContainerVersion, std::string, AsyncResult<>);
+};
+```
 
 ### maidsafe::nfs::Container ###
 The `Container` class stores `Blob` objects or pointers to a `Container` at SAFE network. Construction of a `Container` object requires a FOB object for identifying an identity on the network, or a parent `Container`. There is an additional constructor for test purposes only - it takes a local filesystem path for storing data. A `Container` object constructed in that mode will never store data on the SAFE network.
@@ -289,31 +400,39 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 
 ```c++
 class Container {
-public:
   //
   // Basic API
   //
+  BlobPagination ListBlobs();
+  BlobPagination ListBlobs(std::regex filter);
 
-  // SAFE network storage under fob
-  template<typename Fob>
-  explicit Container(const Fob& fob)
+  FutureExpectedBlobOperation<>            Put(std::string key, std::string, ModifyBlobVersion);
+  FutureExpectedBlobOperation<std::string> Get(std::string key, RetrieveBlobVersion);
+  FutureExpectedBlobOperation<>            Delete(std::string key, RetrieveBlobVersion);
   
-  // Local filesystem test storage
-  explicit Container(boost::filesystem::path, MaxDiskUsage);
-  
-  FutureExpectedOperation<Container> GetContainer(std::string, ModifyVersion);
-  
-  FutureExpectedOperation<> Put(std::string, std::string, ModifyVersion);
-  FutureExpectedOperation<std::string> Get(std::string, RetrieveVersion);
-  FutureExpectedOperation<>            Delete(std::string, Version);
-  
-  FutureExpectedOperation<> Copy(
-      std::string from, RetrieveVersion, std::string to, ModifyVersion);
+  FutureExpectedBlobOperation<std::string> GetRange(
+      std::string key, std::uint64_t offset, std::size_t length, RetrieveBlobVersion);
+
+  FutureExpectedBlobOperation<> Copy(
+      std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
       
   //
   // Advanced API
   //
-  FutureExpectedOperation<std::string> Get(std::string, std::string, RetrieveVersion);
+  unspecified ListVersions(AsyncResult<std::vector<ContainerVersion>>);
+  
+  unspecified ListContainers(
+      RetrieveContainerVersion, AsyncResult<std::vector<std::string>>);
+  unspecified ListContainers(
+      RetrieveContainerVersion, std::regex filter, AsyncResult<std::vector<std::string>>);
+
+  unspecified ListBlobs(
+      RetreieveContainerVersion,
+      AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>);
+  unspecified ListBlobs(
+      RetreieveContainerVersion,
+      std::regex filter,
+      AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>);
   
   unspecified CreateFile(std::string, AsyncResult<std::shared_ptr<LocalBlob>>);
   unspecified OpenFile(std::string, AsyncResult<std::shared_ptr<LocalBlob>>);
@@ -358,18 +477,21 @@ class Blob {
  public:
   typedef detail::MetaData::TimePoint TimePoint;
   
-  const boost::filesystem::path& key() const; // key associated with Blob
+  const std::string& key() const; // key associated with Blob
   std::uint64_t file_size() const;
   TimePoint creation_time() const;
   TimePoint write_time() const; // write time of this revision
+  
+  const std::string& user_metadata() const;
+  void set_user_metadata(std::string);
 
   // Version at open/last successful commit
-  BlobVersion head_version() const;
+  const BlobVersion& head_version() const;
 
   // Version of Blob, or unversioned if empty
   boost::optional<BlobVersion> version() const;
 
-  unspecified ListVersions(AsyncResult<>);
+  unspecified ListVersions(AsyncResult<std::vector<BlobVersion>>);
 
 
   std::uint64_t get_offset() const;
