@@ -241,12 +241,18 @@ In this example, both `Put` calls are done in parallel, and both `Get` calls are
 
 ## Advanced Information ##
 ### maidsafe::nfs::ContainerVersion ###
+> maidsafe/nfs/container_version.h
+
 Currently an alias for StructuredDataVersions::VersionName in common. The user should never have to manipulate this object (except for copying or moving), so no API for this class is listed.
 
 ### maidsafe::nfs::BlobVersion ###
+> maidsafe/nfs/blob_version.h
+
 References a specific version of a `Blob`. Hash of data map chunks (so `BlobVersion` is a hash of the contents). `Blob`s with identical content will have same version, even if their key differs.
 
 ### maidsafe::nfs::RetrieveVersion ###
+> maidsafe/nfs/retrieve_version.h
+
 A template that has a special state to indicate latest version. Allows `Get`, `Copy`, or `Open` calls to retrieve a specific version, or just the newest one.
 
 ```c++
@@ -264,6 +270,8 @@ using RetrieveBlobVersion = RetrieveVersion<BlobVersion>;
 ```
 
 ### maidsafe::nfs::ModifyVersion ###
+> maidsafe/nfs/modify_version.h
+
 A template that has special states to indicate initial, and latest version. Allows `Put`, or `Copy` calls to overwrite a specific version, create a new one, or blindly overwrite data.
 
 ```c++
@@ -287,6 +295,8 @@ using ModifyBlobVersion = ModifyVersion<BlobVersion>;
 ```
 
 ### maidsafe::nfs::Operation<T> ###
+> maidsafe/nfs/operation.h
+
 All requests to the SAFE network will yield an Operation<T> object. Every Operation object will have a path, version, and a result value (which can be void).
 
 ```c++
@@ -310,6 +320,8 @@ using BlobOperation = Operation<BlobVersion, T>;
 ```
 
 ### maidsafe::nfs::ExpectedContainerOperation<T> ###
+> maidsafe/nfs/aliases.h
+
 A type conforming to the proposed [expected](https://github.com/ptal/std-expected-proposal) interface. All functionality listed in [N4109](http://isocpp.org/blog/2014/07/n4109) can be assumed to be available in future releases.
 
 ```c++
@@ -319,6 +331,8 @@ using ExpectedContainerOperation =
 ```
 
 ### maidsafe::nfs::ExpectedBlobOperation<T> ###
+> maidsafe/nfs/aliases.h
+
 A type conforming to the proposed [expected](https://github.com/ptal/std-expected-proposal) interface. All functionality listed in [N4109](http://isocpp.org/blog/2014/07/n4109) can be assumed to be available in future releases.
 
 ```c++
@@ -327,6 +341,8 @@ using ExpectedBlobOperation = boost::expected<BlobOperation<T>, BlobOperation<st
 ```
 
 ### maidsafe::nfs::Future<T> ###
+> maidsafe/nfs/aliases.h
+
 A type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually. Extensions in the `boost::future<T>` implementation are **not** guaranteed to be available in future releases, so use at your own risk. Additionally, non-member extension functions are **not** guaranteed to be available in future releases. It is therefore recommended to only use `maidsafe::nfs::Future<T>` as-if it were a C++11 `std::future<T>` object.
 
 ```c++
@@ -341,6 +357,8 @@ using FutureExpectedBlobOperation = Future<ExpectedBlobOperation<T>>;
 ```
 
 ### maidsafe::nfs::Pagination ###
+> maidsafe/nfs/pagination.h
+
 ```c++
 template<typename T>
 class Pagination {
@@ -355,6 +373,8 @@ using BlobPagination =
 ```
 
 ### maidsafe::nfs::Account ###
+> maidsafe/nfs/account.h
+
 An `Acccount` object is tied to an identity on the SAFE network. It only has `Container`s, and also supports versioning. This allows for multiple `Container`s to be mapped to the same name (in different versions).
 
 ```c++
@@ -389,6 +409,8 @@ class Account {
 ```
 
 ### maidsafe::nfs::Container ###
+> maidsafe/nfs/container.h
+
 The `Container` class stores `Blob` objects or pointers to a `Container` at SAFE network. Construction of a `Container` object requires a FOB object for identifying an identity on the network, or a parent `Container`. There is an additional constructor for test purposes only - it takes a local filesystem path for storing data. A `Container` object constructed in that mode will never store data on the SAFE network.
 
 The `Put` and `Get` methods will move the content `std::string` to the `Future<T>` upon success. This allows advanced users to re-use buffers (and explains why the `Put` method returns a std::string as a result). The `Get` overload that does not accept a std::string as a parameter will create a new std::string as needed.
@@ -445,6 +467,8 @@ class Container {
 ```
 
 ### maidsafe::nfs::LocalBlob ###
+> maidsafe/nfs/local_blob.h
+
 Upon initial creation, `LocalBlob` represents a `Blob` stored at a key/version in the associated `Container` object. Write calls are reflected immediately in that object, but the `LocalBlob` becomes unversioned because it does not represent a `Blob` on the network. The current `LocalBlob` can be saved to the network with a call to a `LocalBlob::Commit`, and success of the async operation indicates that the `LocalBlob` now represents the new version returned. `LocalBlob` provides the strong-exception guarantee for all public methods.
 
 Function |  State After Throw   | State After Return                         |State after Successful Async Operation
