@@ -104,16 +104,21 @@ struct BlobVersion { /* all private */ };
 
 template<typename T = void>
 class ContainerOperation {
-  const std::string& key() const;
   const ContainerVersion& version() const;
   const T& result() const; // iff T != void
 };
 
 template<typename T = void>
 class BlobOperation {
-  const std::string& key() const;
   const BlobVersion& version() const;
   const T& result() const; // iff T != void
+};
+
+template<typename OperationResult>
+class OperationError {
+  using RetryResult = boost::expected<OperationResult, OperationError<OperationResult>>;
+  RetryResult Retry() const;
+  std::error_code code() const;
 };
 
 template<typename T>
@@ -121,11 +126,11 @@ using Future = boost::future<T>;
 
 template<typename T = void>
 using ExpectedContainerOperation = 
-    boost::expected<ContainerOperation<T>, ContainerOperation<std::error_code>>;
+    boost::expected<ContainerOperation<T>, OperationError<ContainerOperation<T>>>;
 
 template<typename T = void>
 using ExpectedBlobOperation =
-    boost::expected<BlobOperation<T>, BlobOperation<std::error_code>>;
+    boost::expected<BlobOperation<T>, OperationError<BlobOperation<T>>>;
 
 template<typename T>
 using FutureExpectedContainerOperation = Future<ExpectedContainerOperation<T>>;
