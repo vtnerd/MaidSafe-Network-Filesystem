@@ -121,9 +121,6 @@ class OperationError {
   std::error_code code() const;
 };
 
-template<typename T>
-using Future = boost::future<T>;
-
 template<typename T = void>
 using ExpectedContainerOperation = 
     boost::expected<ContainerOperation<T>, OperationError<ContainerOperation<T>>>;
@@ -133,10 +130,7 @@ using ExpectedBlobOperation =
     boost::expected<BlobOperation<T>, OperationError<BlobOperation<T>>>;
 
 template<typename T>
-using FutureExpectedContainerOperation = Future<ExpectedContainerOperation<T>>;
-
-template<typename T>
-using FutureExpectedBlobOperation = Future<ExpectedBlobOperation<T>>;
+using Future = boost::future<T>;
 
 class ModifyBlobVersion {
   ModifyBlobVersion(BlobVersion);
@@ -150,13 +144,13 @@ class RetrieveBlobVersion {
 };
 
 class ContainerPagination {
-  FutureExpectedContainerOperation<std::vector<std::string>> GetNext(std::size_t);
-  FutureExpectedContainerOperation<std::vector<std::string>> GetRemaining();
+  Future<ExpectedContainerOperation<std::vector<std::string>>> GetNext(std::size_t);
+  Future<ExpectedContainerOperation<std::vector<std::string>>> GetRemaining();
 };
 
 class BlobPagination {
-  FutureExpectedBlobOperation<std::vector<std::pair<std::string, BlobVersion>>> GetNext(std::size_t);
-  FutureExpectedBlobOperation<std::vector<std::pair<std::string, BlobVersion>>> GetRemaining();
+  Future<ExpectedBlobOperation<std::vector<std::pair<std::string, BlobVersion>>>> GetNext(std::size_t);
+  Future<ExpectedBlobOperation<std::vector<std::pair<std::string, BlobVersion>>>> GetRemaining();
 };
 
 class Account {
@@ -166,22 +160,22 @@ class Account {
   ContainerPagination ListContainers();
   ContainerPagination ListContainers(std::regex filter);
 
-  FutureExpectedContainerOperation<std::shared_ptr<Container>> OpenContainer(std::string);
-  FutureExpectedContainerOperation<>                           DeleteContainer(std::string);
+  Future<ExpectedContainerOperation<std::shared_ptr<Container>>> OpenContainer(std::string);
+  Future<ExpectedContainerOperation<>>                           DeleteContainer(std::string);
 };
 
 class Container {
   BlobPagination ListBlobs();
   BlobPagination ListBlobs(std::regex filter);
 
-  FutureExpectedBlobOperation<>            Put(std::string key, std::string, ModifyBlobVersion);
-  FutureExpectedBlobOperation<std::string> Get(std::string key, RetrieveBlobVersion);
-  FutureExpectedBlobOperation<>            Delete(std::string key, RetrieveBlobVersion);
+  Future<ExpectedBlobOperation<>>            Put(std::string key, std::string, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<std::string>> Get(std::string key, RetrieveBlobVersion);
+  Future<ExpectedBlobOperation<>>            Delete(std::string key, RetrieveBlobVersion);
   
-  FutureExpectedBlobOperation<std::string> GetRange(
+  Future<ExpectedBlobOperation<std::string>> GetRange(
       std::string key, std::uint64_t offset, std::size_t length, RetrieveBlobVersion);
 
-  FutureExpectedBlobOperation<> Copy(
+  Future<ExpectedBlobOperation<>> Copy(
       std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
 };
 ```
