@@ -31,73 +31,103 @@ Every key in a `Container` is stored as a revision, so that conflicts between SA
 
 Every operation will return a `Version` object which will be the most-up-to-date version known to the SAFE API.
 
+## Basic API ##
 ## Futures ##
-Every function in the basic API returns a `Future<T>` to some type `T` (the advanced API has a few more options). While this may seem antithetical to the ease-of-use approach, it more accurately represents the behavior of the API functions. For example, typical write calls to the local filesystem are generally not written to the underlying hard-disk when the function returns, and instead are cached at various levels. The client has to make additional function calls to ensure that data reaches disk, and if a disk write fails - which write calls made it to disk? The SAFE API returning a `Future<T>` therefore better represents the behavior - the function stored the necessary information to complete the operation at some later point in time, and the `Future<T>` object will notify the client when that operation completed. In the SAFE API, clients can assume that a requested operation has completed to the SAFE network when the value T can be retrieved from the `Future<T>`.
+Every basic API function call that requires a network operation returns a `maidsafe::nfs::Future` object. This prevents the interface from blocking, and provides an interface for signalling completion. Currently `maidsafe::nfs::Future` is a `boost::future` object, but this may be changed to a non-allocating design. It is recommended that you use the typedef (`maidsafe::nfs::Future`) in case the implementation changes.
 
-Signalling errors in Futures (whether Boost or std) is done with exceptions. Since SAFE network will have a high probability of failure (lack of storage space for user, version error, etc.), the SAFE API will indicate network failures in the `Expected<T>` object (see [Expected](#expected)). System/programming errors (out-of-memory, broken promise) will use the exceptions feature in the `Future<T>`. Signalling network errors in the `Expected<T>` means clients of the API can safely assume that exceptions in the API are a rare event (most can assume that an exception is a fatal event that should stop the process).
-
-### Example Future Usage ###
-```c++
-void PrintFile(maidsafe::nfs::Container& container, std::string key) {
-  // get() blocks until operation is complete
-  const auto retrieval_result = storage.Get(
-      key, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
-  // ... continued throughout tutorial
-}
-```
-Since the future only uses exceptions for fatal errors, its usage is quite easy. Calling .get() on the Future<T> will block until the operation completes. The function will only throw in fatal conditions, otherwise retrieval_result will contain the result of the operation or a non-fatal error, but never both.
+In the basic API, the `Future` will only throw exceptions on non-network related errors (std::bad_alloc, std::bad_promise, etc.). Values and network related errors are returned in a `boost::expected` object.
 
 ## Expected ##
-Every operation in the NFS API (basic or advanced) will provide an `Expected<Operation<T>>` object when complete (see [operation](#operation) section below). If a non-fatal error ocurred during the operation, the Expected object will have an `Operation<Error>` object instead of an object of type `Operation<T>`. Using `Expected<T>`, instead of exceptions with the `Future<T>`, allows for non-fatal errors to be checked in a functional way. 
+When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain a OperationError object, and on success the object will contain a BlobOperation or a ContainerOperation object depending on the operation requested. For convenience, the templated types `ExpectedContainerOperation<T>` and `ExpectedBlobOperation<T>` are provided, where `T` is the desired result of the operation (i.e. a std::string on a `Get` request). Both types assume `OperationError<T>` as the error object for the operation.
 
-### Example Expected Usage ###
+## OperationError ##
+In the event of a failure, retrieving the cause of the error and a Retry attempt can be done with the `OperationError<T>` interface, where `T` was the desired result of the failed operation. The Retry attempt will return a new Future object with the exact type of the previous failed attempt.
+
+### Examples ###
+#### Hello World ####
 ```c++
-void PrintFile(maidsafe::nfs::Container& container, std::string key) {
-  // get() blocks until operation is complete
-  const auto retrieval_result = container.Get(
-      key, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
-  if (retrieval_result) {
-    std::cout << "Contents of " << key << " : " << 
-                 retrieval_result->result() << std::endl;
-  }
-  else {
-    std::cerr << "Could not retrieve " << key << " : " << 
-                 retrieval_result.error().result() << std::endl;
-  }
-}
-```
-- Note: the example above used `retrieval_result->result()` and `retrieval_result.error().result()` because the `Expected` class wraps an [Operation ](#operation) on success or failure.
-
-The `Expected<T>` object has a conversion to bool operator for use with conditional statements, and overloads `operator*` and `operator->`. The easiest way to use the object is like a pointer, but advanced users are encouraged to [read information](https://github.com/ptal/std-expected-proposal) about this object being proposed for a future revision of C++. The `E` in `expected<T,E>` will **always** be `Operation<Error>`, thus `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>` is shorthand for `expected<maidsafe::nfs::Operation<T>, maidsafe::nfs::Operation<madisafe::nfs::Error>>`. A `Operation<T>` is provided in success or error so the user can grab the latest `Version` of the file.
-
-
-
-## Operation ##
-Every operation (failed and successful) in the NFS API (basic or advanced) will provide an `Operation<T>` object when complete (`Operation<Error>` on error). The `Operation<T>` contains the key for the operation, the most up-to-date `Version` for the `Container` key, and the result of the operation, `T`. If the operation had no type to return, `Operation<>` is returned, and no result is available.
-
-### Example Operation Usage ###
-```c++
-void PrintFileThenDelete(maidsafe::nfs::Container& container, std::string key) {
-  // get() blocks until operation is complete
-  const auto retrieval_result = container.Get(
-      key, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
-  if (retrieval_result) {
-    std::cout << "Contents of " << key << " : " << 
-                 retrieval_result->result() << std::endl;
-    const auto deletion_result = container.Delete(key, retrieval_result->version()).get();
-    if (!deletion_result) {
-      std::cerr << "Could not delete " << key << " : " << 
-                   deletion_result.error().result() << std::endl;
+bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
+  std::error_code error;
+  
+  const auto put_operation = container.Put("example_blob", "hello world", ModifyVersion::New()).get();
+  if (put_operation) {
+    const auto get_operation = container.Get("example_blob", put_operation->version()).get();
+    if (get_operation) {
+      std::cout << get_operation->result() << std::endl;
+    }
+    else {
+      error = get_operation.error().code();
     }
   }
   else {
-    std::cerr << "Could not retrieve " << key << " : " << 
-                 retrieval_result.error().result() << std::endl;
+    error = get_operation.error().code();
   }
+  
+  if (error) {
+    std::cerr << "Hello world failed" << error.message() << std::endl;
+    return false;
+  }
+  
+  return true;
+}
+```
+The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and storing a new file. If an existing file exists at `example_blob`, then `if (put_operation)` will return false because `put_operation` contains an error (so after running this program once, all subsequent runs should fail). The `Get` call uses the `Version` returned by the `Put`, guaranteeing that the contents from the original `Put` ("hello world"), are retrieved. Alternatively, `RetrieveVersion::Latest()` could've been used instead, but if another process or thread updated the file, the new contents would be returned, which may not be "hello world" as desired.
+
+The `.get()` calls after the `Put` and `Get` indicate that the process should wait until the SAFE network successfully completes the requested operation. The `Future<T>` object allows a process to make additional requests before prior requests have completed. If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
+
+#### Hello World Retry ####
+```c++
+namespace {
+  template<typename Result>
+  boost::optional<BlobOperation<Result>> GetOperationResult(
+      ExpectedBlobOperation<Result> operation) {
+    while (!operation) {
+      if (operation.error().code() != std::errc::network_down) {
+        std::cerr << 
+            "Hello world failed: " << operation.error().code().message() << std::endl;
+        return boost::none;
+      }
+      operation = operation.error().Retry().get();
+    }
+    return *operation;
+  }
+}
+
+bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
+  const boost::optional<BlobOperation<>> put_operation(
+      GetOperationResult(
+          container.Put(
+              "example_blob", "hello world", ModifyVersion::New()).get()));
+  if (put_operation) {
+     const boost::optional<BlobOperation<std::string>> get_operation(
+        GetOperationResult(
+            container.Get(
+                "example_blob", "hello world", put_operation->version()).get());
+    if (get_operation) {
+      std::cout << get_operation->result() << std::endl;
+      return true;
+    }
+  }
+  return false;
 }
 ```
 
-## Basic API ##
+#### Hello World Monad ####
+```c++
+bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
+  return container.Put("example_blob", "hello world", ModifyVersion::New()).get().then(
+      [&container](BlobOperation<> put_operation) {
+        return container.Get("example_blob", put_operation->version()).get();
+      }).then([](BlobOperation<std::string> get_operation) {
+        std::cout << get_operation->result() << std::endl;
+      }).catch_error([](auto operation_error) {
+        std::cerr << "Hello world failed" << operation_error.code().message() << std::endl;
+      });
+}
+```
+> This would almost work, except the error values differ. Will have to come up with a solution that allow this style of programming.
+
+### Basic API Interface ###
 ```c++
 struct ContainerVersion { /* all private */ };
 struct BlobVersion { /* all private */ };
@@ -181,28 +211,6 @@ class Container {
 ```
 This isn't as daunting as it looks! Lets go over a quick example, that uses the local filesystem first (**now outdated -- update!**)
 
-### Local Filesystem Hello World ###
-```c++
-int main() {
-  maidsafe::nfs::Container test_storage(
-      "/home/user/test_safe_storage", MaxDiskUsage(10485760));
-  
-  const auto put_result = test_storage.Put(
-      "/simple_example", "hello world", maidsafe::nfs::ModifyVersion::New()).get();
-      
-  if (put_result) {
-    const auto get_result = test_storage.Get("simple_example", put_result->version()).get();
-    if (get_result) {
-      std::cout << get_result->result() << std::endl;
-      return EXIT_SUCCESS;
-    }
-  }
-  return EXIT_FAILURE;
-}
-```
-The `test_storage` object is created with a `boost::filesystem::path` object - meaning writes through this object will be stored at that local path (in 3 encrypted chunks). After running this example, you should see files in the directory given to the constructor of `Container`. The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and storing a new file. If an existing file exists at `test_storage:/test_example`, then `if (put_result)` will return false because `put_result` contains an error (so after running this program once, all subsequent runs should fail). The `Get` call uses the `Version` returned by the `Put`, guaranteeing that the contents from the original `Put` ("hello world"), are retrieved. Alternatively, `RetrieveVersion::Latest()` could've been used instead, but if another process or thread updated the file, the new contents would be returned, which may not be "hello world" as desired.
-
-The `.get()` calls after the `Put` and `Get` indicate that the process should wait until the SAFE network (in this example, the local filesystem), successfully completes the requested operation. The `Future<T>` object allows a process to make additional requests before prior requests have completed. If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
 
 ### Local Filesystem Hello World Concatenation ###
 ```c++
