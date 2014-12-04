@@ -235,7 +235,8 @@ class Container {
   BlobPagination ListBlobs();
   BlobPagination ListBlobs(std::regex filter);
   
-  Future<ExpectedBlobOperation<>>            PutMetadata(std::string key, std::string, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<>>            PutMetadata(
+      std::string key, std::string, ModifyBlobVersion);
   Future<ExpectedBlobOperation<std::string>> GetMetadata(std::string key, RetrieveBlobVersion);
 
   Future<ExpectedBlobOperation<>>            Put(std::string key, std::string, ModifyBlobVersion);
@@ -477,7 +478,8 @@ class Container {
   BlobPagination ListBlobs();
   BlobPagination ListBlobs(std::regex filter);
   
-  Future<ExpectedBlobOperation<>>            PutMetadata(std::string key, std::string, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<>>            PutMetadata(
+      std::string key, std::string, ModifyBlobVersion);
   Future<ExpectedBlobOperation<std::string>> GetMetadata(std::string key, RetrieveBlobVersion);
 
   Future<ExpectedBlobOperation<>>            Put(std::string key, std::string, ModifyBlobVersion);
@@ -513,7 +515,7 @@ class Container {
   // The File object can be from a different Storage object,
   // allowing copying between identities
   unspecified Copy(
-      const LocalBlob& from, std::string to, ModifyVersion, AsyncResult<>);
+      const LocalBlob& from, std::string to, ModifyVersion, AsyncResult<LocalBlob>);
 };
 ```
 
@@ -571,6 +573,6 @@ class Blob {
   unspecified Write(boost::asio::buffer, AsyncResult<>);
   unspecified Truncate(std::uint64_t, AsyncResult<>);
 
-  unspecified commit(AsyncResult<>);
+  unspecified commit(AsyncResult<BlobVersion>);
 };
 ```
