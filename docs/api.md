@@ -205,11 +205,15 @@ class RetrieveBlobVersion {
 };
 
 class ContainerPagination {
+  const ContainerVersion& version() const;
+
   Future<ExpectedContainerOperation<std::vector<std::string>>> GetNext(std::size_t);
   Future<ExpectedContainerOperation<std::vector<std::string>>> GetRemaining();
 };
 
 class BlobPagination {
+  const ContainerVersion& version() const;
+
   Future<ExpectedBlobOperation<std::vector<std::pair<std::string, BlobVersion>>>> GetNext(std::size_t);
   Future<ExpectedBlobOperation<std::vector<std::pair<std::string, BlobVersion>>>> GetRemaining();
 };
@@ -226,15 +230,22 @@ class Account {
 };
 
 class Container {
+  ContainerVersion LatestVersion();
+
   BlobPagination ListBlobs();
   BlobPagination ListBlobs(std::regex filter);
+  
+  Future<ExpectedBlobOperation<>>            PutMetadata(std::string key, std::string, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<std::string>> GetMetadata(std::string key, RetrieveBlobVersion);
 
   Future<ExpectedBlobOperation<>>            Put(std::string key, std::string, ModifyBlobVersion);
   Future<ExpectedBlobOperation<std::string>> Get(std::string key, RetrieveBlobVersion);
   Future<ExpectedBlobOperation<>>            Delete(std::string key, RetrieveBlobVersion);
   
+  Future<ExpectedBlobOperation<>>            ModifyRange(
+      std::string key, std::string, std::uint64_t offset, ModifyBlobVersion);
   Future<ExpectedBlobOperation<std::string>> GetRange(
-      std::string key, std::uint64_t offset, std::size_t length, RetrieveBlobVersion);
+      std::string key, std::size_t length, std::uint64_t offset, RetrieveBlobVersion);
 
   Future<ExpectedBlobOperation<>> Copy(
       std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
@@ -461,39 +472,43 @@ class Container {
   //
   // Basic API
   //
+  ContainerVersion LatestVersion();
+
   BlobPagination ListBlobs();
   BlobPagination ListBlobs(std::regex filter);
-
-  FutureExpectedBlobOperation<>            Put(std::string key, std::string, ModifyBlobVersion);
-  FutureExpectedBlobOperation<std::string> Get(std::string key, RetrieveBlobVersion);
-  FutureExpectedBlobOperation<>            Delete(std::string key, RetrieveBlobVersion);
   
-  FutureExpectedBlobOperation<std::string> GetRange(
-      std::string key, std::uint64_t offset, std::size_t length, RetrieveBlobVersion);
+  Future<ExpectedBlobOperation<>>            PutMetadata(std::string key, std::string, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<std::string>> GetMetadata(std::string key, RetrieveBlobVersion);
 
-  FutureExpectedBlobOperation<> Copy(
+  Future<ExpectedBlobOperation<>>            Put(std::string key, std::string, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<std::string>> Get(std::string key, RetrieveBlobVersion);
+  Future<ExpectedBlobOperation<>>            Delete(std::string key, RetrieveBlobVersion);
+  
+  Future<ExpectedBlobOperation<>>            ModifyRange(
+      std::string key, std::string, std::uint64_t offset, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<std::string>> GetRange(
+      std::string key, std::size_t length, std::uint64_t offset, RetrieveBlobVersion);
+
+  Future<ExpectedBlobOperation<>> Copy(
       std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
       
   //
   // Advanced API
   //
-  unspecified ListVersions(AsyncResult<std::vector<ContainerVersion>>);
+  std::vector<ContainerVersion> ListVersions();
   
   unspecified ListContainers(
-      RetrieveContainerVersion, AsyncResult<std::vector<std::string>>);
-  unspecified ListContainers(
-      RetrieveContainerVersion, std::regex filter, AsyncResult<std::vector<std::string>>);
+      RetrieveContainerVersion, 
+      boost::optional<std::regex> filter, 
+      AsyncResult<std::vector<std::string>>);
 
   unspecified ListBlobs(
       RetreieveContainerVersion,
-      AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>);
-  unspecified ListBlobs(
-      RetreieveContainerVersion,
-      std::regex filter,
+      boost::optional<std::regex> filter,
       AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>);
   
-  unspecified CreateFile(std::string, AsyncResult<LocalBlob>);
-  unspecified OpenFile(std::string, AsyncResult<LocalBlob>);
+  unspecified OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>);
+  unspecified OpenFile(std::string, ModifyBlobVersion, AsyncResult<LocalBlob>);
   
   // The File object can be from a different Storage object,
   // allowing copying between identities
@@ -547,7 +562,6 @@ class Blob {
   boost::optional<BlobVersion> version() const;
 
   unspecified ListVersions(AsyncResult<std::vector<BlobVersion>>);
-
 
   std::uint64_t get_offset() const;
   void set_offset(std::uint64_t);
