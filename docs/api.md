@@ -149,11 +149,11 @@ bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
     
     if (get_part1_result && get_part2_result) {
       std::cout << get_part1_result->result() << get_part2_result->result() << std::endl;
-      return EXIT_SUCCESS;
+      return true;
     }
   }
 
-  return EXIT_FAILURE;
+  return false;
 }
 ```
 In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the `container` object directly.
@@ -266,8 +266,17 @@ class RetrieveVersion {
   bool is_latest() const; // True if constructed with Latest();
   const Version& version() const; // throw if is_latest();
 };
+```
 
+> maidsafe/nfs/retrieve_container_version.h
+
+```c++
 using RetrieveContainerVersion = RetrieveVersion<ContainerVersion>;
+```
+
+> maidsafe/nfs/retrieve_blob_version.h
+
+```c++
 using RetrieveBlobVersion = RetrieveVersion<BlobVersion>;
 ```
 
@@ -291,8 +300,17 @@ class ModifyVersion {
   Instruction instruction() const;
   const Version& version() const; // throw if instruction() != Instruction::kSpecific;
 };
+```
 
+> maidsafe/nfs/modify_container_version.h
+
+```c++
 using ModifyContainerVersion = ModifyVersion<ContainerVersion>;
+```
+
+> maidsafe/nfs/modify_blob_version.h
+
+```c++
 using ModifyBlobVersion = ModifyVersion<BlobVersion>;
 ```
 
@@ -313,49 +331,52 @@ class Operation {
   const T& result() & const; // if T != void
   T&& result() &&; // if T != void
 };
+```
 
+> maidsafe/nfs/container_operation.h
+
+```c++
 template<typename T = void>
 using ContainerOperation = Operation<ContainerVersion, T>;
+```
 
+> maidsafe/nfs/blob_operation.h
+
+```c++
 template<typename T = void>
 using BlobOperation = Operation<BlobVersion, T>;
 ```
 
 ### maidsafe::nfs::ExpectedContainerOperation<T> ###
-> maidsafe/nfs/aliases.h
+> maidsafe/nfs/expected_container_operation.h
 
 A type conforming to the proposed [expected](https://github.com/ptal/std-expected-proposal) interface. All functionality listed in [N4109](http://isocpp.org/blog/2014/07/n4109) can be assumed to be available in future releases.
 
 ```c++
 template<typename T = void>
 using ExpectedContainerOperation = 
-    boost::expected<ContainerOperation<T>, ContainerOperation<std::error_code>>;
+    boost::expected<ContainerOperation<T>, OperationError<ContainerOperation, T>>;
 ```
 
 ### maidsafe::nfs::ExpectedBlobOperation<T> ###
-> maidsafe/nfs/aliases.h
+> maidsafe/nfs/expected_blob_operation.h
 
 A type conforming to the proposed [expected](https://github.com/ptal/std-expected-proposal) interface. All functionality listed in [N4109](http://isocpp.org/blog/2014/07/n4109) can be assumed to be available in future releases.
 
 ```c++
 template<typename T = void>
-using ExpectedBlobOperation = boost::expected<BlobOperation<T>, BlobOperation<std::error_code>>;
+using ExpectedBlobOperation = 
+    boost::expected<BlobOperation<T>, OperationError<BlobOperation, std::error_code>>;
 ```
 
 ### maidsafe::nfs::Future<T> ###
-> maidsafe/nfs/aliases.h
+> maidsafe/nfs/future.h
 
-A type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually. Extensions in the `boost::future<T>` implementation are **not** guaranteed to be available in future releases, so use at your own risk. Additionally, non-member extension functions are **not** guaranteed to be available in future releases. It is therefore recommended to only use `maidsafe::nfs::Future<T>` as-if it were a C++11 `std::future<T>` object.
+A type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually.
 
 ```c++
 template<typename T>
 using Future = boost::future<T>;
-
-template<typename T = void>
-using FutureExpectedContainerOperation = Future<ExpectedContainerOperation<T>>;
-
-template<typename T = void>
-using FutureExpectedBlobOperation = Future<ExpectedBlobOperation<T>>;
 ```
 
 ### maidsafe::nfs::Pagination ###
