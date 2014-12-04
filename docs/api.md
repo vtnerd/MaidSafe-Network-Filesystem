@@ -221,8 +221,8 @@ class Account {
   ContainerPagination ListContainers();
   ContainerPagination ListContainers(std::regex filter);
 
-  Future<ExpectedContainerOperation<std::shared_ptr<Container>>> OpenContainer(std::string);
-  Future<ExpectedContainerOperation<>>                           DeleteContainer(std::string);
+  Future<ExpectedContainerOperation<Container>> OpenContainer(std::string);
+  Future<ExpectedContainerOperation<>>          DeleteContainer(std::string);
 };
 
 class Container {
@@ -250,7 +250,7 @@ Currently an alias for StructuredDataVersions::VersionName in common. The user s
 ### maidsafe::nfs::BlobVersion ###
 > maidsafe/nfs/blob_version.h
 
-References a specific version of a `Blob`. Hash of data map chunks (so `BlobVersion` is a hash of the contents). `Blob`s with identical content will have same version, even if their key differs.
+References a specific version of a `Blob`; hash of metadata and data map chunks (so `BlobVersion` is a hash of the contents).
 
 ### maidsafe::nfs::RetrieveVersion ###
 > maidsafe/nfs/retrieve_version.h
@@ -424,8 +424,8 @@ class Account {
   ContainerPagination ListContainers();
   ContainerPagination ListContainers(std::regex filter);
 
-  FutureExpectedContainerOperation<std::shared_ptr<Container>> OpenContainer(std::string);
-  FutureExpectedContainerOperation<>                           DeleteContainer(std::string);
+  Future<ExpectedContainerOperation<Container>> OpenContainer(std::string);
+  Future<ExpectedContainerOperation<>>          DeleteContainer(std::string);
       
   //
   // Advanced API
@@ -452,9 +452,9 @@ The `Container` class stores `Blob` objects or pointers to a `Container` at SAFE
 The `Put` and `Get` methods will move the content `std::string` to the `Future<T>` upon success. This allows advanced users to re-use buffers (and explains why the `Put` method returns a std::string as a result). The `Get` overload that does not accept a std::string as a parameter will create a new std::string as needed.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
-- A callback that accepts `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`; return type is void
-- A boost::asio::yield_context object; return type is `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`.
-- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::FutureExpectedOperation<T>`.
+- A callback that accepts `boost::expected<T, std::error_code>`; return type is void
+- A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
+- A boost::asio::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`.
 
 ```c++
 class Container {
@@ -492,13 +492,13 @@ class Container {
       std::regex filter,
       AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>);
   
-  unspecified CreateFile(std::string, AsyncResult<std::shared_ptr<LocalBlob>>);
-  unspecified OpenFile(std::string, AsyncResult<std::shared_ptr<LocalBlob>>);
+  unspecified CreateFile(std::string, AsyncResult<LocalBlob>);
+  unspecified OpenFile(std::string, AsyncResult<LocalBlob>);
   
   // The File object can be from a different Storage object,
   // allowing copying between identities
   unspecified Copy(
-      std::shared_ptr<LocalBlob> from, std::string to, ModifyVersion, AsyncResult<>);
+      const LocalBlob& from, std::string to, ModifyVersion, AsyncResult<>);
 };
 ```
 
@@ -522,15 +522,10 @@ If a `LocalBlob` is unversioned, the async operation for `LocalBlob::Commit` wil
  
 If multiple `LocalBlob` objects are opened within the same process, they are treated no differently than `LocalBlob` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `LocalBlob` objects successfully writing to the network. All other `LocalBlob` objects become permanently unversioned.
 
-Parameters labeled as `SimpleAsyncResult` affect the return type of the function, and valid values are:
-- A callback that accepts `maidsafe::nfs::Expected<>`; return type is void
-- A boost::asio::yield_context object; return type is `maidsafe::nfs::Expected<>`.
-- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::Future<maidsafe::nfs::Expected<>>`.
-
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
-- A callback that accepts `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`; return type is void
-- A boost::asio::yield_context object; return type is `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`.
-- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::FutureExpectedOperation<T>`.
+- A callback that accepts `boost::expected<T, std::error_code>`; return type is void
+- A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
+- A boost::asio::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`
 
 ```C++
 class Blob {
@@ -559,8 +554,8 @@ class Blob {
 
   // Offset is implied through setters above.
   unspecified Read(boost::asio::buffer, AsyncResult<std::uint64_t>);
-  unspecified Write(boost::asio::buffer, SimpleAsyncResult<>);
-  unspecified Truncate(std::uint64_t, SimpleAsyncResult<>);
+  unspecified Write(boost::asio::buffer, AsyncResult<>);
+  unspecified Truncate(std::uint64_t, AsyncResult<>);
 
   unspecified commit(AsyncResult<>);
 };
