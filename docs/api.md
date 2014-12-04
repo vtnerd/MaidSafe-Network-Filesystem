@@ -286,7 +286,7 @@ using RetrieveBlobVersion = RetrieveVersion<BlobVersion>;
 A template that has special states to indicate initial, and latest version. Allows `Put`, or `Copy` calls to overwrite a specific version, create a new one, or blindly overwrite data.
 
 ```c++
-template<typename Version
+template<typename Version>
 class ModifyVersion {
   enum class Instruction {
     kSpecific = 0,
@@ -317,34 +317,47 @@ using ModifyBlobVersion = ModifyVersion<BlobVersion>;
 ### maidsafe::nfs::Operation<T> ###
 > maidsafe/nfs/operation.h
 
-All requests to the SAFE network will yield an Operation<T> object. Every Operation object will have a path, version, and a result value (which can be void).
+Network requests in the basic API will yield an `Operation<T>` object on success. Every `Operation` object will have a version, and a result value (which can be void).
 
 ```c++
-template<typename Version, typename T>
+template<typename Version, typename Result>
 class Operation {
-  const std::string& key() & const;
-  std::string key() &&;
-  
   const Version& version() & const;
   Version&& version() &&;
   
-  const T& result() & const; // if T != void
-  T&& result() &&; // if T != void
+  const Result& result() & const; // if Result != void
+  Result&& result() &&; // if Result != void
 };
 ```
 
 > maidsafe/nfs/container_operation.h
 
 ```c++
-template<typename T = void>
-using ContainerOperation = Operation<ContainerVersion, T>;
+template<typename Result = void>
+using ContainerOperation = Operation<ContainerVersion, Result>;
 ```
 
 > maidsafe/nfs/blob_operation.h
 
 ```c++
-template<typename T = void>
-using BlobOperation = Operation<BlobVersion, T>;
+template<typename Result = void>
+using BlobOperation = Operation<BlobVersion, Result>;
+```
+
+### maidsafe::nfs::OperationError<T> ###
+> maidsafe/nfs/operation.h
+
+Network requests in the basic API will yield an `OperationError<T>` object on network failure. Every `OperationError` object will have an error code, and Retry capability that returns a `Future` to a re-attempt at the failed operation.
+
+```c++
+template<typename OperationResult>
+class OperationError {
+  using RetryResult = 
+      Future<boost::expected<OperationResult, OperationError<OperationResult>>>
+  
+  RetryResult Retry() const;
+  const std::error_code& code() const;
+};
 ```
 
 ### maidsafe::nfs::ExpectedContainerOperation<T> ###
@@ -355,7 +368,7 @@ A type conforming to the proposed [expected](https://github.com/ptal/std-expecte
 ```c++
 template<typename T = void>
 using ExpectedContainerOperation = 
-    boost::expected<ContainerOperation<T>, OperationError<ContainerOperation, T>>;
+    boost::expected<ContainerOperation<T>, OperationError<ContainerOperation<T>>>;
 ```
 
 ### maidsafe::nfs::ExpectedBlobOperation<T> ###
@@ -366,13 +379,13 @@ A type conforming to the proposed [expected](https://github.com/ptal/std-expecte
 ```c++
 template<typename T = void>
 using ExpectedBlobOperation = 
-    boost::expected<BlobOperation<T>, OperationError<BlobOperation, std::error_code>>;
+    boost::expected<BlobOperation<T>, OperationError<BlobOperation<T>>>;
 ```
 
 ### maidsafe::nfs::Future<T> ###
 > maidsafe/nfs/future.h
 
-A type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually.
+Returned by all basic API functions that required network access. `Future<T>` is a type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually.
 
 ```c++
 template<typename T>
