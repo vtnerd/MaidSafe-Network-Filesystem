@@ -127,6 +127,37 @@ bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
 ```
 > This would almost work, except the error values differ. Will have to come up with a solution that allow this style of programming.
 
+### Hello World Concatenation ###
+```c++
+bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
+  const auto put_part1 = container.Put(
+      "split_example/part1", "hello ", maidsafe::nfs::ModifyVersion::New());
+  const auto put_part2 = container.Put(
+      "split_example/part2", "world", maidsafe::nfs::ModifyVersion::New());
+      
+  const auto put_part1_result = put_part1.get();
+  const auto put_part2_result = put_part2.get();
+  
+  if (put_part1_result && put_part2_result) {
+    const auto get_part1 = container.Get(
+        "split_example/part1", put_part1_result->version());
+    const auto get_part2 = container.Get(
+        "split_example/part2", put_part2_result->version());
+        
+    const auto get_part1_result = get_part1.get();
+    const auto get_part2_result = get_part2.get();
+    
+    if (get_part1_result && get_part2_result) {
+      std::cout << get_part1_result->result() << get_part2_result->result() << std::endl;
+      return EXIT_SUCCESS;
+    }
+  }
+
+  return EXIT_FAILURE;
+}
+```
+In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the `container` object directly.
+
 ## Basic API Interface ##
 ```c++
 struct ContainerVersion { /* all private */ };
@@ -209,42 +240,6 @@ class Container {
       std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
 };
 ```
-This isn't as daunting as it looks! Lets go over a quick example, that uses the local filesystem first (**now outdated -- update!**)
-
-
-### Local Filesystem Hello World Concatenation ###
-```c++
-int main() {
-  maidsafe::nfs::Container test_storage(
-      "/home/user/test_safe_storage", MaxDiskUsage(10485760));
-      
-  const auto put_part1 = test_storage.Put(
-      "split_example/part1", "hello ", maidsafe::nfs::ModifyVersion::New());
-  const auto put_part2 = test_storage.Put(
-      "split_example/part2", "world", maidsafe::nfs::ModifyVersion::New());
-      
-  const auto put_part1_result = put_part1.get();
-  const auto put_part2_result = put_part2.get();
-  
-  if (put_part1_result && put_part2_result) {
-    const auto get_part1 = test_storage.Get(
-        "split_example/part1", put_part1_result->version());
-    const auto get_part2 = test_storage.Get(
-        "split_example/part2", put_part2_result->version());
-        
-    const auto get_part1_result = get_part1.get();
-    const auto get_part2_result = get_part2.get();
-    
-    if (get_part1_result && get_part2_result) {
-      std::cout << get_part1_result->result() << get_part2_result->result() << std::endl;
-      return EXIT_SUCCESS;
-    }
-  }
-
-  return EXIT_FAILURE;
-}
-```
-In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the "test_storage" `Container`, under the keys "split_example/part1" and "split_example/part2".
 
 ## Advanced Information ##
 ### maidsafe::nfs::ContainerVersion ###
