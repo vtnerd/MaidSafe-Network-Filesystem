@@ -111,6 +111,7 @@ bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
   return false;
 }
 ```
+This is identical to the [hello world](#hello-world) example, except `Put` and `Get` operations that failed due to the network being down (no connection) are retried. In production code you may want to limit the attempts.
 
 ### Hello World Monad ###
 ```c++
