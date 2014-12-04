@@ -115,11 +115,14 @@ This is identical to the [hello world](#hello-world) example, except `Put` and `
 ### Hello World Monad ###
 ```c++
 bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
-  return container.Put("example_blob", "hello world", ModifyVersion::New()).get().then(
+  return container.Put("example_blob", "hello world", ModifyVersion::New()).get().bind(
+  
       [&container](BlobOperation<> put_operation) {
         return container.Get("example_blob", put_operation->version()).get();
-      }).then([](BlobOperation<std::string> get_operation) {
-        std::cout << get_operation->result() << std::endl;
+        
+      }).bind([](BlobOperation<std::string> get_operation) {
+          std::cout << get_operation->result() << std::endl;
+          
       }).catch_error([](auto operation_error) {
         std::cerr << "Hello world failed" << operation_error.code().message() << std::endl;
       });
