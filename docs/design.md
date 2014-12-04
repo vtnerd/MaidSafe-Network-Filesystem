@@ -1,7 +1,7 @@
 # Maidsafe NFS API Design #
 ![Maidsafe NFS API Design](https://rawgit.com/vtnerd/MaidSafe-Network-Filesystem/api_docs/docs/design.svg)
 
-## NetworkInterface ##
+## detail::NetworkInterface ##
 > * Non-copyable
 
 An interface that provides the ability to store/retrieve single chunks of data, and the ability to store/retrieve structured data version objects. Currently there are two implementations of this interface, one that uses the SAFE network, and one that uses the local filesystem (testing only).
@@ -37,7 +37,7 @@ Client interface for writing/reading contents of a blob. Creates new copy of `de
 Every call to `LocalBlob::Commit` will send an object of this type to `detail::Container` for storage. The separation allows LocalBlob to take a "snapshot" of the current attempt at versioning the modified `Blob`. If the storage is successful, the associated `detail::Container` object will be updated with a new `detail::Blob` containing the data map, metadata, and buffer that was owner by the `detail::LocalBlob` object.
 
 ## detail::Blob ##
-Represents an immutable `Blob` stored on the network. Automatically freed when a `detail::ContainerInstance` no longer references it (and whose delete function removes the cache entry in `unordered_map<BlobVersion, weak_ptr<detail::Blob>>`).
+Represents an immutable `Blob` stored on the network. Automatically freed when no `detail::ContainerInstance` object references it (and whose delete function removes the cache entry in `unordered_map<BlobVersion, weak_ptr<detail::Blob>>`).
 
 ## detail::BlobBuffer ##
 > * Non-copyable
