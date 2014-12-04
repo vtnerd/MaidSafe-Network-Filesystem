@@ -12,16 +12,15 @@ A `Container` stores `Blobs` or a pointer to another `Container`, at keys that u
 The top-most `Container`ers are stored in a special object that does not store `Blob`s. This special object is versioned, so the history of `Container` pointers at the top-most level can be reviewed.
 
 #### Nested Containers and Blob Forks ####
-Nested `Container` objects are only recommended for advanced users. A `Container` pointer can be deleted, and then a new `Container` pointer with the same key can be created. If an application is treating a `Container` like a directory, this can give the appearance of a "forked" Blob. For example, given the sequence:
-
+The chunk information for each `Blob` is stored directly in the `Container`, but only a reference ID (a pointer) is stored for child `Container`s. Since a child `Container` is a pointer to another `Container` on the network, a key can have multiple reference IDs stored in its history for a child `Container`. If the client treats children `Container`s as directories on a local filesystem, the result can be a fork in the history. The problem is if a child `Container` is deleted and re-created while another process is writing to the same `Container`:
 ```
-CREATE TOP-MOST "example" -> CONTAINER(1)
-STORE ["dir1"->CONTAINER(2)] in CONTAINER(1)
-STORE ["file1"->"BLAH"] in CONTAINER(2)
-STORE ["dir1"->CONTAINER(3)] in CONTAINER(1)
-STORE [file1"->"NO_BLAH"] in CONTAINER(3)
+                        Container(users)-->V1["user1":foo]-->V2["user1:foo2]
+                        /
+Container(root)-->V1["users"]-->V2[]-->V3["users"]
+                                              \
+                                             Container(users)-->V1["user1":bar]
 ```
-An application could write to CONTAINER(2)["file1"] and not be aware that CONTAINER(1) no longer pointed to CONTAINER(2). If an application were to treat this like a directory structure, it would not be aware of the "fork" consequences. In other words, CONTAINER(1) has two pointers for "dir1" in its versioned history, so clients can see two different histories for "dir1"/"file1". Thus, containers shall not be treated like directories.
+If treated as a filepath, "/users/user1" would have two different histories depending on what version of the root was retrieved. Clients are encouraged to only create a container at the top-level (at the `Account` object level), and rarely delete them. Advanced clients will have to handle these data fork issues; no mechanism for detecting forks and reacting to them currently exists.
 
 #### Container Keys != Filesystem Paths ####
 Containers are nested, but they cannot be used like paths. You cannot open "/container1/container2/document"; a "/" character has no special meaning in a `Container` key. This is intentional, [nested containers are complicated](#nested-containers-and-blob-forks), and should generally be avoided.
