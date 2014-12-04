@@ -38,13 +38,13 @@ Every basic API function call that requires a network operation returns a `maids
 In the basic API, the `Future` will only throw exceptions on non-network related errors (std::bad_alloc, std::bad_promise, etc.). Values and network related errors are returned in a `boost::expected` object.
 
 ## Expected ##
-When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain a OperationError object, and on success the object will contain a BlobOperation or a ContainerOperation object depending on the operation requested. For convenience, the templated types `ExpectedContainerOperation<T>` and `ExpectedBlobOperation<T>` are provided, where `T` is the desired result of the operation (i.e. a std::string on a `Get` request). Both types assume `OperationError<T>` as the error object for the operation.
+When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain a OperationError object, and on success the object will contain a BlobOperation or a ContainerOperation object depending on the operation requested. For convenience, the templated types `ExpectedContainerOperation<T>` and `ExpectedBlobOperation<T>` are provided, where `T` is the result of the operation (i.e. a std::string on a `Get` request). Both types assume `OperationError<T>` as the error object for the operation.
 
 ## OperationError ##
-In the event of a failure, retrieving the cause of the error and a Retry attempt can be done with the `OperationError<T>` interface, where `T` was the desired result of the failed operation. The Retry attempt will return a new Future object with the exact type of the previous failed attempt.
+In the event of a failure, retrieving the cause of the error and a Retry attempt can be done with the `OperationError<T>` interface, where `T` was the result of the failed operation. The Retry attempt will return a new Future object with the exact type of the previous failed attempt.
 
-### Examples ###
-#### Hello World ####
+## Examples ##
+### Hello World ###
 ```c++
 bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
   std::error_code error;
@@ -75,7 +75,7 @@ The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and s
 
 The `.get()` calls after the `Put` and `Get` indicate that the process should wait until the SAFE network successfully completes the requested operation. The `Future<T>` object allows a process to make additional requests before prior requests have completed. If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
 
-#### Hello World Retry ####
+### Hello World Retry ###
 ```c++
 namespace {
   template<typename Result>
@@ -112,7 +112,7 @@ bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
 }
 ```
 
-#### Hello World Monad ####
+### Hello World Monad ###
 ```c++
 bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
   return container.Put("example_blob", "hello world", ModifyVersion::New()).get().then(
@@ -127,7 +127,7 @@ bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
 ```
 > This would almost work, except the error values differ. Will have to come up with a solution that allow this style of programming.
 
-### Basic API Interface ###
+## Basic API Interface ##
 ```c++
 struct ContainerVersion { /* all private */ };
 struct BlobVersion { /* all private */ };
