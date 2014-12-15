@@ -10,6 +10,12 @@ Data on the SAFE network is stored in `Blob`s. A `Blob` can contain text or bina
 ### Container ###
 A `Container` stores `Blobs` at keys that uniquely identify the `Blob`. The key has no restrictions (any sequence of bytes are valid). The `Blob` stored at each key is versioned, so past `Blob`s can be retrieved.
 
+### Identities ###
+Each SAFE account can have multiple private, public, or privately-shared identities. Applications are given permission to use 0 or more of these identities. Applications cannot read or modify data in identities they were not given permission to access. Each Identity will store 0 or more `Container`s.
+
+### IDs ###
+An ID contains the necessary information to decrypt the `Identity` information. Apps are given the ID information from the Maidsafe provided application, which prevents apps from being exposed to all of the cryptographic keys or the users SAFE network login credentials.
+
 ### Versioning ###
 Every key in a `Container` is stored as a revision, so that conflicts between SAFE Apps (or multiple instances of the same SAFE App) can be detected. Every SAFE storage operation that modifies the contents stored at a key requires a `Version` object, and the operation will fail if the `Version` object represents an outdated `Version` from the one currently stored in the `Container`. SAFE App developers will be responsible for handling version conflicts, no generic solution exists.
 
@@ -24,6 +30,8 @@ In the REST API, the `Future` will only throw exceptions on non-network related 
 ### Expected ###
 When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain a OperationError object, and on success the object will contain a BlobOperation or a ContainerOperation object depending on the operation requested. For convenience, the templated types `ExpectedContainerOperation<T>` and `ExpectedBlobOperation<T>` are provided, where `T` is the result of the operation (i.e. a std::string on a `Get` request). Both types assume `OperationError` as the error object for the operation.
 
+The only exception is the `Identity::GetIDs()` function, which returns a `Future<boost::expected<Identity, std::error_code>>` object.
+
 ### OperationError ###
 In the event of a failure, retrieving the cause of the error and a Retry attempt can be done with the `OperationError` interface. The error is a std::error_code object, and the retry attempt will return a new `Future` object with the exact type of the previous failed attempt.
 
@@ -32,14 +40,14 @@ In the event of a failure, retrieving the cause of the error and a Retry attempt
 ```c++
 int main() {
   try {
-    const auto identities = maidsafe::nfs::Account::GetAvailableIndentities().get();
+    const auto ids = maidsafe::nfs::Identity::GetAvailableIDs().get();
     
-    if (identities.value().size() != 1) {
+    if (ids.value().size() != 1) {
       throw std::runtime_error("Expected only one identity");
     }
     
-    maidsafe::nfs::Account account(identities.value()[0]);
-    maidsafe::nfs::Container container(account.GetContainer("example").get().value());
+    maidsafe::nfs::Identity identity(ids.value()[0]);
+    maidsafe::nfs::Container container(identity.GetContainer("example").get().value());
   
     const auto put_operation = container.Put("example_blob", "hello world", ModifyVersion::New()).get();
     const auto get_operation = container.Get("example_blob", put_operation.value().version()).get();
@@ -58,7 +66,7 @@ int main() {
   return EXIT_SUCCESS;
 }
 ```
-The `.get()` calls after `GetIdentities`, `GetContainer`, `Put` and `Get` indicate that the process should wait until the SAFE network successfully completes the requested operation (the `.get()` is called on the `Future<T>` object). The `Future<T>` object allows a process to make additional requests before prior requests have completed. If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
+The `.get()` calls after `GetIDs`, `GetContainer`, `Put` and `Get` indicate that the process should wait until the SAFE network successfully completes the requested operation (the `.get()` is called on the `Future<T>` object). The `Future<T>` object allows a process to make additional requests before prior requests have completed. If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
 
 The `Future<T>` returns a `boost::expected` object. In this example, exception style error-handling was used, so `.value()` was invoked on the `boost::expected`. The `.value()` function checks the error status, and throws if the `boost::expected` object has an error instead of a valid operation.
 
@@ -155,7 +163,7 @@ In this example, both `Put` calls are done in parallel, and both `Get` calls are
 ```c++
 namespace maidsafe {
 namespace nfs {
-struct Identity { /* all private */ };
+struct ID { /* all private */ };
 struct ContainerVersion { /* all private */ };
 struct BlobVersion { /* all private */ };
 
@@ -200,10 +208,10 @@ class RetrieveBlobVersion {
   static RetrieveBlobVersion Latest();
 };
 
-class Account {
-  static Future<boost::expected<std::vector<Identity>, std::error_code>> GetAvailableIdentities();
+class Identity {
+  static Future<boost::expected<std::vector<ID>, std::error_code>> GetAvailableIDs();
 
-  explicit Account(const Identity& identity);
+  explicit Identity(const ID& id);
   
   Future<ExpectedContainerOperation<std::vector<std::string>>> ListContainers();
 
