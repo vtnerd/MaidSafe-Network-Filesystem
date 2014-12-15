@@ -12,16 +12,15 @@ A `Container` stores `Blobs` or a pointer to another `Container`, at keys that u
 The top-most `Container`ers are stored in a special object that does not store `Blob`s. This special object is versioned, so the history of `Container` pointers at the top-most level can be reviewed.
 
 #### Nested Containers and Blob Forks ####
-Nested `Container` objects are only recommended for advanced users. A `Container` pointer can be deleted, and then a new `Container` pointer with the same key can be created. If an application is treating a `Container` like a directory, this can give the appearance of a "forked" Blob. For example, given the sequence:
-
+The chunk information for each `Blob` is stored directly in the `Container`, but only a reference ID (a pointer) is stored for child `Container`s. Since a child `Container` is a pointer to another `Container` on the network, a key can have multiple reference IDs stored in its history for a child `Container`. If the client treats children `Container`s as directories on a local filesystem, the result can be a fork in the history. The problem is if a child `Container` is deleted and re-created while another process is writing to the same `Container`:
 ```
-CREATE TOP-MOST "example" -> CONTAINER(1)
-STORE ["dir1"->CONTAINER(2)] in CONTAINER(1)
-STORE ["file1"->"BLAH"] in CONTAINER(2)
-STORE ["dir1"->CONTAINER(3)] in CONTAINER(1)
-STORE [file1"->"NO_BLAH"] in CONTAINER(3)
+                        Container(users)-->V1["user1":foo]-->V2["user1:foo2]
+                        /
+Container(root)-->V1["users"]-->V2[]-->V3["users"]
+                                              \
+                                             Container(users)-->V1["user1":bar]
 ```
-An application could write to CONTAINER(2)["file1"] and not be aware that CONTAINER(1) no longer pointed to CONTAINER(2). If an application were to treat this like a directory structure, it would not be aware of the "fork" consequences. In other words, CONTAINER(1) has two pointers for "dir1" in its versioned history, so clients can see two different histories for "dir1"/"file1". Thus, containers shall not be treated like directories.
+If treated as a filepath, "/users/user1" would have two different histories depending on what version of the root was retrieved. Clients are encouraged to only create a container at the top-level (at the `Account` object level), and rarely delete them. Advanced clients will have to handle these data fork issues; no mechanism for detecting forks and reacting to them currently exists.
 
 #### Container Keys != Filesystem Paths ####
 Containers are nested, but they cannot be used like paths. You cannot open "/container1/container2/document"; a "/" character has no special meaning in a `Container` key. This is intentional, [nested containers are complicated](#nested-containers-and-blob-forks), and should generally be avoided.
@@ -31,73 +30,138 @@ Every key in a `Container` is stored as a revision, so that conflicts between SA
 
 Every operation will return a `Version` object which will be the most-up-to-date version known to the SAFE API.
 
+## Basic API ##
 ## Futures ##
-Every function in the basic API returns a `Future<T>` to some type `T` (the advanced API has a few more options). While this may seem antithetical to the ease-of-use approach, it more accurately represents the behavior of the API functions. For example, typical write calls to the local filesystem are generally not written to the underlying hard-disk when the function returns, and instead are cached at various levels. The client has to make additional function calls to ensure that data reaches disk, and if a disk write fails - which write calls made it to disk? The SAFE API returning a `Future<T>` therefore better represents the behavior - the function stored the necessary information to complete the operation at some later point in time, and the `Future<T>` object will notify the client when that operation completed. In the SAFE API, clients can assume that a requested operation has completed to the SAFE network when the value T can be retrieved from the `Future<T>`.
+Every basic API function call that requires a network operation returns a `maidsafe::nfs::Future` object. This prevents the interface from blocking, and provides an interface for signalling completion. Currently `maidsafe::nfs::Future` is a `boost::future` object, but this may be changed to a non-allocating design. It is recommended that you use the typedef (`maidsafe::nfs::Future`) in case the implementation changes.
 
-Signalling errors in Futures (whether Boost or std) is done with exceptions. Since SAFE network will have a high probability of failure (lack of storage space for user, version error, etc.), the SAFE API will indicate network failures in the `Expected<T>` object (see [Expected](#expected)). System/programming errors (out-of-memory, broken promise) will use the exceptions feature in the `Future<T>`. Signalling network errors in the `Expected<T>` means clients of the API can safely assume that exceptions in the API are a rare event (most can assume that an exception is a fatal event that should stop the process).
-
-### Example Future Usage ###
-```c++
-void PrintFile(maidsafe::nfs::Container& container, std::string key) {
-  // get() blocks until operation is complete
-  const auto retrieval_result = storage.Get(
-      key, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
-  // ... continued throughout tutorial
-}
-```
-Since the future only uses exceptions for fatal errors, its usage is quite easy. Calling .get() on the Future<T> will block until the operation completes. The function will only throw in fatal conditions, otherwise retrieval_result will contain the result of the operation or a non-fatal error, but never both.
+In the basic API, the `Future` will only throw exceptions on non-network related errors (std::bad_alloc, std::bad_promise, etc.). Values and network related errors are returned in a `boost::expected` object.
 
 ## Expected ##
-Every operation in the NFS API (basic or advanced) will provide an `Expected<Operation<T>>` object when complete (see [operation](#operation) section below). If a non-fatal error ocurred during the operation, the Expected object will have an `Operation<Error>` object instead of an object of type `Operation<T>`. Using `Expected<T>`, instead of exceptions with the `Future<T>`, allows for non-fatal errors to be checked in a functional way. 
+When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain a OperationError object, and on success the object will contain a BlobOperation or a ContainerOperation object depending on the operation requested. For convenience, the templated types `ExpectedContainerOperation<T>` and `ExpectedBlobOperation<T>` are provided, where `T` is the result of the operation (i.e. a std::string on a `Get` request). Both types assume `OperationError<T>` as the error object for the operation.
 
-### Example Expected Usage ###
+## OperationError ##
+In the event of a failure, retrieving the cause of the error and a Retry attempt can be done with the `OperationError<T>` interface, where `T` was the result of the failed operation. The Retry attempt will return a new Future object with the exact type of the previous failed attempt.
+
+## Examples ##
+### Hello World ###
 ```c++
-void PrintFile(maidsafe::nfs::Container& container, std::string key) {
-  // get() blocks until operation is complete
-  const auto retrieval_result = container.Get(
-      key, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
-  if (retrieval_result) {
-    std::cout << "Contents of " << key << " : " << 
-                 retrieval_result->result() << std::endl;
-  }
-  else {
-    std::cerr << "Could not retrieve " << key << " : " << 
-                 retrieval_result.error().result() << std::endl;
-  }
-}
-```
-- Note: the example above used `retrieval_result->result()` and `retrieval_result.error().result()` because the `Expected` class wraps an [Operation ](#operation) on success or failure.
-
-The `Expected<T>` object has a conversion to bool operator for use with conditional statements, and overloads `operator*` and `operator->`. The easiest way to use the object is like a pointer, but advanced users are encouraged to [read information](https://github.com/ptal/std-expected-proposal) about this object being proposed for a future revision of C++. The `E` in `expected<T,E>` will **always** be `Operation<Error>`, thus `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>` is shorthand for `expected<maidsafe::nfs::Operation<T>, maidsafe::nfs::Operation<madisafe::nfs::Error>>`. A `Operation<T>` is provided in success or error so the user can grab the latest `Version` of the file.
-
-
-
-## Operation ##
-Every operation (failed and successful) in the NFS API (basic or advanced) will provide an `Operation<T>` object when complete (`Operation<Error>` on error). The `Operation<T>` contains the key for the operation, the most up-to-date `Version` for the `Container` key, and the result of the operation, `T`. If the operation had no type to return, `Operation<>` is returned, and no result is available.
-
-### Example Operation Usage ###
-```c++
-void PrintFileThenDelete(maidsafe::nfs::Container& container, std::string key) {
-  // get() blocks until operation is complete
-  const auto retrieval_result = container.Get(
-      key, maidsafe::nfs::RetrievalVersion::Latest()).get(); 
-  if (retrieval_result) {
-    std::cout << "Contents of " << key << " : " << 
-                 retrieval_result->result() << std::endl;
-    const auto deletion_result = container.Delete(key, retrieval_result->version()).get();
-    if (!deletion_result) {
-      std::cerr << "Could not delete " << key << " : " << 
-                   deletion_result.error().result() << std::endl;
+bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
+  std::error_code error;
+  
+  const auto put_operation = container.Put("example_blob", "hello world", ModifyVersion::New()).get();
+  if (put_operation) {
+    const auto get_operation = container.Get("example_blob", put_operation->version()).get();
+    if (get_operation) {
+      std::cout << get_operation->result() << std::endl;
+    }
+    else {
+      error = get_operation.error().code();
     }
   }
   else {
-    std::cerr << "Could not retrieve " << key << " : " << 
-                 retrieval_result.error().result() << std::endl;
+    error = get_operation.error().code();
   }
+  
+  if (error) {
+    std::cerr << "Hello world failed" << error.message() << std::endl;
+    return false;
+  }
+  
+  return true;
 }
 ```
+The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and storing a new file. If an existing file exists at `example_blob`, then `if (put_operation)` will return false because `put_operation` contains an error (so after running this program once, all subsequent runs should fail). The `Get` call uses the `Version` returned by the `Put`, guaranteeing that the contents from the original `Put` ("hello world"), are retrieved. Alternatively, `RetrieveVersion::Latest()` could've been used instead, but if another process or thread updated the file, the new contents would be returned, which may not be "hello world" as desired.
 
-## Basic API ##
+The `.get()` calls after the `Put` and `Get` indicate that the process should wait until the SAFE network successfully completes the requested operation. The `Future<T>` object allows a process to make additional requests before prior requests have completed. If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
+
+### Hello World Retry ###
+```c++
+namespace {
+  template<typename Result>
+  boost::optional<BlobOperation<Result>> GetOperationResult(
+      ExpectedBlobOperation<Result> operation) {
+    while (!operation) {
+      if (operation.error().code() != std::errc::network_down) {
+        std::cerr << 
+            "Hello world failed: " << operation.error().code().message() << std::endl;
+        return boost::none;
+      }
+      operation = operation.error().Retry().get();
+    }
+    return *operation;
+  }
+}
+
+bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
+  const boost::optional<BlobOperation<>> put_operation(
+      GetOperationResult(
+          container.Put(
+              "example_blob", "hello world", ModifyVersion::New()).get()));
+  if (put_operation) {
+     const boost::optional<BlobOperation<std::string>> get_operation(
+        GetOperationResult(
+            container.Get(
+                "example_blob", "hello world", put_operation->version()).get());
+    if (get_operation) {
+      std::cout << get_operation->result() << std::endl;
+      return true;
+    }
+  }
+  return false;
+}
+```
+This is identical to the [hello world](#hello-world) example, except `Put` and `Get` operations that failed due to the network being down (no connection) are retried. In production code you may want to limit the attempts.
+
+### Hello World Monad ###
+```c++
+bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
+  return container.Put("example_blob", "hello world", ModifyVersion::New()).get().bind(
+  
+      [&container](BlobOperation<> put_operation) {
+        return container.Get("example_blob", put_operation->version()).get();
+        
+      }).bind([](BlobOperation<std::string> get_operation) {
+          std::cout << get_operation->result() << std::endl;
+          
+      }).catch_error([](auto operation_error) {
+        std::cerr << "Hello world failed" << operation_error.code().message() << std::endl;
+      });
+}
+```
+> This would almost work, except the error values differ. Will have to come up with a solution that allow this style of programming.
+
+### Hello World Concatenation ###
+```c++
+bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
+  const auto put_part1 = container.Put(
+      "split_example/part1", "hello ", maidsafe::nfs::ModifyVersion::New());
+  const auto put_part2 = container.Put(
+      "split_example/part2", "world", maidsafe::nfs::ModifyVersion::New());
+      
+  const auto put_part1_result = put_part1.get();
+  const auto put_part2_result = put_part2.get();
+  
+  if (put_part1_result && put_part2_result) {
+    const auto get_part1 = container.Get(
+        "split_example/part1", put_part1_result->version());
+    const auto get_part2 = container.Get(
+        "split_example/part2", put_part2_result->version());
+        
+    const auto get_part1_result = get_part1.get();
+    const auto get_part2_result = get_part2.get();
+    
+    if (get_part1_result && get_part2_result) {
+      std::cout << get_part1_result->result() << get_part2_result->result() << std::endl;
+      return true;
+    }
+  }
+
+  return false;
+}
+```
+In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the `container` object directly.
+
+## Basic API Interface ##
 ```c++
 struct ContainerVersion { /* all private */ };
 struct BlobVersion { /* all private */ };
@@ -144,11 +208,15 @@ class RetrieveBlobVersion {
 };
 
 class ContainerPagination {
+  const ContainerVersion& version() const;
+
   Future<ExpectedContainerOperation<std::vector<std::string>>> GetNext(std::size_t);
   Future<ExpectedContainerOperation<std::vector<std::string>>> GetRemaining();
 };
 
 class BlobPagination {
+  const ContainerVersion& version() const;
+
   Future<ExpectedBlobOperation<std::vector<std::pair<std::string, BlobVersion>>>> GetNext(std::size_t);
   Future<ExpectedBlobOperation<std::vector<std::pair<std::string, BlobVersion>>>> GetRemaining();
 };
@@ -160,83 +228,33 @@ class Account {
   ContainerPagination ListContainers();
   ContainerPagination ListContainers(std::regex filter);
 
-  Future<ExpectedContainerOperation<std::shared_ptr<Container>>> OpenContainer(std::string);
-  Future<ExpectedContainerOperation<>>                           DeleteContainer(std::string);
+  Future<ExpectedContainerOperation<Container>> OpenContainer(std::string);
+  Future<ExpectedContainerOperation<>>          DeleteContainer(std::string);
 };
 
 class Container {
+  ContainerVersion LatestVersion();
+
   BlobPagination ListBlobs();
   BlobPagination ListBlobs(std::regex filter);
+  
+  Future<ExpectedBlobOperation<>>            PutMetadata(
+      std::string key, std::string, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<std::string>> GetMetadata(std::string key, RetrieveBlobVersion);
 
   Future<ExpectedBlobOperation<>>            Put(std::string key, std::string, ModifyBlobVersion);
   Future<ExpectedBlobOperation<std::string>> Get(std::string key, RetrieveBlobVersion);
   Future<ExpectedBlobOperation<>>            Delete(std::string key, RetrieveBlobVersion);
   
+  Future<ExpectedBlobOperation<>>            ModifyRange(
+      std::string key, std::string, std::uint64_t offset, ModifyBlobVersion);
   Future<ExpectedBlobOperation<std::string>> GetRange(
-      std::string key, std::uint64_t offset, std::size_t length, RetrieveBlobVersion);
+      std::string key, std::size_t length, std::uint64_t offset, RetrieveBlobVersion);
 
   Future<ExpectedBlobOperation<>> Copy(
       std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
 };
 ```
-This isn't as daunting as it looks! Lets go over a quick example, that uses the local filesystem first (**now outdated -- update!**)
-
-### Local Filesystem Hello World ###
-```c++
-int main() {
-  maidsafe::nfs::Container test_storage(
-      "/home/user/test_safe_storage", MaxDiskUsage(10485760));
-  
-  const auto put_result = test_storage.Put(
-      "/simple_example", "hello world", maidsafe::nfs::ModifyVersion::New()).get();
-      
-  if (put_result) {
-    const auto get_result = test_storage.Get("simple_example", put_result->version()).get();
-    if (get_result) {
-      std::cout << get_result->result() << std::endl;
-      return EXIT_SUCCESS;
-    }
-  }
-  return EXIT_FAILURE;
-}
-```
-The `test_storage` object is created with a `boost::filesystem::path` object - meaning writes through this object will be stored at that local path (in 3 encrypted chunks). After running this example, you should see files in the directory given to the constructor of `Container`. The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and storing a new file. If an existing file exists at `test_storage:/test_example`, then `if (put_result)` will return false because `put_result` contains an error (so after running this program once, all subsequent runs should fail). The `Get` call uses the `Version` returned by the `Put`, guaranteeing that the contents from the original `Put` ("hello world"), are retrieved. Alternatively, `RetrieveVersion::Latest()` could've been used instead, but if another process or thread updated the file, the new contents would be returned, which may not be "hello world" as desired.
-
-The `.get()` calls after the `Put` and `Get` indicate that the process should wait until the SAFE network (in this example, the local filesystem), successfully completes the requested operation. The `Future<T>` object allows a process to make additional requests before prior requests have completed. If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
-
-### Local Filesystem Hello World Concatenation ###
-```c++
-int main() {
-  maidsafe::nfs::Container test_storage(
-      "/home/user/test_safe_storage", MaxDiskUsage(10485760));
-      
-  const auto put_part1 = test_storage.Put(
-      "split_example/part1", "hello ", maidsafe::nfs::ModifyVersion::New());
-  const auto put_part2 = test_storage.Put(
-      "split_example/part2", "world", maidsafe::nfs::ModifyVersion::New());
-      
-  const auto put_part1_result = put_part1.get();
-  const auto put_part2_result = put_part2.get();
-  
-  if (put_part1_result && put_part2_result) {
-    const auto get_part1 = test_storage.Get(
-        "split_example/part1", put_part1_result->version());
-    const auto get_part2 = test_storage.Get(
-        "split_example/part2", put_part2_result->version());
-        
-    const auto get_part1_result = get_part1.get();
-    const auto get_part2_result = get_part2.get();
-    
-    if (get_part1_result && get_part2_result) {
-      std::cout << get_part1_result->result() << get_part2_result->result() << std::endl;
-      return EXIT_SUCCESS;
-    }
-  }
-
-  return EXIT_FAILURE;
-}
-```
-In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the "test_storage" `Container`, under the keys "split_example/part1" and "split_example/part2".
 
 ## Advanced Information ##
 ### maidsafe::nfs::ContainerVersion ###
@@ -247,7 +265,7 @@ Currently an alias for StructuredDataVersions::VersionName in common. The user s
 ### maidsafe::nfs::BlobVersion ###
 > maidsafe/nfs/blob_version.h
 
-References a specific version of a `Blob`. Hash of data map chunks (so `BlobVersion` is a hash of the contents). `Blob`s with identical content will have same version, even if their key differs.
+References a specific version of a `Blob`; hash of metadata and data map chunks (so `BlobVersion` is a hash of the contents).
 
 ### maidsafe::nfs::RetrieveVersion ###
 > maidsafe/nfs/retrieve_version.h
@@ -263,8 +281,17 @@ class RetrieveVersion {
   bool is_latest() const; // True if constructed with Latest();
   const Version& version() const; // throw if is_latest();
 };
+```
 
+> maidsafe/nfs/retrieve_container_version.h
+
+```c++
 using RetrieveContainerVersion = RetrieveVersion<ContainerVersion>;
+```
+
+> maidsafe/nfs/retrieve_blob_version.h
+
+```c++
 using RetrieveBlobVersion = RetrieveVersion<BlobVersion>;
 ```
 
@@ -274,7 +301,7 @@ using RetrieveBlobVersion = RetrieveVersion<BlobVersion>;
 A template that has special states to indicate initial, and latest version. Allows `Put`, or `Copy` calls to overwrite a specific version, create a new one, or blindly overwrite data.
 
 ```c++
-template<typename Version
+template<typename Version>
 class ModifyVersion {
   enum class Instruction {
     kSpecific = 0,
@@ -288,71 +315,96 @@ class ModifyVersion {
   Instruction instruction() const;
   const Version& version() const; // throw if instruction() != Instruction::kSpecific;
 };
+```
 
+> maidsafe/nfs/modify_container_version.h
+
+```c++
 using ModifyContainerVersion = ModifyVersion<ContainerVersion>;
+```
+
+> maidsafe/nfs/modify_blob_version.h
+
+```c++
 using ModifyBlobVersion = ModifyVersion<BlobVersion>;
 ```
 
 ### maidsafe::nfs::Operation<T> ###
 > maidsafe/nfs/operation.h
 
-All requests to the SAFE network will yield an Operation<T> object. Every Operation object will have a path, version, and a result value (which can be void).
+Network requests in the basic API will yield an `Operation<T>` object on success. Every `Operation` object will have a version, and a result value (which can be void).
 
 ```c++
-template<typename Version, typename T>
+template<typename Version, typename Result>
 class Operation {
-  const std::string& key() & const;
-  std::string key() &&;
-  
   const Version& version() & const;
   Version&& version() &&;
   
-  const T& result() & const; // if T != void
-  T&& result() &&; // if T != void
+  const Result& result() & const; // if Result != void
+  Result&& result() &&; // if Result != void
 };
+```
 
-template<typename T = void>
-using ContainerOperation = Operation<ContainerVersion, T>;
+> maidsafe/nfs/container_operation.h
 
-template<typename T = void>
-using BlobOperation = Operation<BlobVersion, T>;
+```c++
+template<typename Result = void>
+using ContainerOperation = Operation<ContainerVersion, Result>;
+```
+
+> maidsafe/nfs/blob_operation.h
+
+```c++
+template<typename Result = void>
+using BlobOperation = Operation<BlobVersion, Result>;
+```
+
+### maidsafe::nfs::OperationError<T> ###
+> maidsafe/nfs/operation.h
+
+Network requests in the basic API will yield an `OperationError<T>` object on network failure. Every `OperationError` object will have an error code, and Retry capability that returns a `Future` to a re-attempt at the failed operation.
+
+```c++
+template<typename OperationResult>
+class OperationError {
+  using RetryResult = 
+      Future<boost::expected<OperationResult, OperationError<OperationResult>>>
+  
+  RetryResult Retry() const;
+  const std::error_code& code() const;
+};
 ```
 
 ### maidsafe::nfs::ExpectedContainerOperation<T> ###
-> maidsafe/nfs/aliases.h
+> maidsafe/nfs/expected_container_operation.h
 
 A type conforming to the proposed [expected](https://github.com/ptal/std-expected-proposal) interface. All functionality listed in [N4109](http://isocpp.org/blog/2014/07/n4109) can be assumed to be available in future releases.
 
 ```c++
 template<typename T = void>
 using ExpectedContainerOperation = 
-    boost::expected<ContainerOperation<T>, ContainerOperation<std::error_code>>;
+    boost::expected<ContainerOperation<T>, OperationError<ContainerOperation<T>>>;
 ```
 
 ### maidsafe::nfs::ExpectedBlobOperation<T> ###
-> maidsafe/nfs/aliases.h
+> maidsafe/nfs/expected_blob_operation.h
 
 A type conforming to the proposed [expected](https://github.com/ptal/std-expected-proposal) interface. All functionality listed in [N4109](http://isocpp.org/blog/2014/07/n4109) can be assumed to be available in future releases.
 
 ```c++
 template<typename T = void>
-using ExpectedBlobOperation = boost::expected<BlobOperation<T>, BlobOperation<std::error_code>>;
+using ExpectedBlobOperation = 
+    boost::expected<BlobOperation<T>, OperationError<BlobOperation<T>>>;
 ```
 
 ### maidsafe::nfs::Future<T> ###
-> maidsafe/nfs/aliases.h
+> maidsafe/nfs/future.h
 
-A type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually. Extensions in the `boost::future<T>` implementation are **not** guaranteed to be available in future releases, so use at your own risk. Additionally, non-member extension functions are **not** guaranteed to be available in future releases. It is therefore recommended to only use `maidsafe::nfs::Future<T>` as-if it were a C++11 `std::future<T>` object.
+Returned by all basic API functions that required network access. `Future<T>` is a type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually.
 
 ```c++
 template<typename T>
 using Future = boost::future<T>;
-
-template<typename T = void>
-using FutureExpectedContainerOperation = Future<ExpectedContainerOperation<T>>;
-
-template<typename T = void>
-using FutureExpectedBlobOperation = Future<ExpectedBlobOperation<T>>;
 ```
 
 ### maidsafe::nfs::Pagination ###
@@ -387,8 +439,8 @@ class Account {
   ContainerPagination ListContainers();
   ContainerPagination ListContainers(std::regex filter);
 
-  FutureExpectedContainerOperation<std::shared_ptr<Container>> OpenContainer(std::string);
-  FutureExpectedContainerOperation<>                           DeleteContainer(std::string);
+  Future<ExpectedContainerOperation<Container>> OpenContainer(std::string);
+  Future<ExpectedContainerOperation<>>          DeleteContainer(std::string);
       
   //
   // Advanced API
@@ -415,53 +467,58 @@ The `Container` class stores `Blob` objects or pointers to a `Container` at SAFE
 The `Put` and `Get` methods will move the content `std::string` to the `Future<T>` upon success. This allows advanced users to re-use buffers (and explains why the `Put` method returns a std::string as a result). The `Get` overload that does not accept a std::string as a parameter will create a new std::string as needed.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
-- A callback that accepts `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`; return type is void
-- A boost::asio::yield_context object; return type is `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`.
-- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::FutureExpectedOperation<T>`.
+- A callback that accepts `boost::expected<T, std::error_code>`; return type is void
+- A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
+- A boost::asio::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`.
 
 ```c++
 class Container {
   //
   // Basic API
   //
+  ContainerVersion LatestVersion();
+
   BlobPagination ListBlobs();
   BlobPagination ListBlobs(std::regex filter);
-
-  FutureExpectedBlobOperation<>            Put(std::string key, std::string, ModifyBlobVersion);
-  FutureExpectedBlobOperation<std::string> Get(std::string key, RetrieveBlobVersion);
-  FutureExpectedBlobOperation<>            Delete(std::string key, RetrieveBlobVersion);
   
-  FutureExpectedBlobOperation<std::string> GetRange(
-      std::string key, std::uint64_t offset, std::size_t length, RetrieveBlobVersion);
+  Future<ExpectedBlobOperation<>>            PutMetadata(
+      std::string key, std::string, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<std::string>> GetMetadata(std::string key, RetrieveBlobVersion);
 
-  FutureExpectedBlobOperation<> Copy(
+  Future<ExpectedBlobOperation<>>            Put(std::string key, std::string, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<std::string>> Get(std::string key, RetrieveBlobVersion);
+  Future<ExpectedBlobOperation<>>            Delete(std::string key, RetrieveBlobVersion);
+  
+  Future<ExpectedBlobOperation<>>            ModifyRange(
+      std::string key, std::string, std::uint64_t offset, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<std::string>> GetRange(
+      std::string key, std::size_t length, std::uint64_t offset, RetrieveBlobVersion);
+
+  Future<ExpectedBlobOperation<>> Copy(
       std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
       
   //
   // Advanced API
   //
-  unspecified ListVersions(AsyncResult<std::vector<ContainerVersion>>);
+  std::vector<ContainerVersion> ListVersions();
   
   unspecified ListContainers(
-      RetrieveContainerVersion, AsyncResult<std::vector<std::string>>);
-  unspecified ListContainers(
-      RetrieveContainerVersion, std::regex filter, AsyncResult<std::vector<std::string>>);
+      RetrieveContainerVersion, 
+      boost::optional<std::regex> filter, 
+      AsyncResult<std::vector<std::string>>);
 
   unspecified ListBlobs(
       RetreieveContainerVersion,
-      AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>);
-  unspecified ListBlobs(
-      RetreieveContainerVersion,
-      std::regex filter,
+      boost::optional<std::regex> filter,
       AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>);
   
-  unspecified CreateFile(std::string, AsyncResult<std::shared_ptr<LocalBlob>>);
-  unspecified OpenFile(std::string, AsyncResult<std::shared_ptr<LocalBlob>>);
+  unspecified OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>);
+  unspecified OpenFile(std::string, ModifyBlobVersion, AsyncResult<LocalBlob>);
   
   // The File object can be from a different Storage object,
   // allowing copying between identities
   unspecified Copy(
-      std::shared_ptr<LocalBlob> from, std::string to, ModifyVersion, AsyncResult<>);
+      const LocalBlob& from, std::string to, ModifyVersion, AsyncResult<LocalBlob>);
 };
 ```
 
@@ -485,15 +542,10 @@ If a `LocalBlob` is unversioned, the async operation for `LocalBlob::Commit` wil
  
 If multiple `LocalBlob` objects are opened within the same process, they are treated no differently than `LocalBlob` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `LocalBlob` objects successfully writing to the network. All other `LocalBlob` objects become permanently unversioned.
 
-Parameters labeled as `SimpleAsyncResult` affect the return type of the function, and valid values are:
-- A callback that accepts `maidsafe::nfs::Expected<>`; return type is void
-- A boost::asio::yield_context object; return type is `maidsafe::nfs::Expected<>`.
-- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::Future<maidsafe::nfs::Expected<>>`.
-
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
-- A callback that accepts `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`; return type is void
-- A boost::asio::yield_context object; return type is `maidsafe::nfs::Expected<maidsafe::nfs::Operation<T>>`.
-- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::FutureExpectedOperation<T>`.
+- A callback that accepts `boost::expected<T, std::error_code>`; return type is void
+- A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
+- A boost::asio::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`
 
 ```C++
 class Blob {
@@ -516,15 +568,14 @@ class Blob {
 
   unspecified ListVersions(AsyncResult<std::vector<BlobVersion>>);
 
-
   std::uint64_t get_offset() const;
   void set_offset(std::uint64_t);
 
   // Offset is implied through setters above.
   unspecified Read(boost::asio::buffer, AsyncResult<std::uint64_t>);
-  unspecified Write(boost::asio::buffer, SimpleAsyncResult<>);
-  unspecified Truncate(std::uint64_t, SimpleAsyncResult<>);
+  unspecified Write(boost::asio::buffer, AsyncResult<>);
+  unspecified Truncate(std::uint64_t, AsyncResult<>);
 
-  unspecified commit(AsyncResult<>);
+  unspecified commit(AsyncResult<BlobVersion>);
 };
 ```
