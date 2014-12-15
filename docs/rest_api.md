@@ -1,5 +1,5 @@
 # Maidsafe App REST API [DRAFT] #
-> NOTE: This API is subject to change. The `OperationError` object is the most likely to change, see [Hello World (Monad Style)](#hello-world-(monad-style)).
+> NOTE: This API is subject to change. The `OperationError` object is the most likely to change, see [Hello World (Monad Style)](#hello-world-monad-style).
 
 The Maidsafe REST API strives to be easy to use, consistent, and flexible for advanced users requiring performance.
 
