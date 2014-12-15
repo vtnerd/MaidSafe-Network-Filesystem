@@ -14,7 +14,7 @@ A `Container` stores `Blobs` at keys that uniquely identify the `Blob`. The key 
 Each SAFE account can have multiple private, public, or privately-shared identities. Applications are given permission to use 0 or more of these identities. Applications cannot read or modify data in identities they were not given permission to access. Each Identity will store 0 or more `Container`s.
 
 ### IDs ###
-An ID contains the necessary information to decrypt the `Identity` information. Apps are given the ID information from the Maidsafe provided application, which prevents apps from being exposed to all of the cryptographic keys or the users SAFE network login credentials.
+An ID contains the necessary information to decrypt the `Identity`. Apps are given the ID information from the Maidsafe provided application, which prevents apps from being exposed to all of the users cryptographic keys or the users SAFE network login credentials.
 
 ### Versioning ###
 Every key in a `Container` is stored as a revision, so that conflicts between SAFE Apps (or multiple instances of the same SAFE App) can be detected. Every SAFE storage operation that modifies the contents stored at a key requires a `Version` object, and the operation will fail if the `Version` object represents an outdated `Version` from the one currently stored in the `Container`. SAFE App developers will be responsible for handling version conflicts, no generic solution exists.
