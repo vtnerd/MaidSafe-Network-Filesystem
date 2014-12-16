@@ -70,7 +70,8 @@ namespace {
   }
 }
 
-bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
+bool HelloWorld(maidsafe::nfs::Storage& storage) {
+  
   const boost::optional<BlobOperation<>> put_operation(
       GetOperationResult(
           container.Put(
@@ -92,14 +93,19 @@ This is identical to the [hello world](#hello-world) example, except `Put` and `
 
 ### Hello World (Monad Style) ###
 ```c++
-bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
-  return container.Put("example_blob", "hello world", ModifyVersion::New()).get().bind(
+bool PrintHelloWorld(const maidsafe::nfs::Storage& storage) {
+  return storage.OpenContainer("example_container").get().bind(
+      [](ContainerOperation<Container> open_operation) {
   
-      [&container](BlobOperation<> put_operation) {
-        return container.Get("example_blob", put_operation->version()).get();
+        return open_operation.value().Put(
+            "example_blob", "hello world", ModifyVersion::New()).get().bind(
+  
+                [&open_operation](BlobOperation<> put_operation) {
+                  return open_operation.value().Get("example_blob", put_operation.version()).get();
         
-      }).bind([](BlobOperation<std::string> get_operation) {
-          std::cout << get_operation->result() << std::endl;
+                }).bind([](BlobOperation<std::string> get_operation) {
+                  std::cout << get_operation.result() << std::endl;
+                });
           
       }).catch_error([](auto operation_error) {
         std::cerr << "Hello world failed" << operation_error.code().message() << std::endl;
