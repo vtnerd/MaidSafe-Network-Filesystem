@@ -161,8 +161,6 @@ class BlobVersion { /* No Public Elements */ };
 ### ContainerVersion ###
 > maidsafe/nfs/container_version.h
 
-
-
 ```c++
 class ContainerVersion { /* No Public Elements */ };
 ```
