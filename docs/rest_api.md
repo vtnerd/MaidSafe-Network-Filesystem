@@ -149,40 +149,58 @@ Represents the [`StorageID`](#storageid) abstraction listed above. Obtaining rel
 class StorageID { /* No Public Elements */ };
 ```
 
-### ContainerVersion ###
-> maidsafe/nfs/container_version.h
-
-```c++
-class ContainerVersion { /* No Public Elements */ };
-```
-
 ### BlobVersion ###
 > maidsafe/nfs/blob_version.h
+
+Blobs stored at the same key are differentiated/identified by a `BlobVersion` object. The `BlobVersion` allows REST API users to retrieve older revisions of Blobs, or place constraints on operations that change the blob associated with a key.
 
 ```c++
 class BlobVersion { /* No Public Elements */ };
 ```
 
+### ContainerVersion ###
+> maidsafe/nfs/container_version.h
+
+
+
+```c++
+class ContainerVersion { /* No Public Elements */ };
+```
+
 ### ModifyBlobVersion ###
 > maidsafe/nfs/modfy_blob_version.h
 
+Operations in [`Container`](#container-1) that change the Blob stored at a key require a ModifyBlobVersion object.
+
 ```c++
 class ModifyBlobVersion {
-  ModifyBlobVersion(BlobVersion);
   static ModifyBlobVersion New();
   static ModifyBlobVersion Latest();
+  ModifyBlobVersion(BlobVersion);
 };
 ```
+- **New()**
+  - Returns an object that indicates the REST API should only succeed if the specified key is unused.
+- **Latest()**
+  - Returns an object that indicates the REST API should overwrite any existing Blob at the specified key.
+- **ModifyBlobVersion(BlobVersion)**
+  - Creates an object that indicates the REST API should only overwrite the Blob at the specified key if it matches the BlobVersion.
 
 ### RetrieveBlobVersion ###
 > maidsafe/nfs/retrieve_blob_version.h
 
+Operations in [`Container`](#container-1) that retrieve a Blob stored at a key require a RetrieveBlobVersion object.
+
 ```c++
 class RetrieveBlobVersion {
-  RetrieveBlobVersion(BlobVersion);
   static RetrieveBlobVersion Latest();
+  RetrieveBlobVersion(BlobVersion);
 };
 ```
+- **Latest()**
+  - Returns an object that indicates the REST API should retrieve the latest Blob stored at the specified key.
+- **RetrieveBlobVersion(BlobVersion)**
+  - Creates an object that indicates the REST API needs to retrieve a specific Blob version stored at the specified key.
 
 ### ContainerOperation<T> ###
 > maidsafe/nfs/container_operation.h
