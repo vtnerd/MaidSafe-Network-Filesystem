@@ -25,7 +25,7 @@ Every REST API function call that requires a network operation returns a [`Futur
 bool HelloWorld(maidsafe::nfs::Storage& storage) {
   try {
     maidsafe::nfs::Container container(
-        storage.GetContainer("example_container").get().value());
+        storage.OpenContainer("example_container").get().value());
   
     const auto put_operation = container.Put(
         "example_blob", "hello world", ModifyVersion::New()).get();
