@@ -8,7 +8,7 @@ The Maidsafe REST API strives to be easy to use, consistent, and flexible for ad
 Data on the SAFE network is stored in `Blob`s. A `Blob` can contain text or binary data, and the SAFE network has no upward limit on size. However, local system contraints may apply to maximum size. Each Blob is immutable, once it is stored it cannot be modified.
 
 ### Container ###
-A `Container` stores `Blob`s at keys that have no restrictions (any sequence of bytes are valid). Each key is versioned, so past `Blob`s can be retrieved (which gives the appearance of mutability since the `Blob` stored at a key can change).
+A `Container` stores `Blob`s at keys that have no restrictions (any sequence of bytes are valid). Each key is versioned, so past `Blob`s can be retrieved (which gives the appearance of mutability since a new `Blob`s can be stored at an existing key).
 
 ### Storage ###
 A `Storage` object has 0 more `Container`s. The `Storage` object can be public, private, or privately-shared.
@@ -17,6 +17,12 @@ A `Storage` object has 0 more `Container`s. The `Storage` object can be public, 
 A `StorageID` identifies a particular `Storage` instance on the SAFE network, and contains the necessary information to decrypt the contents.
 
 ## REST API Types ##
+### StorageID ###
+Represents the [`StorageID`](#storageid) abstraction listed above. Obtaining relevant `StorageID` objects are out of the scope of this document.
+
+### Storage ###
+Represents the [`Storage`](#storage) abstraction listed above. Constructing a `Storage` objects requires a `StorageID` object.
+
 ### Futures ###
 Every REST API function call that requires a network operation returns a `maidsafe::nfs::Future` object. This prevents the interface from blocking, and provides an interface for signalling completion. Currently `maidsafe::nfs::Future` is a `boost::future` object, but this may be changed to a non-allocating design. It is recommended that you use the typedef (`maidsafe::nfs::Future`) in case the implementation changes.
 
@@ -25,24 +31,16 @@ In the REST API, the `Future` will only throw exceptions on non-network related 
 ### Expected ###
 When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain a OperationError object, and on success the object will contain a BlobOperation or a ContainerOperation object depending on the operation requested. For convenience, the templated types `ExpectedContainerOperation<T>` and `ExpectedBlobOperation<T>` are provided, where `T` is the result of the operation (i.e. a std::string on a `Get` request). Both types assume `OperationError` as the error object for the operation.
 
-The only exception is the `Identity::GetIDs()` function, which returns a `Future<boost::expected<Identity, std::error_code>>` object.
-
 ### OperationError ###
 In the event of a failure, retrieving the cause of the error and a Retry attempt can be done with the `OperationError` interface. The error is a std::error_code object, and the retry attempt will return a new `Future` object with the exact type of the previous failed attempt.
 
 ## Examples ##
 ### Hello World (Exception Style) ###
 ```c++
-int main() {
+bool HelloWorld(maidsafe::nfs::Storage& storage) {
   try {
-    const auto ids = maidsafe::nfs::Identity::GetAvailableIDs().get();
-    
-    if (ids.value().size() != 1) {
-      throw std::runtime_error("Expected only one identity");
-    }
-    
-    maidsafe::nfs::Identity identity(ids.value()[0]);
-    maidsafe::nfs::Container container(identity.GetContainer("example").get().value());
+    maidsafe::nfs::Container container(
+        storage.GetContainer("example_container").get().value());
   
     const auto put_operation = container.Put(
         "example_blob", "hello world", ModifyVersion::New()).get();
@@ -52,18 +50,18 @@ int main() {
     std::cout << get_operation.value().result() << std::endl;
   }  
   catch (const std::runtime_error& error) {
-    std::cerr << "Error :" << error.what(), std::endl;
-    return EXIT_FAILURE;
+    std::cerr << "Error : " << error.what() << std::endl;
+    return false;
   }
   catch (...) {
     std::cerr << "Uknown Error" << std::endl;
-    return EXIT_FAILURE;
+    return false;
   }
   
-  return EXIT_SUCCESS;
+  return true;
 }
 ```
-The `.get()` calls after `GetIDs`, `GetContainer`, `Put` and `Get` indicate that the process should wait until the SAFE network successfully completes the requested operation (the `.get()` is called on the `Future<T>` object). The `Future<T>` object allows a process to make additional requests before prior requests have completed. If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
+The `.get()` calls after `GetContainer`, `Put` and `Get` indicate that the process should wait until the SAFE network successfully completes the requested operation (the `.get()` is called on the `Future<T>` object). The `Future<T>` object allows a process to make additional requests before prior requests have completed (see [Hello World Concatenation](#hello-world-concatenation)). If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
 
 The `Future<T>` returns a `boost::expected` object. In this example, exception style error-handling was used, so `.value()` was invoked on the `boost::expected`. The `.value()` function checks the error status, and throws if the `boost::expected` object has an error instead of a valid operation.
 
@@ -160,7 +158,7 @@ In this example, both `Put` calls are done in parallel, and both `Get` calls are
 ```c++
 namespace maidsafe {
 namespace nfs {
-struct ID { /* all private */ };
+struct StorageID { /* all private */ };
 struct ContainerVersion { /* all private */ };
 struct BlobVersion { /* all private */ };
 
@@ -205,10 +203,8 @@ class RetrieveBlobVersion {
   static RetrieveBlobVersion Latest();
 };
 
-class Identity {
-  static Future<boost::expected<std::vector<ID>, std::error_code>> GetAvailableIDs();
-
-  explicit Identity(const ID& id);
+class Storage {
+  explicit Storage(const StorageID&);
   
   Future<ExpectedContainerOperation<std::vector<std::string>>> ListContainers();
 
