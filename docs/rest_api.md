@@ -16,7 +16,7 @@ Storage has 0 more Containers. The Storage can be public, private, or privately-
 ### StorageID ###
 A StorageID identifies a particular Storage instance on the SAFE network, and contains the necessary information to decrypt the contents.
 
-## Brief Overview ##
+## Behavior Overview ##
 Every REST API function call that requires a network operation returns a [`Future<T>`](#futuret) object. This prevents the interface from blocking, and provides an interface for signalling completion. Every `Future<T>` object in the REST API returns an [expected](#expected) object, which either holds the result of the operation or a network related error. An expected object allows for exception-style programming, return-code style programming, or monadic style programming. When an expected object contains a successful operation, it will have the result of the operation and version information. When an expected object contains a failed operation, it will contain an error code and a retry mechanism that returns a `Future<T>` with the same type as the original `Future<T>`.
 
 ## Examples ##
