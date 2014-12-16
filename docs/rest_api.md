@@ -16,86 +16,8 @@ Storage has 0 more Containers. The Storage can be public, private, or privately-
 ### StorageID ###
 A StorageID identifies a particular Storage instance on the SAFE network, and contains the necessary information to decrypt the contents.
 
-## REST API Types ##
-### `StorageID` ###
-> maidsafe/nfs/storage_id.h
-
-Represents the [`StorageID`](#storageid) abstraction listed above. Obtaining relevant `StorageID` objects are out of the scope of this document.
-
-```c++
-class StorageID { /* No Public Elements */ };
-```
-
-### `ContainerOperation<T>` ###
-> maidsafe/nfs/container_operation.h
-
-```c++
-template<typename T = void>
-class ContainerOperation {
-  const ContainerVersion& version() const;
-  const T& result() const; // iff T != void
-};
-```
-
-### `BlobOperation<T>` ###
-> maidsafe/nfs/container_operation.h
-
-```c++
-template<typename T = void>
-class BlobOperation {
-  const BlobVersion& version() const;
-  const T& result() const; // iff T != void
-};
-```
-
-### `OperationError<ExpectedOperation, T>` ###
-> maidsafe/nfs/operation_error.h
-
-In the event of a failure, retrieving the cause of the error and a Retry attempt can be done with the `OperationError` interface. The error is a std::error_code object, and the retry attempt will return a new `Future` object with the exact type of the previous failed attempt.
-
-```c++
-template<typename OperationResult>
-class OperationError {
-  using RetryResult = boost::expected<OperationResult, OperationError<OperationResult>>;
-  RetryResult Retry() const;
-  std::error_code code() const;
-};
-```
-
-### `Future<T>` ###
-> maidafe/nfs/future.h
-
-Every REST API function call that requires a network operation returns a `maidsafe::nfs::Future` object. This prevents the interface from blocking, and provides an interface for signalling completion. Currently `maidsafe::nfs::Future` is a `boost::future` object, but this may be changed to a non-allocating design. It is recommended that you use the typedef (`maidsafe::nfs::Future`) in case the implementation changes.
-
-In the REST API, the `Future` will only throw exceptions on non-network related errors (std::bad_alloc, std::bad_promise, etc.). Values and network related errors are returned in a `boost::expected` object.
-
-```c++
-template<typename T>
-using Future = boost::future<T>;
-```
-
-### Expected ###
-When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain a OperationError object, and on success the object will contain a BlobOperation or a ContainerOperation object depending on the operation requested. For convenience, the templated types `ExpectedContainerOperation<T>` and `ExpectedBlobOperation<T>` are provided, where `T` is the result of the operation (i.e. a std::string on a `Get` request). Both types assume `OperationError` as the error object for the operation.
-
-#### `ExpectedContainerOperation<T>` ####
-
-#### `ExpectedBlobOperation<T>` ####
-
-### Storage ###
-> maidsafe/nfs/storage.h
-
-Represents the [`Storage`](#storage) abstraction listed above. Constructing a `Storage` objects requires a `StorageID` object.
-
-```c++
-class Storage {
-  explicit Storage(const StorageID&);
-  
-  Future<ExpectedContainerOperation<std::vector<std::string>>> ListContainers();
-
-  Future<ExpectedContainerOperation<Container>> OpenContainer(std::string);
-  Future<ExpectedContainerOperation<>>          DeleteContainer(std::string);
-};
-```
+## Brief Overview ##
+Every REST API function call that requires a network operation returns a [`Future<T>`](#futuret) object. This prevents the interface from blocking, and provides an interface for signalling completion. Every `Future<T>` object in the REST API returns an [expected](#expected) object, which either holds the result of the operation or a network related error. An expected object allows for exception-style programming, return-code style programming, or monadic style programming. When an expected object contains a successful operation, it will have the result of the operation and version information. When an expected object contains a failed operation, it will contain an error code and a retry mechanism that returns a `Future<T>` with the same type as the original `Future<T>`.
 
 ## Examples ##
 ### Hello World (Exception Style) ###
@@ -128,7 +50,7 @@ The `.get()` calls after `GetContainer`, `Put` and `Get` indicate that the proce
 
 The `Future<T>` returns a `boost::expected` object. In this example, exception style error-handling was used, so `.value()` was invoked on the `boost::expected`. The `.value()` function checks the error status, and throws if the `boost::expected` object has an error instead of a valid operation.
 
-The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and storing a new file. If an existing file exists at `example_blob`, then an exception will be thrown in the `Get` call because `put_operation` contains an error (so after running this program once, all subsequent runs should fail). The `Get` call uses the `Version` returned by the `Put`, guaranteeing that the contents from the original `Put` ("hello world"), are retrieved. Alternatively, `RetrieveVersion::Latest()` could've been used instead, but if another process or thread updated the file, the new contents would be returned, which may not be "hello world" as desired.
+The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and storing a new file. If an existing file exists at `example_blob`, then an exception will be thrown in the `Get` call because `put_operation` contains an error (so after running this program once, all subsequent runs should fail). The `Get` call uses the [`BlobVersion`](#blobversion) returned by the `Put`, guaranteeing that the contents from the original `Put` ("hello world"), are retrieved. Alternatively, `RetrieveVersion::Latest()` could've been used instead, but if another process or thread updated the file, the new contents would be returned, which may not be "hello world" as desired.
 
 ### Hello World Retry (Return-Code Style) ###
 ```c++
@@ -139,7 +61,7 @@ namespace {
     while (!operation) {
       if (operation.error().code() != std::errc::network_down) {
         std::cerr << 
-            "Hello world failed: " << operation.error().code().message() << std::endl;
+            "Error: " << operation.error().code().message() << std::endl;
         return boost::none;
       }
       operation = operation.error().Retry().get();
@@ -216,6 +138,87 @@ bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
 }
 ```
 In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the `container` object directly.
+
+## REST Style API ##
+### `StorageID` ###
+> maidsafe/nfs/storage_id.h
+
+Represents the [`StorageID`](#storageid) abstraction listed above. Obtaining relevant `StorageID` objects are out of the scope of this document.
+
+```c++
+class StorageID { /* No Public Elements */ };
+```
+
+### `ContainerOperation<T>` ###
+> maidsafe/nfs/container_operation.h
+
+```c++
+template<typename T = void>
+class ContainerOperation {
+  const ContainerVersion& version() const;
+  const T& result() const; // iff T != void
+};
+```
+
+### `BlobOperation<T>` ###
+> maidsafe/nfs/container_operation.h
+
+```c++
+template<typename T = void>
+class BlobOperation {
+  const BlobVersion& version() const;
+  const T& result() const; // iff T != void
+};
+```
+
+### `OperationError<ExpectedOperation, T>` ###
+> maidsafe/nfs/operation_error.h
+
+In the event of a failure, retrieving the cause of the error and a Retry attempt can be done with the `OperationError` interface. The error is a std::error_code object, and the retry attempt will return a new `Future` object with the exact type of the previous failed attempt.
+
+```c++
+template<typename OperationResult>
+class OperationError {
+  using RetryResult = boost::expected<OperationResult, OperationError<OperationResult>>;
+  RetryResult Retry() const;
+  std::error_code code() const;
+};
+```
+
+### `Future<T>` ###
+> maidafe/nfs/future.h
+
+Currently `maidsafe::nfs::Future` is a `boost::future` object, but this may be changed to a non-allocating design. It is recommended that you use the typedef (`maidsafe::nfs::Future`) in case the implementation changes.
+
+In the REST API, the `Future` will only throw exceptions on non-network related errors (std::bad_alloc, std::bad_promise, etc.). Values and network related errors are returned in a `boost::expected` object.
+
+```c++
+template<typename T>
+using Future = boost::future<T>;
+```
+
+### Expected ###
+When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain a OperationError object, and on success the object will contain a BlobOperation or a ContainerOperation object depending on the operation requested. For convenience, the templated types `ExpectedContainerOperation<T>` and `ExpectedBlobOperation<T>` are provided, where `T` is the result of the operation (i.e. a std::string on a `Get` request). Both types assume `OperationError` as the error object for the operation.
+
+#### `ExpectedContainerOperation<T>` ####
+
+#### `ExpectedBlobOperation<T>` ####
+
+### Storage ###
+> maidsafe/nfs/storage.h
+
+Represents the [`Storage`](#storage) abstraction listed above. Constructing a `Storage` objects requires a `StorageID` object.
+
+```c++
+class Storage {
+  explicit Storage(const StorageID&);
+  
+  Future<ExpectedContainerOperation<std::vector<std::string>>> ListContainers();
+
+  Future<ExpectedContainerOperation<Container>> OpenContainer(std::string);
+  Future<ExpectedContainerOperation<>>          DeleteContainer(std::string);
+};
+```
 
 ## REST API Interface ##
 ```c++
