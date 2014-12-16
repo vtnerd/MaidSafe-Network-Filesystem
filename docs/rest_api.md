@@ -155,11 +155,17 @@ class StorageID { /* No Public Elements */ };
 Blobs stored at the same key are differentiated/identified by a `BlobVersion` object. The `BlobVersion` allows REST API users to retrieve older revisions of Blobs, or place constraints on operations that change the blob associated with a key.
 
 ```c++
-class BlobVersion { /* No Public Elements */ };
+class BlobVersion {
+  static BlobVersion Defunct();
+};
 ```
+- **Defunct()**
+  - Returns a `BlobVersion` that is used to indicate a deleted Blob. This is never returned by a [`BlobOperation`](#bloboperation), and is only used when retrieving the history of the Blobs stored at a key.
 
 ### ContainerVersion ###
 > maidsafe/nfs/container_version.h
+
+Containers are also versioned, but none of the REST API functions accept a ContainerVersion. This class is mentioned/returned by `Container` operations for users that wish to use the [Posix API](posix_api.md) in some situations.
 
 ```c++
 class ContainerVersion { /* No Public Elements */ };
@@ -203,6 +209,8 @@ class RetrieveBlobVersion {
 ### ContainerOperation<T> ###
 > maidsafe/nfs/container_operation.h
 
+Most REST API users should only need to invoke the result() function to retrieve a `Container` returned in a `Storage::OpenContainer` call. A version is returned for consistency with BlobOperations, and for users that wish to use the [Posix API](posix_api.md) in some situations.
+
 ```c++
 template<typename T = void>
 class ContainerOperation {
@@ -214,6 +222,8 @@ class ContainerOperation {
 ### BlobOperation<T> ###
 > maidsafe/nfs/container_operation.h
 
+Every operation on Blobs return a `BlobOperation` object.
+
 ```c++
 template<typename T = void>
 class BlobOperation {
@@ -221,10 +231,15 @@ class BlobOperation {
   const T& result() const; // iff T != void
 };
 ```
+- **version**
+  - Returns the `BlobVersion` involved in the operation.
+- **result()**
+  - If the operation is NOT void, this will return the result of the operation. Compile error on void.
 
 ### OperationError<ExpectedOperation> ###
 > maidsafe/nfs/operation_error.h
 
+This object is returned if a network operation fails.
 In the event of a failure, retrieving the cause of the error and a Retry attempt can be done with the `OperationError` interface. The error is a std::error_code object, and the retry attempt will return a new `Future` object with the exact type of the previous failed attempt.
 
 ```c++
@@ -235,6 +250,10 @@ class OperationError {
   std::error_code code() const;
 };
 ```
+- **Retry**
+  - Return a Future to another attempt at the failed operation. Be careful of infinite loops - some operations could fail indefinitely (ModifyVersion::Create() for example).
+- **code()**
+  - Return error code for the failed operation.
 
 ### Future<T> ###
 > maidafe/nfs/future.h
@@ -272,25 +291,37 @@ using ExpectedBlobOperation =
 ### Storage ###
 > maidsafe/nfs/storage.h
 
-Represents the [`Storage`](#storage) abstraction listed above. Constructing a `Storage` objects requires a `StorageID` object.
+Represents the [`Storage`](#storage) abstraction listed above. Constructing a `Storage` object requires a `StorageID` object.
 
 ```c++
 class Storage {
   explicit Storage(const StorageID&);
-  
+
   Future<ExpectedContainerOperation<std::vector<std::string>>> ListContainers();
 
   Future<ExpectedContainerOperation<Container>> OpenContainer(std::string);
   Future<ExpectedContainerOperation<>>          DeleteContainer(std::string);
 };
 ```
+- **Storage(const StorageID)**
+  - Creates a Storage object. The `StorageID` provides the keys necessary for decrypting the data.
+- **GetContainers()**
+  - Retrieves the names of containers currently in Storage.
+- **OpenContainer(std::string)**
+  - Retrieves a `Container` with the specified name. The Container is created as necessary.
+- **DeleteContainer(std::string)**
+  - Deletes a container with the specified name.
 
 ### Container ###
 > maidsafe/nfs/container.h
 
+Represents the [`Container`](#container) abstraction listed above. Constructing a `Container` object cannot be done directly; `Container` objects can only be retrieved from `Storage::OpenContainer`.
+
 ```c++
 class Container {
-  Future<ExpectedContainerOperation<std::vector<std::pair<std::string, BlobVersion>>>> ListBlobs();
+  Future<ExpectedContainerOperation<std::vector<std::pair<std::string, BlobVersion>>>> GetBlobs();
+  
+  Future<ExpectedContainerOperation<std::vector<BlobVersion>>> GetBlobVersions(std::string key);
   
   Future<ExpectedBlobOperation<>>            PutMetadata(
       std::string key, std::string, ModifyBlobVersion);
@@ -309,3 +340,23 @@ class Container {
       std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
 };
 ```
+- **GetBlobs()**
+  - Retrieves the names of Blobs in the Container. The `BlobVersion` is provided for each Blob.
+- ** GetBlobVersions() **
+  - Retrieves the `BlobVersion`s at the key. First BlobVersion is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time.
+- **PutMetadata(std::string key, std::string, ModifyBlobVersion)**
+  - Store the contents at the key as metadata. Same effect as storing a blob (new BlobVersion). Maximum size is 64KB.
+- **GetMetadata(std::string key, RetrieveBlobVersion)**
+  - Retrieves the user controlled metadata for a Blob.
+- **Put(std::string key, std::string, ModifyBlobVersion)**
+  - Stores the Blob contents at the key.
+- **Get(std::string key, RetrieveBlobVersion)**
+  - Retrieves the Blob contents at the key.
+- **Delete(std::string key, RetrieveBlobVersion)**
+  - Removes the key from the Container.
+- **ModifyRange(std::string key, std::string, std::uint64_t offset, ModifyBlobVersion)**
+  - Stores a new Blob by re-using a portion of an existing Blob. The size of the Blob is automatically extended if offset exceeds the size of the original Blob.
+- **GetRange(std::string key, std::size_t length, std::uint64_t offset, RetrieveBlobVersion)**
+  - Retrieves a portion of the Blob contents at the key. Returned std::string is automatically truncated if length + offset exceeds Blob size.
+- **Copy(std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion)**
+  - Copies user metadata + data from a Blob at one key to a Blob at another key.
