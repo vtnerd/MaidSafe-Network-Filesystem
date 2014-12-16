@@ -5,21 +5,16 @@ The Maidsafe REST API strives to be easy to use, consistent, and flexible for ad
 
 ## Storage Abstractions ##
 ### Blobs ###
-Data on the SAFE network is stored in `Blob`s. A `Blob` can contain text or binary data, and the SAFE network has no upward limit on size. However, local system contraints may apply to maximum size. Each Blob is immutable, once it is stored it cannot be modified. `Blob`s are stored in a versioned structure, `Container`, so the appearance of mutability can be achieved (new versions).
+Data on the SAFE network is stored in `Blob`s. A `Blob` can contain text or binary data, and the SAFE network has no upward limit on size. However, local system contraints may apply to maximum size. Each Blob is immutable, once it is stored it cannot be modified.
 
 ### Container ###
-A `Container` stores `Blobs` at keys that uniquely identify the `Blob`. The key has no restrictions (any sequence of bytes are valid). The `Blob` stored at each key is versioned, so past `Blob`s can be retrieved.
+A `Container` stores `Blob`s at keys that have no restrictions (any sequence of bytes are valid). Each key is versioned, so past `Blob`s can be retrieved (which gives the appearance of mutability since the `Blob` stored at a key can change).
 
-### Identities ###
-Each SAFE account can have multiple private, public, or privately-shared identities. Applications are given permission to use 0 or more of these identities. Applications cannot read or modify data in identities they were not given permission to access. Each Identity will store 0 or more `Container`s.
+### Storage ###
+A `Storage` object has 0 more `Container`s. The `Storage` object can be public, private, or privately-shared.
 
-### IDs ###
-An ID contains the necessary information to decrypt the `Identity`. Apps are given the ID information from the Maidsafe provided application, which prevents apps from being exposed to all of the users cryptographic keys or the users SAFE network login credentials.
-
-### Versioning ###
-Every key in a `Container` is stored as a revision, so that conflicts between SAFE Apps (or multiple instances of the same SAFE App) can be detected. Every SAFE storage operation that modifies the contents stored at a key requires a `Version` object, and the operation will fail if the `Version` object represents an outdated `Version` from the one currently stored in the `Container`. SAFE App developers will be responsible for handling version conflicts, no generic solution exists.
-
-Every operation will return a `Version` object which will be the most-up-to-date version known to the SAFE API.
+### StorageID ###
+A `StorageID` identifies a particular `Storage` instance on the SAFE network, and contains the necessary information to decrypt the contents.
 
 ## REST API Types ##
 ### Futures ###
@@ -49,8 +44,10 @@ int main() {
     maidsafe::nfs::Identity identity(ids.value()[0]);
     maidsafe::nfs::Container container(identity.GetContainer("example").get().value());
   
-    const auto put_operation = container.Put("example_blob", "hello world", ModifyVersion::New()).get();
-    const auto get_operation = container.Get("example_blob", put_operation.value().version()).get();
+    const auto put_operation = container.Put(
+        "example_blob", "hello world", ModifyVersion::New()).get();
+    const auto get_operation = container.Get(
+        "example_blob", put_operation.value().version()).get();
     
     std::cout << get_operation.value().result() << std::endl;
   }  
