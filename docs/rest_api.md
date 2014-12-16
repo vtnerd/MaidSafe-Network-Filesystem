@@ -343,7 +343,7 @@ class Container {
 - **GetBlobs()**
   - Retrieves the names of Blobs in the Container. The `BlobVersion` is provided for each Blob.
 - **GetBlobVersions()**
-  - Retrieves the history of `BlobVersion`s at the key. Oldest BlobVersion is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time. `std::vector::begin()` will the newest `BlobVersion`, and `std::vector::end() - 1` will have the oldest `BlobVersion` (which is always `BlobVersion::Defunct()`).
+  - Retrieves the history of `BlobVersion`s at the key. Oldest BlobVersion is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time. `std::vector::begin()` will be the newest `BlobVersion`, and `std::vector::end() - 1` will have the oldest `BlobVersion` (which is always `BlobVersion::Defunct()`).
 - **PutMetadata(std::string key, std::string, ModifyBlobVersion)**
   - Stores the contents at the key as user metadata. Same effect as storing a blob (new BlobVersion). Maximum size is 64KB.
 - **GetMetadata(std::string key, RetrieveBlobVersion)**
