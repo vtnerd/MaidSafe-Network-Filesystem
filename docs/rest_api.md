@@ -140,7 +140,7 @@ bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
 In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the `container` object directly.
 
 ## REST Style API ##
-### `StorageID` ###
+### StorageID ###
 > maidsafe/nfs/storage_id.h
 
 Represents the [`StorageID`](#storageid) abstraction listed above. Obtaining relevant `StorageID` objects are out of the scope of this document.
@@ -149,7 +149,42 @@ Represents the [`StorageID`](#storageid) abstraction listed above. Obtaining rel
 class StorageID { /* No Public Elements */ };
 ```
 
-### `ContainerOperation<T>` ###
+### ContainerVersion ###
+> maidsafe/nfs/container_version.h
+
+```c++
+class ContainerVersion { /* No Public Elements */ };
+```
+
+### BlobVersion ###
+> maidsafe/nfs/blob_version.h
+
+```c++
+class BlobVersion { /* No Public Elements */ };
+```
+
+### ModifyBlobVersion ###
+> maidsafe/nfs/modfy_blob_version.h
+
+```c++
+class ModifyBlobVersion {
+  ModifyBlobVersion(BlobVersion);
+  static ModifyBlobVersion New();
+  static ModifyBlobVersion Latest();
+};
+```
+
+### RetrieveBlobVersion ###
+> maidsafe/nfs/retrieve_blob_version.h
+
+```c++
+class RetrieveBlobVersion {
+  RetrieveBlobVersion(BlobVersion);
+  static RetrieveBlobVersion Latest();
+};
+```
+
+### ContainerOperation<T> ###
 > maidsafe/nfs/container_operation.h
 
 ```c++
@@ -160,7 +195,7 @@ class ContainerOperation {
 };
 ```
 
-### `BlobOperation<T>` ###
+### BlobOperation<T> ###
 > maidsafe/nfs/container_operation.h
 
 ```c++
@@ -171,21 +206,21 @@ class BlobOperation {
 };
 ```
 
-### `OperationError<ExpectedOperation, T>` ###
+### OperationError<ExpectedOperation> ###
 > maidsafe/nfs/operation_error.h
 
 In the event of a failure, retrieving the cause of the error and a Retry attempt can be done with the `OperationError` interface. The error is a std::error_code object, and the retry attempt will return a new `Future` object with the exact type of the previous failed attempt.
 
 ```c++
-template<typename OperationResult>
+template<typename ExpectedOperation>
 class OperationError {
-  using RetryResult = boost::expected<OperationResult, OperationError<OperationResult>>;
+  using RetryResult = Future<boost::expected<ExpectedOperation, OperationError<ExpectedOperation>>;
   RetryResult Retry() const;
   std::error_code code() const;
 };
 ```
 
-### `Future<T>` ###
+### Future<T> ###
 > maidafe/nfs/future.h
 
 Currently `maidsafe::nfs::Future` is a `boost::future` object, but this may be changed to a non-allocating design. It is recommended that you use the typedef (`maidsafe::nfs::Future`) in case the implementation changes.
@@ -200,9 +235,23 @@ using Future = boost::future<T>;
 ### Expected ###
 When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain a OperationError object, and on success the object will contain a BlobOperation or a ContainerOperation object depending on the operation requested. For convenience, the templated types `ExpectedContainerOperation<T>` and `ExpectedBlobOperation<T>` are provided, where `T` is the result of the operation (i.e. a std::string on a `Get` request). Both types assume `OperationError` as the error object for the operation.
 
-#### `ExpectedContainerOperation<T>` ####
+#### ExpectedContainerOperation<T> ####
+> maidsafe/nfs/expected_container_operation.h
 
-#### `ExpectedBlobOperation<T>` ####
+```c++
+template<typename T = void>
+using ExpectedContainerOperation = 
+    boost::expected<ContainerOperation<T>, OperationError<ContainerOperation<T>>>;
+```
+
+#### ExpectedBlobOperation<T> ####
+> maidsafe/nfs/expected_blob_operation.h
+
+```c++
+template<typename T = void>
+using ExpectedBlobOperation =
+    boost::expected<BlobOperation<T>, OperationError<BlobOperation<T>>>;
+```
 
 ### Storage ###
 > maidsafe/nfs/storage.h
@@ -220,36 +269,10 @@ class Storage {
 };
 ```
 
-## REST API Interface ##
+### Container ###
+> maidsafe/nfs/container.h
+
 ```c++
-namespace maidsafe {
-namespace nfs {
-struct StorageID { /* all private */ };
-struct ContainerVersion { /* all private */ };
-struct BlobVersion { /* all private */ };
-
-template<typename T = void>
-using ExpectedContainerOperation = 
-    boost::expected<ContainerOperation<T>, OperationError<ContainerOperation<T>>>;
-
-template<typename T = void>
-using ExpectedBlobOperation =
-    boost::expected<BlobOperation<T>, OperationError<BlobOperation<T>>>;
-
-template<typename T>
-using Future = boost::future<T>;
-
-class ModifyBlobVersion {
-  ModifyBlobVersion(BlobVersion);
-  static ModifyBlobVersion New();
-  static ModifyBlobVersion Latest();
-};
-
-class RetrieveBlobVersion {
-  RetrieveBlobVersion(BlobVersion);
-  static RetrieveBlobVersion Latest();
-};
-
 class Container {
   Future<ExpectedContainerOperation<std::vector<std::pair<std::string, BlobVersion>>>> ListBlobs();
   
@@ -269,7 +292,4 @@ class Container {
   Future<ExpectedBlobOperation<>> Copy(
       std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
 };
-
-}  // namespace nfs
-}  // namespace maidsafe
 ```
