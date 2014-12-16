@@ -297,7 +297,7 @@ Represents the [`Storage`](#storage) abstraction listed above. Constructing a `S
 class Storage {
   explicit Storage(const StorageID&);
 
-  Future<ExpectedContainerOperation<std::vector<std::string>>> ListContainers();
+  Future<ExpectedContainerOperation<std::vector<std::string>>> GetContainers();
 
   Future<ExpectedContainerOperation<Container>> OpenContainer(std::string);
   Future<ExpectedContainerOperation<>>          DeleteContainer(std::string);
@@ -342,10 +342,10 @@ class Container {
 ```
 - **GetBlobs()**
   - Retrieves the names of Blobs in the Container. The `BlobVersion` is provided for each Blob.
-- ** GetBlobVersions() **
-  - Retrieves the `BlobVersion`s at the key. First BlobVersion is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time.
+- **GetBlobVersions()**
+  - Retrieves the history of `BlobVersion`s at the key. Oldest BlobVersion is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time. `std::vector::begin()` will the newest `BlobVersion`, and `std::vector::end() - 1` will have the oldest `BlobVersion` (which is always `BlobVersion::Defunct()`).
 - **PutMetadata(std::string key, std::string, ModifyBlobVersion)**
-  - Store the contents at the key as metadata. Same effect as storing a blob (new BlobVersion). Maximum size is 64KB.
+  - Stores the contents at the key as user metadata. Same effect as storing a blob (new BlobVersion). Maximum size is 64KB.
 - **GetMetadata(std::string key, RetrieveBlobVersion)**
   - Retrieves the user controlled metadata for a Blob.
 - **Put(std::string key, std::string, ModifyBlobVersion)**
