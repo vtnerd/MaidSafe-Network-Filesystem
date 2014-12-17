@@ -97,11 +97,11 @@ bool PrintHelloWorld(const maidsafe::nfs::Storage& storage) {
   return storage.OpenContainer("example_container").get().bind(
   
       [](ContainerOperation<Container> open_operation) {
-        return open_operation.value().Put(
+        return open_operation.result().Put(
             "example_blob", "hello world", ModifyVersion::New()).get().bind(
             
                 [&open_operation](BlobOperation<> put_operation) {
-                  return open_operation.value().Get("example_blob", put_operation.version()).get();
+                  return open_operation.result().Get("example_blob", put_operation.version()).get();
         
                 }).bind([](BlobOperation<std::string> get_operation) {
                   std::cout << get_operation.result() << std::endl;
