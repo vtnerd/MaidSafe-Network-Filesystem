@@ -56,8 +56,8 @@ The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and s
 ```c++
 namespace {
   template<typename Result>
-  boost::optional<BlobOperation<Result>> GetOperationResult(
-      ExpectedBlobOperation<Result> operation) {
+  auto GetOperationResult(
+      ExpectedBlobOperation<Result> operation) -> decltype(boost::optional*operation){
     while (!operation) {
       if (operation.error().code() != std::errc::network_down) {
         std::cerr << 
@@ -95,11 +95,11 @@ This is identical to the [hello world](#hello-world) example, except `Put` and `
 ```c++
 bool PrintHelloWorld(const maidsafe::nfs::Storage& storage) {
   return storage.OpenContainer("example_container").get().bind(
-      [](ContainerOperation<Container> open_operation) {
   
+      [](ContainerOperation<Container> open_operation) {
         return open_operation.value().Put(
             "example_blob", "hello world", ModifyVersion::New()).get().bind(
-  
+            
                 [&open_operation](BlobOperation<> put_operation) {
                   return open_operation.value().Get("example_blob", put_operation.version()).get();
         
