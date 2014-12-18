@@ -25,13 +25,13 @@ Every REST API function call that requires a network operation returns a [`Futur
 bool HelloWorld(maidsafe::nfs::Storage& storage) {
   try {
     maidsafe::nfs::Container container(
-        storage.OpenContainer("example_container").get().value());
-  
+        storage.OpenContainer("example_container").get().value().result());
+
     const auto put_operation = container.Put(
-        "example_blob", "hello world", ModifyVersion::New()).get();
+        "example_blob", "hello world", maidsafe::nfs::ModifyBlobVersion::Create()).get();
     const auto get_operation = container.Get(
         "example_blob", put_operation.value().version()).get();
-    
+
     std::cout << get_operation.value().result() << std::endl;
   }  
   catch (const std::runtime_error& error) {
@@ -42,7 +42,7 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
     std::cerr << "Uknown Error" << std::endl;
     return false;
   }
-  
+
   return true;
 }
 ```
