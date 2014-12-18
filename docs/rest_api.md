@@ -99,10 +99,10 @@ bool HelloWorld(const maidsafe::nfs::Storage& storage) {
   
   return nfs::monadic(storage.OpenContainer("example_container").get()).bind(
 
-      [](nfs::ContainerOperation<maidsafe::nfs::Container> open_operation) {
+      [](nfs::ContainerOperation<nfs::Container> open_operation) {
         return nfs::monadic(
             open_operation.result().Put(
-                "example_blob","hello world", nfs::ModifyBlobVersion::Create()).get()).bind(
+                "example_blob", "hello world", nfs::ModifyBlobVersion::Create()).get()).bind(
 
                 [&open_operation](nfs::BlobOperation<> put_operation) {
                   return nfs::monadic(
