@@ -125,26 +125,27 @@ This is an example of monadic programming, which is better described in the [Exp
 
 ### Hello World Concatenation ###
 ```c++
-bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
-  const auto put_part1 = container.Put(
-      "split_example/part1", "hello ", maidsafe::nfs::ModifyVersion::New());
-  const auto put_part2 = container.Put(
-      "split_example/part2", "world", maidsafe::nfs::ModifyVersion::New());
-      
+bool HelloWorld(maidsafe::nfs::Container& container) {
+  auto put_part1 = container.Put(
+      "split_example/part1", "hello ", maidsafe::nfs::ModifyBlobVersion::Create());
+  auto put_part2 = container.Put(
+      "split_example/part2", "world", maidsafe::nfs::ModifyBlobVersion::Create());
+
   const auto put_part1_result = put_part1.get();
   const auto put_part2_result = put_part2.get();
-  
+
   if (put_part1_result && put_part2_result) {
-    const auto get_part1 = container.Get(
-        "split_example/part1", put_part1_result->version());
-    const auto get_part2 = container.Get(
-        "split_example/part2", put_part2_result->version());
-        
+    auto get_part1 = container.Get("split_example/part1", put_part1_result->version());
+    auto get_part2 = container.Get("split_example/part2", put_part2_result->version());
+
     const auto get_part1_result = get_part1.get();
     const auto get_part2_result = get_part2.get();
-    
+
     if (get_part1_result && get_part2_result) {
-      std::cout << get_part1_result->result() << get_part2_result->result() << std::endl;
+      std::cout <<
+        get_part1_result->result() <<
+        get_part2_result->result() <<
+        std::endl;
       return true;
     }
   }
@@ -152,7 +153,7 @@ bool PrintHelloWorld(const maidsafe::nfs::Container& container) {
   return false;
 }
 ```
-In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Unfortunately this waits for both `Put` calls to complete before issuing a single `Get` call. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the `container` object directly.
+In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Each `Get` call cannot be requested until the corresponding `Put` operation completes. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the `container` object directly.
 
 ## REST Style API ##
 ### StorageID ###
