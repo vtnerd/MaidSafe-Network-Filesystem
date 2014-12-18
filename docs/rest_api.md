@@ -304,28 +304,18 @@ using ExpectedBlobOperation =
 ```
 
 #### Monadic ####
+The REST API returns `ExpectedContainerOperation<T>` or `ExpectedBlobOperation<T>` objects which use an error type that depends on `T`. This makes monadic programming difficult because the unwrap functions in `boost::expected` will not work as desired. The REST API includes some standalone functions that return a `boost::expected` object with a consistent error type, `std::error_code`. After removing the `OperationError<T>`, retrying the failed operation is not possible. [An example](#hello-world-monad-style) of the standalone functions in use.
+
 > maidsafe/nfs/expected_container_operation.h
 
 ```c++
 template<typename T>
 boost::expected<BlobOperation<T>, std::error_code> monadic(
-    const ExpectedBlobOperation<T>& expected) {
-  if (expected) {
-    return *expected;
-  }
-
-  return boost::make_unexpected(expected.error().code());
-}
+    const ExpectedBlobOperation<T>& expected);
 
 template<typename T>
 boost::expected<BlobOperation<T>, std::error_code> monadic(
-    ExpectedBlobOperation<T>&& expected) {
-  if (expected) {
-    return *std::move(expected);
-  }
-
-  return boost::make_unexpected(expected.error().code());
-}
+    ExpectedBlobOperation<T>&& expected);
 ```
 
 > maidsafe/nfs/expected_blob_operation.h
@@ -333,23 +323,11 @@ boost::expected<BlobOperation<T>, std::error_code> monadic(
 ```c++
 template<typename T>
 boost::expected<ContainerOperation<T>, std::error_code> monadic(
-    const ExpectedContainerOperation<T>& expected) {
-  if (expected) {
-    return *expected;
-  }
-
-  return boost::make_unexpected(expected.error().code());
-}
+    const ExpectedContainerOperation<T>& expected);
 
 template<typename T>
 boost::expected<ContainerOperation<T>, std::error_code> monadic(
-    ExpectedContainerOperation<T>&& expected) {
-  if (expected) {
-    return *std::move(expected);
-  }
-
-  return boost::make_unexpected(expected.error().code());
-}
+    ExpectedContainerOperation<T>&& expected);
 ```
 
 ### Storage ###
