@@ -119,19 +119,22 @@ using Future = boost::future<T>;
 
 Represents the [`Storage`](#storage) abstraction listed above. Constructing a `Storage` object requires a `StorageID` object.
 
+Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
+- A callback in the form `void(boost::expected<T, std::error_code>)`; return type is void
+- A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
+- A boost::asio::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`.
+
 ```c++
 class Storage {
-  unspecified ListVersions(AsyncResult<std::vector<ContainerVersion>>);
+  unspecified GetVersions(AsyncResult<std::vector<ContainerVersion>>);
   
-  unspecified ListContainers(
+  unspecified GetContainers(
       RetrieveContainerVersion, AsyncResult<std::vector<std::string>>);
-  unspecified ListContainers(
-      RetrieveContainerVersion, std::regex filter, AsyncResult<std::vector<std::string>>);
 
   unspecified OpenContainer(
-      RetreiveContainerVersion, std::string, AsyncResult<std::shared_ptr<Container>>);
+      std::string, ModifyContainerVersion, AsyncResult<Container>);
   unspecified DeleteContainer(
-      RetrieveContainerVersion, std::string, AsyncResult<>);
+      std::string, RetrieveContainerVersion, AsyncResult<>);
 };
 ```
 
@@ -147,23 +150,18 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 
 ```c++
 class Container {
-  std::vector<ContainerVersion> ListVersions();
+  unspecified GetVersions(AsyncResult<std::vector<ContainerVersion>>);
   
-  unspecified ListContainers(
-      RetrieveContainerVersion, 
-      boost::optional<std::regex> filter, 
-      AsyncResult<std::vector<std::string>>);
+  unspecified GetContainers(
+      RetrieveContainerVersion, AsyncResult<std::vector<std::string>>);
 
-  unspecified ListBlobs(
+  unspecified GetBlobs(
       RetreieveContainerVersion,
-      boost::optional<std::regex> filter,
       AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>);
   
   unspecified OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>);
-  unspecified OpenFile(std::string, ModifyBlobVersion, AsyncResult<LocalBlob>);
+  unspecified OpenBlob(std::string, ModifyBlobVersion, AsyncResult<LocalBlob>);
   
-  // The File object can be from a different Storage object,
-  // allowing copying between identities
   unspecified Copy(
       const LocalBlob& from, std::string to, ModifyVersion, AsyncResult<LocalBlob>);
 };
@@ -190,12 +188,12 @@ If a `LocalBlob` is unversioned, the async operation for `LocalBlob::Commit` wil
 If multiple `LocalBlob` objects are opened within the same process, they are treated no differently than `LocalBlob` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `LocalBlob` objects successfully writing to the network. All other `LocalBlob` objects become permanently unversioned.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
-- A callback that accepts `boost::expected<T, std::error_code>`; return type is void
+- A callback in the form `void(boost::expected<T, std::error_code>)`; return type is void
 - A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
 - A boost::asio::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`
 
 ```C++
-class Blob {
+class LocalBlob {
  public:
   typedef detail::MetaData::TimePoint TimePoint;
   
@@ -207,18 +205,14 @@ class Blob {
   const std::string& user_metadata() const;
   void set_user_metadata(std::string);
 
-  // Version at open/last successful commit
+  // Version at open
   const BlobVersion& head_version() const;
 
-  // Version of Blob, or unversioned if empty
-  boost::optional<BlobVersion> version() const;
-
-  unspecified ListVersions(AsyncResult<std::vector<BlobVersion>>);
+  unspecified GetVersions(AsyncResult<std::vector<BlobVersion>>);
 
   std::uint64_t get_offset() const;
   void set_offset(std::uint64_t);
 
-  // Offset is implied through setters above.
   unspecified Read(boost::asio::buffer, AsyncResult<std::uint64_t>);
   unspecified Write(boost::asio::buffer, AsyncResult<>);
   unspecified Truncate(std::uint64_t, AsyncResult<>);
