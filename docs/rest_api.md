@@ -56,8 +56,8 @@ The `Put` call uses `ModifyVersion::New()` to indicate that it is creating and s
 ```c++
 namespace {
   template<typename Result>
-  auto GetOperationResult(
-      ExpectedBlobOperation<Result> operation) -> decltype(boost::optional*operation){
+  boost::optional<maidsafe::nfs::BlobOperation<Result>> GetOperationResult(
+      maidsafe::nfs::ExpectedBlobOperation<Result> operation) {
     while (!operation) {
       if (operation.error().code() != std::errc::network_down) {
         std::cerr << 
@@ -70,17 +70,16 @@ namespace {
   }
 }
 
-bool HelloWorld(maidsafe::nfs::Storage& storage) {
-  
-  const boost::optional<BlobOperation<>> put_operation(
+bool HelloWorld(maidsafe::nfs::Container& storage) {
+  const boost::optional<maidsafe::nfs::BlobOperation<>> put_operation(
       GetOperationResult(
-          container.Put(
-              "example_blob", "hello world", ModifyVersion::New()).get()));
+          storage.Put(
+              "example_blob", "hello world", maidsafe::nfs::ModifyBlobVersion::Create()).get()));
   if (put_operation) {
-     const boost::optional<BlobOperation<std::string>> get_operation(
+    const boost::optional<maidsafe::nfs::BlobOperation<std::string>> get_operation(
         GetOperationResult(
-            container.Get(
-                "example_blob", "hello world", put_operation->version()).get());
+            storage.Get(
+                "example_blob", put_operation->version()).get()));
     if (get_operation) {
       std::cout << get_operation->result() << std::endl;
       return true;
@@ -89,7 +88,9 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
   return false;
 }
 ```
-This is identical to the [hello world](#hello-world) example, except `Put` and `Get` operations that failed due to the network being down (no connection) are retried. In production code you may want to limit the attempts.
+This example starts from the `Container` object for brevity. It is identical to the [hello world](#hello-world) example, except `Put` and `Get` operations that failed due to the network being down (no connection) are retried. In production code you may want to limit the attempts, or have some signal mechanism for network connectivity.
+
+> If the retry mechanism returns std::errc::not_supported then no retry is possible. It is important that clients check the error code after a retry, or clients could continually attempt an operation that will never succeed.
 
 ### Hello World (Monad Style) ###
 ```c++
