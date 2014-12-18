@@ -94,26 +94,34 @@ This example starts from the `Container` object for brevity. It is identical to 
 
 ### Hello World (Monad Style) ###
 ```c++
-bool PrintHelloWorld(const maidsafe::nfs::Storage& storage) {
-  return storage.OpenContainer("example_container").get().bind(
+bool HelloWorld(const maidsafe::nfs::Storage& storage) {
+  namespace nfs = maidsafe::nfs;
   
-      [](ContainerOperation<Container> open_operation) {
-        return open_operation.result().Put(
-            "example_blob", "hello world", ModifyVersion::New()).get().bind(
-            
-                [&open_operation](BlobOperation<> put_operation) {
-                  return open_operation.result().Get("example_blob", put_operation.version()).get();
-        
-                }).bind([](BlobOperation<std::string> get_operation) {
+  return nfs::monadic(storage.OpenContainer("example_container").get()).bind(
+
+      [](nfs::ContainerOperation<maidsafe::nfs::Container> open_operation) {
+        return nfs::monadic(
+            open_operation.result().Put(
+                "example_blob","hello world", nfs::ModifyBlobVersion::Create()).get()).bind(
+
+                [&open_operation](nfs::BlobOperation<> put_operation) {
+                  return nfs::monadic(
+                      open_operation.result().Get("example_blob", put_operation.version()).get());
+
+                }).bind([](nfs::BlobOperation<std::string> get_operation) {
                   std::cout << get_operation.result() << std::endl;
                 });
-          
-      }).catch_error([](auto operation_error) {
-        std::cerr << "Hello world failed" << operation_error.code().message() << std::endl;
-      });
+
+      }).catch_error([](std::error_code error) {
+        std::cerr << "Error: " << error.message() << std::endl;
+        return boost::make_unexpected(error);
+
+      }).valid();
 }
 ```
-> This would almost work, except the error values differ. Will have to come up with a solution that allow this style of programming.
+This is an example of monadic programming, which is better described in the [Expected](#expected) documentation. The callbacks provided to the `bind` function calls are only invoked if the operation was successful, and the `catch_error` callback is only invoked if *any* of the previous operations failed. This eliminates the need for client code to check for errors after each operation. Also, in this example all values are *moved*, not copied, so it is efficient as well.
+
+> Using monadic programming with boost expected will require the usage of [`maidsafe::nfs::monadic`](#monadic).
 
 ### Hello World Concatenation ###
 ```c++
@@ -293,6 +301,55 @@ using ExpectedContainerOperation =
 template<typename T = void>
 using ExpectedBlobOperation =
     boost::expected<BlobOperation<T>, OperationError<BlobOperation<T>>>;
+```
+
+#### Monadic ####
+> maidsafe/nfs/expected_container_operation.h
+
+```c++
+template<typename T>
+boost::expected<BlobOperation<T>, std::error_code> monadic(
+    const ExpectedBlobOperation<T>& expected) {
+  if (expected) {
+    return *expected;
+  }
+
+  return boost::make_unexpected(expected.error().code());
+}
+
+template<typename T>
+boost::expected<BlobOperation<T>, std::error_code> monadic(
+    ExpectedBlobOperation<T>&& expected) {
+  if (expected) {
+    return *std::move(expected);
+  }
+
+  return boost::make_unexpected(expected.error().code());
+}
+```
+
+> maidsafe/nfs/expected_blob_operation.h
+
+```c++
+template<typename T>
+boost::expected<ContainerOperation<T>, std::error_code> monadic(
+    const ExpectedContainerOperation<T>& expected) {
+  if (expected) {
+    return *expected;
+  }
+
+  return boost::make_unexpected(expected.error().code());
+}
+
+template<typename T>
+boost::expected<ContainerOperation<T>, std::error_code> monadic(
+    ExpectedContainerOperation<T>&& expected) {
+  if (expected) {
+    return *std::move(expected);
+  }
+
+  return boost::make_unexpected(expected.error().code());
+}
 ```
 
 ### Storage ###
