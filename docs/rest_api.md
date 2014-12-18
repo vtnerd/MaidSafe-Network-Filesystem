@@ -337,7 +337,7 @@ Represents the [`Storage`](#storage) abstraction listed above. Constructing a `S
 
 ```c++
 class Storage {
-  explicit Storage(const StorageID&);
+  explicit Storage(StorageID);
 
   Future<ExpectedContainerOperation<std::vector<std::string>>> GetContainers();
 
