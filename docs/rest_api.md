@@ -269,7 +269,7 @@ class OperationError {
 };
 ```
 - **Retry**
-  - Return a Future to another attempt at the failed operation. Be careful of infinite loops - some operations could fail indefinitely (ModifyBlobVersion::Create() for example).
+  - Return a Future to another attempt at the failed operation. Be careful of infinite loops - some operations could fail indefinitely (ModifyBlobVersion::Create() for example). If the retry returns an error code `std::errc::not_supported`, then a retry is not possible.
 - **code()**
   - Return error code for the failed operation.
 
