@@ -88,7 +88,7 @@ bool HelloWorld(maidsafe::nfs::Container& storage) {
   return false;
 }
 ```
-This example starts from the `Container` object for brevity. It is identical to the [hello world](#hello-world) example, except `Put` and `Get` operations that failed due to the network being down (no connection) are retried. In production code you may want to limit the attempts, or have some signal mechanism for network connectivity.
+This example starts from the `Container` object for brevity. It is identical to the [hello world](#hello-world) example, except `Put` and `Get` operations that failed due to the network being down (no connection) are retried. In production code you may want to limit the attempts, or have a signal that indicates the return of network connectivity.
 
 > If the retry mechanism returns std::errc::not_supported then no retry is possible. It is important that clients check the error code after a retry, or clients could continually attempt an operation that will never succeed.
 
