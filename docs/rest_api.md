@@ -155,6 +155,8 @@ bool HelloWorld(maidsafe::nfs::Container& container) {
 ```
 In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Each `Get` call cannot be requested until the corresponding `Put` operation completes. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the `container` object directly.
 
+This examples uses the `->` operator on the `boost::expected` object instead of `.value()` like in the [exception example](#hello-world-exception-style). The `->` operator does not check if the `boost::expected` has an error (similar to `->` being unchecked for `boost::optional`); the conversion to bool in the if statement is the check for validity.
+
 ## REST Style API ##
 ### StorageID ###
 > maidsafe/nfs/storage_id.h
