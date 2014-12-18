@@ -13,7 +13,7 @@ A Container stores Blobs or a pointer to another Container at keys that have no 
 > Most users should **not** use nested Containers, see [nested containers](#nested-containers-and-blob-forks).
 
 #### Root-Level Container ####
-The top-most Container are stored in a special object that does not store Blobs. This special object is versioned, so the history of Container pointers at the top-most level can be reviewed.
+The top-most Containers are stored in a special object that does not store Blobs. This special object is versioned, so the history of Container pointers at the top-most level can be reviewed.
 
 #### Nested Containers and Blob Forks ####
 The chunk information for each Blob is stored directly in the Container, but only a reference ID (a pointer) is stored for child Containers. Since a child Container is a pointer to another Container on the network, a key can have multiple reference IDs stored in its history for a child Container. If the client treats children Containers as directories on a local filesystem, the result can be a fork in the history. The problem is if a child Container is deleted and re-created while another process is writing to the same Container:
