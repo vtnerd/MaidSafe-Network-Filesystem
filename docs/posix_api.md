@@ -38,8 +38,14 @@ A StorageID identifies a particular Storage instance on the SAFE network, and co
 
 
 ## Posix Style API ##
+All public functions in this API provide the strong exception guarantee.
+
 ### StorageID ###
 > maidsafe/nfs/storage_id.h
+
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
 
 Represents the [`StorageID`](#storageid) abstraction listed above. Obtaining relevant `StorageID` objects are out of the scope of this document.
 
@@ -49,6 +55,10 @@ class StorageID { /* No Public Elements */ };
 
 ### BlobVersion ###
 > maidsafe/nfs/blob_version.h
+
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
 
 Blobs stored at the same key are differentiated/identified by a `BlobVersion` object. The `BlobVersion` allows REST API users to retrieve older revisions of Blobs, or place constraints on operations that change the blob associated with a key.
 
@@ -63,6 +73,10 @@ class BlobVersion {
 ### ContainerVersion ###
 > maidsafe/nfs/container_version.h
 
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
 Containers are also versioned, but none of the REST API functions accept a ContainerVersion. This class is mentioned/returned by `Container` operations for users that wish to use the [Posix API](posix_api.md) in some situations.
 
 ```c++
@@ -71,6 +85,10 @@ class ContainerVersion { /* No Public Elements */ };
 
 ### ModifyBlobVersion ###
 > maidsafe/nfs/modfy_blob_version.h
+
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
 
 Operations in [`Container`](#container-1) that change the Blob stored at a key require a ModifyBlobVersion object.
 
@@ -91,6 +109,10 @@ class ModifyBlobVersion {
 ### RetrieveBlobVersion ###
 > maidsafe/nfs/retrieve_blob_version.h
 
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
 Operations in [`Container`](#container-1) that retrieve a Blob stored at a key require a RetrieveBlobVersion object.
 
 ```c++
@@ -107,6 +129,10 @@ class RetrieveBlobVersion {
 ### maidsafe::nfs::Future<T> ###
 > maidsafe/nfs/future.h
 
+- [x] Thread-safe Public Functions
+- [ ] Copyable
+- [x] Movable
+
 Returned by all basic API functions that required network access. `Future<T>` is a type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually.
 
 ```c++
@@ -116,6 +142,12 @@ using Future = boost::future<T>;
 
 ### maidsafe::nfs::Storage ###
 > maidsafe/nfs/storage.h
+
+- [x] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
+> This object has a single shared_ptr, and is shallow-copied. This makes it extremely quick to copy.
 
 Represents the [`Storage`](#storage) abstraction listed above. Constructing a `Storage` object requires a `StorageID` object.
 
@@ -140,6 +172,12 @@ class Storage {
 
 ### maidsafe::nfs::Container ###
 > maidsafe/nfs/container.h
+
+- [x] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
+> This object has a single shared_ptr, and is shallow-copied. This makes it extremely quick to copy.
 
 Represents the [`Container`](#container) abstraction listed above. Constructing a `Container` object cannot be done directly; `Container` objects can only be retrieved from `Storage::OpenContainer`.
 
@@ -169,6 +207,10 @@ class Container {
 
 ### maidsafe::nfs::LocalBlob ###
 > maidsafe/nfs/local_blob.h
+
+- [ ] Thread-safe Public Functions
+- [ ] Copyable
+- [x] Movable
 
 Upon initial creation, `LocalBlob` represents a `Blob` stored at a key/version in the associated `Container` object. Write calls are reflected immediately in that object, but the `LocalBlob` becomes unversioned because it does not represent a `Blob` on the network. The current `LocalBlob` can be saved to the network with a call to a `LocalBlob::Commit`, and success of the async operation indicates that the `LocalBlob` now represents the new version returned. `LocalBlob` provides the strong-exception guarantee for all public methods.
 
