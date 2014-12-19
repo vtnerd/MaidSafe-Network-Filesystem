@@ -158,6 +158,8 @@ In this example, both `Put` calls are done in parallel, and both `Get` calls are
 This examples uses the `->` operator on the `boost::expected` object instead of `.value()` like in the [exception example](#hello-world-exception-style). The `->` operator does not check if the `boost::expected` has an error (similar to `->` being unchecked for `boost::optional`); the conversion to bool in the if statement is the check for validity.
 
 ## REST Style API ##
+All public functions listed in this API provide the strong exception guarantee.
+
 ### StorageID ###
 > maidsafe/nfs/storage_id.h
 
