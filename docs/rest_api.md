@@ -381,8 +381,10 @@ boost::expected<ContainerOperation<T>, std::error_code> monadic(
 > maidsafe/nfs/storage.h
 
 - [x] Thread-safe Public Functions
-- [ ] Copyable
+- [x] Copyable
 - [x] Movable
+
+> This object has a single `shared_ptr`, and is shallow-copied. This makes it extremely quick to copy.
 
 Represents the [`Storage`](#storage) abstraction listed above. Constructing a `Storage` object requires a `StorageID` object.
 
@@ -409,8 +411,10 @@ class Storage {
 > maidsafe/nfs/container.h
 
 - [x] Thread-safe Public Functions
-- [ ] Copyable
+- [x] Copyable
 - [x] Movable
+
+> This object has a single `shared_ptr`, and is shallow-copied. This makes it extremely quick to copy.
 
 Represents the [`Container`](#container) abstraction listed above. Constructing a `Container` object cannot be done directly; `Container` objects can only be retrieved from `Storage::OpenContainer`.
 
