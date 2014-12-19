@@ -161,6 +161,10 @@ This examples uses the `->` operator on the `boost::expected` object instead of 
 ### StorageID ###
 > maidsafe/nfs/storage_id.h
 
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
 Represents the [`StorageID`](#storageid) abstraction listed above. Obtaining relevant `StorageID` objects are out of the scope of this document.
 
 ```c++
@@ -169,6 +173,10 @@ class StorageID { /* No Public Elements */ };
 
 ### BlobVersion ###
 > maidsafe/nfs/blob_version.h
+
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
 
 Blobs stored at the same key are differentiated/identified by a `BlobVersion` object. The `BlobVersion` allows REST API users to retrieve older revisions of Blobs, or place constraints on operations that change the blob associated with a key.
 
@@ -183,6 +191,10 @@ class BlobVersion {
 ### ContainerVersion ###
 > maidsafe/nfs/container_version.h
 
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
 Containers are also versioned, but none of the REST API functions accept a ContainerVersion. This class is mentioned/returned by `Container` operations for users that wish to use the [Posix API](posix_api.md) in some situations.
 
 ```c++
@@ -191,6 +203,10 @@ class ContainerVersion { /* No Public Elements */ };
 
 ### ModifyBlobVersion ###
 > maidsafe/nfs/modfy_blob_version.h
+
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
 
 Operations in [`Container`](#container-1) that change the Blob stored at a key require a ModifyBlobVersion object.
 
@@ -211,6 +227,10 @@ class ModifyBlobVersion {
 ### RetrieveBlobVersion ###
 > maidsafe/nfs/retrieve_blob_version.h
 
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
 Operations in [`Container`](#container-1) that retrieve a Blob stored at a key require a RetrieveBlobVersion object.
 
 ```c++
@@ -227,6 +247,10 @@ class RetrieveBlobVersion {
 ### ContainerOperation<T> ###
 > maidsafe/nfs/container_operation.h
 
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
 Most REST API users should only need to invoke the result() function to retrieve a `Container` returned in a `Storage::OpenContainer` call. A version is returned for consistency with BlobOperations, and for users that wish to use the [Posix API](posix_api.md) in some situations.
 
 ```c++
@@ -239,6 +263,10 @@ class ContainerOperation {
 
 ### BlobOperation<T> ###
 > maidsafe/nfs/container_operation.h
+
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
 
 Every operation on Blobs return a `BlobOperation` object.
 
@@ -256,6 +284,10 @@ class BlobOperation {
 
 ### OperationError<ExpectedOperation> ###
 > maidsafe/nfs/operation_error.h
+
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
 
 This object is returned if a network operation fails.
 In the event of a failure, retrieving the cause of the error and a Retry attempt can be done with the `OperationError` interface. The error is a std::error_code object, and the retry attempt will return a new `Future` object with the exact type of the previous failed attempt.
@@ -276,6 +308,10 @@ class OperationError {
 ### Future<T> ###
 > maidafe/nfs/future.h
 
+- [x] Thread-safe Public Functions
+- [ ] Copyable
+- [x] Movable
+
 Currently `maidsafe::nfs::Future` is a `boost::future` object, but this may be changed to a non-allocating design. It is recommended that you use the typedef (`maidsafe::nfs::Future`) in case the implementation changes.
 
 In the REST API, the `Future` will only throw exceptions on non-network related errors (std::bad_alloc, std::bad_promise, etc.). Values and network related errors are returned in a `boost::expected` object.
@@ -291,6 +327,10 @@ When a network operation has completed, the future will return a [`boost::expect
 #### ExpectedContainerOperation<T> ####
 > maidsafe/nfs/expected_container_operation.h
 
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
 ```c++
 template<typename T = void>
 using ExpectedContainerOperation = 
@@ -299,6 +339,10 @@ using ExpectedContainerOperation =
 
 #### ExpectedBlobOperation<T> ####
 > maidsafe/nfs/expected_blob_operation.h
+
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
 
 ```c++
 template<typename T = void>
@@ -336,6 +380,10 @@ boost::expected<ContainerOperation<T>, std::error_code> monadic(
 ### Storage ###
 > maidsafe/nfs/storage.h
 
+- [x] Thread-safe Public Functions
+- [ ] Copyable
+- [x] Movable
+
 Represents the [`Storage`](#storage) abstraction listed above. Constructing a `Storage` object requires a `StorageID` object.
 
 ```c++
@@ -359,6 +407,10 @@ class Storage {
 
 ### Container ###
 > maidsafe/nfs/container.h
+
+- [x] Thread-safe Public Functions
+- [ ] Copyable
+- [x] Movable
 
 Represents the [`Container`](#container) abstraction listed above. Constructing a `Container` object cannot be done directly; `Container` objects can only be retrieved from `Storage::OpenContainer`.
 
