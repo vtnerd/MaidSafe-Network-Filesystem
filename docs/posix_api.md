@@ -306,7 +306,7 @@ class LocalBlob {
   - Returns the file size of the `LocalBlob`. This is *not* necessarily the size of any `Blob` stored on the network.
 - **creation_time()**
   - Returns the timestamp of when `key()` last went from storing nothing to storing a Blob.
-- ** head_write_time()**
+- **head_write_time()**
   - Returns the timestamp of when the head_version() was stored.
 - **user_metadata()**
   - Returns the user metadata being stored.
