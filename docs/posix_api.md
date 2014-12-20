@@ -168,8 +168,8 @@ class Storage {
 };
 ```
 - **GetVersions(AsyncResult<std::vector<ContainerVersion>>)**
-  - Request the version of Storage.
-  - AsyncResult is given a listing of all version of Storage. A new version is created each time a Container is created or deleted.
+  - Request the version history of Storage.
+  - AsyncResult is given the version history of Storage. A new version is created each time a Container is created or deleted. Oldest `ContainerVersion` is always `ContainerVersion::Defunct()`, and is used subsequently when the key had no associated Container for some period of time. `std::vector::begin()` will be the newest `ContainerVersion`, and `std::vector::end() - 1` will have the oldest `ContainerVersion` (which is always `ContainerVersion::Defunct()`).
 - **GetContainers(RetrieveContainerVersion, AsyncResult<std::vector<std::string>>)**
   - Request the list of nested Containers.
   - AsyncResult is given the list of nested containers.
@@ -219,8 +219,8 @@ class Container {
 > A key can only store a Blob or a nested Container at a given point in time.
 
 - **GetVersions(AsyncResult<std::vector<ContainerVersion>>)**
-  - Request the version of the Container.
-  - AsyncResult is given a listing of all version of the container. A new version is created each time a blob is stored or deleted, or when a nested container is created or destroyed.
+  - Request the version history of Container.
+  - AsyncResult is given the version history of Container. A new version is created each time a Container is created or deleted. Oldest `ContainerVersion` is always `ContainerVersion::Defunct()`, and is used subsequently when the key had no associated Container for some period of time. `std::vector::begin()` will be the newest `ContainerVersion`, and `std::vector::end() - 1` will have the oldest `ContainerVersion` (which is always `ContainerVersion::Defunct()`).
 - **GetContainers(RetrieveContainerVersion, AsyncResult<std::vector<std::string>>)**
   - Request the list of nested Containers.
   - AsyncResult is given the list of nested containers.
@@ -315,7 +315,8 @@ class LocalBlob {
 - **head_version()**
   - Returns the version from when the `LocalBlob` was opened. This is **not** updated after a `Commit` succeeds.
 - **GetVersions(AsyncResult<std::vector<BlobVersion>>)**
-  - Retrieves the history of `BlobVersion`s at the key. Oldest `BlobVersion` is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time. `std::vector::begin()` will be the newest `BlobVersion`, and `std::vector::end() - 1` will have the oldest BlobVersion (which is always `BlobVersion::Defunct()`).
+  - Request the version history of the Blob.
+  - AsyncResult is given the version history of `BlobVersion`s at the key. Oldest `BlobVersion` is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time. `std::vector::begin()` will be the newest `BlobVersion`, and `std::vector::end() - 1` will have the oldest BlobVersion (which is always `BlobVersion::Defunct()`).
 - **get_offset()**
   - Returns the offset that will be used by the next Read, Write, or Truncate call.
 - **set_offset(std::uint64_t)**
