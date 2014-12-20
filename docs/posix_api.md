@@ -163,12 +163,21 @@ class Storage {
   unspecified GetContainers(
       RetrieveContainerVersion, AsyncResult<std::vector<std::string>>);
 
-  unspecified OpenContainer(
-      std::string, ModifyContainerVersion, AsyncResult<Container>);
-  unspecified DeleteContainer(
-      std::string, RetrieveContainerVersion, AsyncResult<>);
+  unspecified OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>);
+  unspecified DeleteContainer(std::string, RetrieveContainerVersion, AsyncResult<>);
 };
 ```
+- **GetVersions(AsyncResult<std::vector<ContainerVersion>>)**
+  - Request the version of Storage.
+  - AsyncResult is given a listing of all version of Storage. A new version is created each time a Container is created or deleted.
+- **GetContainers(RetrieveContainerVersion, AsyncResult<std::vector<std::string>>)**
+  - Request the list of nested Containers.
+  - AsyncResult is given the list of nested containers.
+- **OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>)**
+  - Make a request to open a container at the specified key.
+  - AsyncResult is given the nested `Container` with the specified name.
+- **DeleteContainer(std::string, RetrieveContainerVersion, AsyncResult<>)**
+  - Make a request to delete a container at the specified key.
 
 ### maidsafe::nfs::Container ###
 > maidsafe/nfs/container.h
@@ -200,10 +209,37 @@ class Container {
   unspecified OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>);
   unspecified OpenBlob(std::string, ModifyBlobVersion, AsyncResult<LocalBlob>);
   
+  unspecified DeleteContainer(std::string, RetrieveContainerVersion, AsyncResult<>);
+  unspecified DeleteBlob(std:string, ModifyBlobVersion, AsyncResult<>);
+  
   unspecified Copy(
       const LocalBlob& from, std::string to, ModifyVersion, AsyncResult<LocalBlob>);
 };
 ```
+> A key can only store a Blob or a nested Container at a given point in time.
+
+- **GetVersions(AsyncResult<std::vector<ContainerVersion>>)**
+  - Request the version of the Container.
+  - AsyncResult is given a listing of all version of the container. A new version is created each time a blob is stored or deleted, or when a nested container is created or destroyed.
+- **GetContainers(RetrieveContainerVersion, AsyncResult<std::vector<std::string>>)**
+  - Request the list of nested Containers.
+  - AsyncResult is given the list of nested containers.
+- **GetBlobs(RetreieveContainerVersion,AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>)**
+  - Request the list of Blobs.
+  - AsyncResult Retrieves the names of Blobs in the Container. The BlobVersion is provided for each Blob.
+- **OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>)**
+  - Make a request to open a container at the specified key.
+  - AsyncResult is given the nested `Container` with the specified name.
+- **OpenBlob(std::string, ModifyBlobVersion, AsyncResult<LocalBlob>)**
+  - Make a request to open a Blob at the specified key.
+  - AsyncResult is given a `LocalBlob` that represents the Blob at the specified key.
+- **DeleteContainer(std::string, RetrieveContainerVersion, AsyncResult<>)**
+  - Make a request to delete the Container at the specified key.
+- **DeleteBlob(std:string, ModifyBlobVersion, AsyncResult<>)**
+  - Make a request to delete the Blob at the specified key.
+- **Copy(const LocalBlob& from, std::string to, ModifyVersion, AsyncResult<LocalBlob>)**
+  - Make a request to copy the contents of the `LocalBlob` to the specified key.
+  - AsyncResult is given the new `LocalBlob` associated with the destination of the copy.
 
 ### maidsafe::nfs::LocalBlob ###
 > maidsafe/nfs/local_blob.h
@@ -242,7 +278,7 @@ class LocalBlob {
   const std::string& key() const; // key associated with Blob
   std::uint64_t file_size() const;
   TimePoint creation_time() const;
-  TimePoint write_time() const; // write time of this revision
+  TimePoint head_write_time() const; // write time of this revision
   
   const std::string& user_metadata() const;
   void set_user_metadata(std::string);
@@ -262,3 +298,43 @@ class LocalBlob {
   unspecified commit(AsyncResult<BlobVersion>);
 };
 ```
+> The network currently has no time server of its own, so the timestamps are from the clients. If a client has a misconfigured clock, the timestamps stored will also be incorrect.
+
+- **key()**
+  - Returns the key associated with the Blob
+- **file_size()**
+  - Returns the file size of the `LocalBlob`. This is *not* necessarily the size of any `Blob` stored on the network.
+- **creation_time()**
+  - Returns the timestamp of when `key()` last went from storing nothing to storing a Blob.
+- ** head_write_time()**
+  - Returns the timestamp of when the head_version() was stored.
+- **user_metadata()**
+  - Returns the user metadata being stored.
+- **set_user_metadata(std::string)**
+  - Sets the user metadata. Binary data is allowed.
+- **head_version()**
+  - Returns the version from when the `LocalBlob` was opened. This is **not** updated after a `Commit` succeeds.
+- **GetVersions(AsyncResult<std::vector<BlobVersion>>)**
+  - Retrieves the history of `BlobVersion`s at the key. Oldest `BlobVersion` is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time. `std::vector::begin()` will be the newest `BlobVersion`, and `std::vector::end() - 1` will have the oldest BlobVersion (which is always `BlobVersion::Defunct()`).
+- **get_offset()**
+  - Returns the offset that will be used by the next Read, Write, or Truncate call.
+- **set_offset(std::uint64_t)**
+  - Change the value returned by `get_offset()`.
+- **Read(boost::asio::buffer, AsyncResult<std::uint64_t>)**
+  - Read from the `LocalBlob` starting at `get_offset()` into the provided buffer. The buffer must remain valid until AsyncResult returns.
+  - `get_offset()` is immediately updated to `min(file_size() - get_offset(), get_offset() + buffer::size())`
+  - AsyncResult is given the number of bytes actually read.
+  - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
+- **Write(boost::asio::buffer, AsyncResult<>)**
+  - Write to the `LocalBlob` starting at `get_offset()` from the provided buffer. The buffer must remain valid until AsyncResult returns.
+  - `get_offset()` is immediately updated to `get_offset() + buffer::size()`
+  - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
+- **Truncate(std::uint64_t, AsyncResult<>)**
+  - Change the size of the `LocalBlob` to get_offset() + size bytes.
+  - `get_offset()` is immediately updated to `get_offset() + buffer::size()`
+  - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
+- **commit(AsyncResult<BlobVersion>)**
+  - Make a request to store the contents of the `LocalBlob` at `key()`
+  - Storing a  `LocalBlob` at `key()` will fail if another `LocalBlob` modified `key()` since `head_version()`.
+  - AsyncResult is given the `BlobVersion` of the new Blob stored on the network.
+  - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
