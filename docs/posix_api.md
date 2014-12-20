@@ -332,7 +332,7 @@ class LocalBlob {
   - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
 - **Truncate(std::uint64_t, AsyncResult<>)**
   - Change the size of the `LocalBlob` to get_offset() + size bytes.
-  - `get_offset()` is immediately updated to `get_offset() + buffer::size()`
+  - `get_offset()` is immediately updated to `get_offset() + size`
   - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
 - **commit(AsyncResult<BlobVersion>)**
   - Make a request to store the contents of the `LocalBlob` at `key()`
