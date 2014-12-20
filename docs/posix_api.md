@@ -224,7 +224,7 @@ class Container {
 - **GetContainers(RetrieveContainerVersion, AsyncResult<std::vector<std::string>>)**
   - Request the list of nested Containers.
   - AsyncResult is given the list of nested containers.
-- **GetBlobs(RetreieveContainerVersion,AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>)**
+- **GetBlobs(RetreieveContainerVersion, AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>)**
   - Request the list of Blobs.
   - AsyncResult Retrieves the names of Blobs in the Container. The BlobVersion is provided for each Blob.
 - **OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>)**
