@@ -297,17 +297,15 @@ Upon initial creation, `LocalBlob` represents a `Blob` stored at a key/version i
 Function |  State After Throw   | State After Return                         |State after Successful Async Operation
 ---------|----------------------|--------------------------------------------|-------------------------------
 Read     | Valid and Unchanged. | Unchanged.                                 | Unchanged (buffer has requested contents from LocalBlob).
-Write    | Valid and Unchanged. | Unversioned. Buffer is stored in LocalBlob.| Buffer is stored on network, but not visible to remote `Blob`s.
-Truncate | Valid and Unchanged. | Unversioned. Data is changed in LocalBlob. | Data change is stored on network, but not visible to remote `Blob`s
+Write    | Valid and Unchanged. | Unversioned. Buffer is stored in LocalBlob.| Buffer has been copied, but not visible to remote `Blob`s.
+Truncate | Valid and Unchanged. | Unversioned. Data is changed in LocalBlob. | N/A
 Commit   | Valid and Unchanged. | Unchanged.                                 | Local changes are visible to remote `Blob`s. Version matches remote version.
 
-Since write operations are reflected immediately in the `LocalBlob` object, users do not have to wait for the previous operation to complete to make additional read or write calls. The `SimpleAsyncResult` object provided to `LocalBlob::Write` or `LocalBlob::Truncate` calls is notified when the data has been stored to the network. Writes stored on the network are hidden from other clients until the async operation for `LocalBlob::Commit` succeeds.
+Since write operations are reflected immediately in the `LocalBlob` object, users do not have to wait for the previous operation to complete to make additional read or write calls. The `AsyncResult` object provided to `LocalBlob::Write` calls is notified when the data has been safely copied. Writes stored on the network are hidden from other clients until the async operation for `LocalBlob::Commit` succeeds.
 
-- Need to specify when write calls will be sent to network - generally not until Commit or Copy call, but there needs to be a sized based event too.
-
-If a `LocalBlob` is unversioned, the async operation for `LocalBlob::Commit` will wait for all uncompleted `LocalBlob::Write` or `LocalBlob::Truncate` calls to complete, and then try to store the new Blob version. If `LocalBlob::Commit` signals failure to the `AsyncResult<>`, all subsequent calls to `LocalBlob::Commit` will continue to fail, however subsequent `LocalBlob::Write` or `LocalBlob::Truncate` async operations can succeed because they indicate when the data has been stored to the network. Changes to the `LocalBlob` object can always be be stored with `Container::Copy`, which will wait for any remaining write calls to complete, and then commit a new version.
+If a `LocalBlob` is unversioned, the async operation for `LocalBlob::Commit` will wait for all uncompleted `LocalBlob::Write` or `LocalBlob::Truncate` calls to complete, and then try to store the new Blob version. If `LocalBlob::Commit` signals failure to the `AsyncResult<>`, all subsequent calls to `LocalBlob::Commit` will continue to fail, however subsequent `LocalBlob::Write` or `LocalBlob::Truncate` async operations can succeed. Changes to the `LocalBlob` object can always be be stored with `Container::Copy`, which will wait for any remaining write calls to complete, and then commit a new version.
  
-If multiple `LocalBlob` objects are opened within the same process, they are treated no differently than `LocalBlob` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `LocalBlob` objects successfully writing to the network. All other `LocalBlob` objects become permanently unversioned.
+If multiple `LocalBlob` objects are opened within the same process, they are treated no differently than `LocalBlob` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `LocalBlob` objects successfully writing to the network (the first to successfully call `LocalBlob::Commit`). All other `LocalBlob` objects become permanently unversioned.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback in the form `void(boost::expected<T, std::error_code>)`; return type is void
@@ -337,7 +335,7 @@ class LocalBlob {
 
   unspecified Read(boost::asio::buffer, AsyncResult<std::uint64_t>);
   unspecified Write(boost::asio::buffer, AsyncResult<>);
-  unspecified Truncate(std::uint64_t, AsyncResult<>);
+  void Truncate(std::uint64_t);
 
   unspecified commit(AsyncResult<BlobVersion>);
 };
