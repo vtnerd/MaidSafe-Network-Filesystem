@@ -491,7 +491,7 @@ class LocalBlob {
   - Change the size of the `LocalBlob` to offset() + size bytes.
   - `offset()` is immediately updated to `offset() + size`
   - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
-- **commit(AsyncResult<BlobVersion>)**
+- **Commit(AsyncResult<BlobVersion>)**
   - Make a request to store the contents of the `LocalBlob` at `key()`
   - Storing a  `LocalBlob` at `key()` will fail if another `LocalBlob` modified `key()` since `head_version()`.
   - AsyncResult is given the `BlobVersion` of the new Blob stored on the network.
