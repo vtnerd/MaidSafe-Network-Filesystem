@@ -409,12 +409,12 @@ class Container {
 
 Upon initial creation, `LocalBlob` represents a `Blob` stored at a key/version in the associated `Container` object. Write calls are reflected immediately in that object, but the `LocalBlob` becomes unversioned because it does not represent a `Blob` on the network. The current `LocalBlob` can be saved to the network with a call to a `LocalBlob::Commit`, and success of the async operation indicates that the `LocalBlob` now represents the new version returned.
 
-Function |  State After Throw   | State After Return                             |State after Successful Async Operation
----------|----------------------|------------------------------------------------|-------------------------------
-Read     | Valid and Unchanged. | Unchanged.                                     | Unchanged (buffer has requested contents from LocalBlob).
-Write    | Valid and Unchanged. | Unversioned. Buffer can be read from LocalBlob.| Buffer has been copied, but not visible to remote `Blob`s.
-Truncate | Valid and Unchanged. | Unversioned. Data is changed in LocalBlob.     | N/A
-Commit   | Valid and Unchanged. | Unchanged.                                     | Local changes are visible to remote `Blob`s. Version provided to AsyncResult is `ModifyBlobVersion::Latest()`.
+Function |  State After Throw   | State After Return                                 |State after Successful Async Operation
+---------|----------------------|----------------------------------------------------|-------------------------------
+Read     | Valid and Unchanged. | Unchanged.                                         | Unchanged (buffer has requested contents from LocalBlob).
+Write    | Valid and Unchanged. | Unversioned. Buffer can be read from LocalBlob.    | Buffer has been copied, but not visible to remote `Blob`s.
+Truncate | Valid and Unchanged. | Unversioned. Truncation can be read from LocalBlob.| N/A
+Commit   | Valid and Unchanged. | Unchanged.                                         | Local changes are visible to remote `Blob`s. Version provided to AsyncResult is `ModifyBlobVersion::Latest()`.
 
 Since write operations are reflected immediately in the `LocalBlob` object, users do not have to wait for the previous operation to complete to make additional read or write calls. The `AsyncResult` object provided to `LocalBlob::Write` calls is notified when the data has been safely copied. Writes stored on the network are hidden from other clients until the async operation for `LocalBlob::Commit` succeeds.
 
