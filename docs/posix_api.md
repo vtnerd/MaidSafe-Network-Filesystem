@@ -32,6 +32,78 @@ Storage has 0 more Containers. The Storage can be public, private, or privately-
 ### StorageID ###
 A StorageID identifies a particular Storage instance on the SAFE network, and contains the necessary information to decrypt the contents.
 
+## Examples ##
+
+### Hello World (Callbacks) ###
+```c++
+bool HelloWorld(maidsafe::nfs::Storage& storage) {
+  using ExpectedContainer =
+      boost::expected<maidsafe::nfs::Container, std::error_code>;
+  using ExpectedBlob = 
+      boost::expected<maidsafe::nfs::LocalBlob, std::error_code>;
+  using ExpectedVersion =
+      boost::expected<maidsafe::nfs::BlobVersion, std::error_code>;
+  using FutureExpectedString =
+      maidsafe::nfs::Future<maidsafe::nfs::ExpectedBlobOperation<std::string>>;
+      
+
+  boost::promise<boost::expected<std::string, std::error_code>> result;
+  
+  storage.OpenContainer(
+      "example_container",
+      maidsafe::nfs::ModifyContainerVersion::Create(),
+      [&result](ExpectedContainer container) {
+      
+        if (!container) {
+          result.set_value(boost::make_unexpected(container.error()));
+          return;
+        }
+        
+        container->OpenBlob(
+            "example_blob",
+            maidsafe::nfs::ModifyBlobVersion::Create(),
+            [&result, container](ExpectedBlob blob) {
+              
+              if (!blob) {
+                result.set_value(boost::make_unexpected(blob.error()));
+                return;
+              }
+
+              blob->Write("hello world");
+              blob->Commit(
+                  [&result, container](ExpectedVersion version) {
+                  
+                    if (!version) {
+                      result.set_value(boost::make_unexpected(version.error()));
+                      return;
+                    }
+                    
+                    container->Read("example_blob", *std::move(version)).then(
+                        [&result](FutureExpectedString future_read) {
+                        
+                          const auto read = future_read.get();
+                          if (!read) {
+                            result.set_value(boost::make_unexpected(read.error().code());
+                            return;
+                          }
+                          
+                          result.set_value(std::move(read)->result());
+                        });
+                  });
+            });
+      });
+  
+  const auto value = result.get_promise().get();
+  if (!value) {
+    std::cerr << value.error().message() << std::endl;
+    return false;
+  }
+    
+   std::cout << *value << std::endl;
+   return true;
+}
+```
+
 ## Posix Style API ##
 All public functions in this API provide the strong exception guarantee. All public const methods are thread-safe.
 
