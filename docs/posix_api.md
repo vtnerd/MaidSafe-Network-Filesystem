@@ -175,7 +175,9 @@ class RetrieveContainerVersion {
 - [ ] Copyable
 - [x] Movable
 
-Returned by all basic API functions that required network access. `Future<T>` is a type conforming to [std::future<T>](http://en.cppreference.com/w/cpp/thread/future). [boost::future<T>](http://www.boost.org/doc/libs/1_57_0/doc/html/thread/synchronization.html#thread.synchronization.futures) is currently the type being used, but a type supporting non-allocating future promises may be used eventually.
+Currently `maidsafe::nfs::Future` is a `boost::future` object, but this may be changed to a non-allocating design. It is recommended that you use the typedef (`maidsafe::nfs::Future`) in case the implementation changes.
+
+In the Posix API, the `Future` will only throw exceptions on non-network related errors (std::bad_alloc, std::bad_promise, etc.). Values and network related errors are returned in a `boost::expected` object.
 
 ```c++
 template<typename T>
@@ -196,7 +198,7 @@ Represents the [`Storage`](#storage) abstraction listed above. Constructing a `S
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback in the form `void(boost::expected<T, std::error_code>)`; return type is void
 - A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
-- A boost::asio::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`.
+- A maidsafe::nfs::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`.
 
 ```c++
 class Storage {
@@ -235,7 +237,7 @@ Represents the [`Container`](#container) abstraction listed above. Constructing 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback in the form `void(boost::expected<T, std::error_code>)`; return type is void
 - A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
-- A boost::asio::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`.
+- A maidsafe::nfs::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`.
 
 ```c++
 class Container {
@@ -310,7 +312,7 @@ If multiple `LocalBlob` objects are opened within the same process, they are tre
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback in the form `void(boost::expected<T, std::error_code>)`; return type is void
 - A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
-- A boost::asio::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`
+- A maidsafe::nfs::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`
 
 ```C++
 class LocalBlob {
