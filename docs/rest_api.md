@@ -214,12 +214,12 @@ Operations in [`Container`](#container-1) that change the Blob stored at a key r
 
 ```c++
 class ModifyBlobVersion {
-  static ModifyBlobVersion New();
+  static ModifyBlobVersion Create();
   static ModifyBlobVersion Latest();
   ModifyBlobVersion(BlobVersion);
 };
 ```
-- **New()**
+- **Create()**
   - Returns an object that indicates the REST API should only succeed if the specified key is unused.
 - **Latest()**
   - Returns an object that indicates the REST API should overwrite any existing Blob at the specified key.
