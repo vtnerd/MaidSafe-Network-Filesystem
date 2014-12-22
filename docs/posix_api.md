@@ -477,9 +477,9 @@ class LocalBlob {
 - **offset()**
   - Returns the offset that will be used by the next Read, Write, or Truncate call.
 - **set_offset(std::uint64_t)**
-  - Change the value returned by `get_offset()`.
+  - Change the value returned by `offset()`.
 - **Read(boost::asio::buffer, AsyncResult<std::uint64_t>)**
-  - Read from the `LocalBlob` starting at `get_offset()` into the provided buffer. The buffer must remain valid until AsyncResult returns.
+  - Read from the `LocalBlob` starting at `offset()` into the provided buffer. The buffer must remain valid until AsyncResult returns.
   - `offset()` is immediately updated to `min(file_size() - offset(), offset() + buffer::size())`
   - AsyncResult is given the number of bytes actually read.
   - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
