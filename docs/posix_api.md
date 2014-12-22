@@ -69,7 +69,7 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
                 return;
               }
 
-              blob->Write("hello world");
+              blob->Write(boost::asio::buffer("hello world"), []{});
               blob->Commit(
                   [&result, container](ExpectedVersion version) {
                   
@@ -101,6 +101,47 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
     
    std::cout << *value << std::endl;
    return true;
+}
+```
+### Hello World (Stackful Co-routines) ###
+```c++
+bool HelloWorld(maidsafe::nfs::Storage& storage) {
+  maidsafe::nfs::Future<boost::expected<std::string, std::error_code>> result;
+  
+  boost::asio::spawn([]{}, [&result](boost::asio::yield_context yield) {
+    result.set_value( 
+        storage.OpenContainer(
+            "example_container", maidsafe::nfs::ModifyContainerVersion::Create(), yield).bind(
+            
+                [&yield](maidsafe::nfs::Container container) {
+                  return container.OpenBlob(
+                      "example_blob", maidsafe::nfs::ModifyBlobVersion::Create(), yield);
+                }
+            
+        ).bind([&yield](maidsafe::nfs::LocalBlob blob) {
+          blob.Write(boost::asio::buffer("hello world"), []{});
+          return blob.Commit(yield).bind(
+          
+              [&yield, &blob](maidsafe::nfs::BlobVersion) {
+                std::string buffer;
+                buffer.resize(blob.size());
+                return blob.Read(boost::asio::buffer(&buffer[0], buffer.size()), yield).bind(
+                
+                    [&yield, &buffer]() {
+                      return std::move(buffer);
+                    });
+              });
+        }));
+    });
+    
+  const auto value = result.get();
+  if (!value) {
+    std::cerr << "Error: " << value.error().message() << std::endl;
+    return false;
+  }
+  
+  std::cout << *value << std::endl;
+  return true;
 }
 ```
 
