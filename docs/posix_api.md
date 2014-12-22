@@ -33,6 +33,7 @@ Storage has 0 more Containers. The Storage can be public, private, or privately-
 A StorageID identifies a particular Storage instance on the SAFE network, and contains the necessary information to decrypt the contents.
 
 ## Examples ##
+Network operations in the Posix API are done asynchronously so that client code doesn't block while network operations are being performed. The Posix API uses the [AsyncResult](http://www.boost.org/doc/libs/1_57_0/doc/html/boost_asio/reference/async_result.html) framework from `boost::asio`. This allows clients to use callbacks, stackful co-routines, or futures as the completion signalling mechanism.
 
 ### Hello World (Callbacks) ###
 ```c++
@@ -431,7 +432,7 @@ class LocalBlob {
   typedef detail::MetaData::TimePoint TimePoint;
   
   const std::string& key() const; // key associated with Blob
-  std::uint64_t file_size() const;
+  std::uint64_t size() const;
   TimePoint creation_time() const;
   TimePoint head_write_time() const; // write time of this revision
   
@@ -443,7 +444,7 @@ class LocalBlob {
 
   unspecified GetVersions(AsyncResult<std::vector<BlobVersion>>);
 
-  std::uint64_t get_offset() const;
+  std::uint64_t offset() const;
   void set_offset(std::uint64_t);
 
   unspecified Read(boost::asio::buffer, AsyncResult<std::uint64_t>);
@@ -457,8 +458,8 @@ class LocalBlob {
 
 - **key()**
   - Returns the key associated with the Blob
-- **file_size()**
-  - Returns the file size of the `LocalBlob`. This is *not* necessarily the size of any `Blob` stored on the network.
+- **size()**
+  - Returns the size of the `LocalBlob` in bytes. This is *not* necessarily the size of any `Blob` stored on the network.
 - **creation_time()**
   - Returns the timestamp of when `key()` last went from storing nothing to storing a Blob.
 - **head_write_time()**
@@ -472,22 +473,22 @@ class LocalBlob {
 - **GetVersions(AsyncResult<std::vector<BlobVersion>>)**
   - Request the version history of the Blob.
   - AsyncResult is given the version history of `BlobVersion`s at the key. Oldest `BlobVersion` is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time. `std::vector::begin()` will be the newest `BlobVersion`, and `std::vector::end() - 1` will have the oldest BlobVersion (which is always `BlobVersion::Defunct()`).
-- **get_offset()**
+- **offset()**
   - Returns the offset that will be used by the next Read, Write, or Truncate call.
 - **set_offset(std::uint64_t)**
   - Change the value returned by `get_offset()`.
 - **Read(boost::asio::buffer, AsyncResult<std::uint64_t>)**
   - Read from the `LocalBlob` starting at `get_offset()` into the provided buffer. The buffer must remain valid until AsyncResult returns.
-  - `get_offset()` is immediately updated to `min(file_size() - get_offset(), get_offset() + buffer::size())`
+  - `offset()` is immediately updated to `min(file_size() - offset(), offset() + buffer::size())`
   - AsyncResult is given the number of bytes actually read.
   - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
 - **Write(boost::asio::buffer, AsyncResult<>)**
-  - Write to the `LocalBlob` starting at `get_offset()` from the provided buffer. The buffer must remain valid until AsyncResult returns.
-  - `get_offset()` is immediately updated to `get_offset() + buffer::size()`
+  - Write to the `LocalBlob` starting at `offset()` from the provided buffer. The buffer must remain valid until AsyncResult returns.
+  - `offset()` is immediately updated to `offset() + buffer::size()`
   - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
 - **Truncate(std::uint64_t, AsyncResult<>)**
-  - Change the size of the `LocalBlob` to get_offset() + size bytes.
-  - `get_offset()` is immediately updated to `get_offset() + size`
+  - Change the size of the `LocalBlob` to offset() + size bytes.
+  - `offset()` is immediately updated to `offset() + size`
   - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
 - **commit(AsyncResult<BlobVersion>)**
   - Make a request to store the contents of the `LocalBlob` at `key()`
