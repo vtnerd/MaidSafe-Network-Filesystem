@@ -33,7 +33,7 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
         "example_blob", put_operation.value().version()).get();
 
     std::cout << get_operation.value().result() << std::endl;
-  }  
+  }
   catch (const std::runtime_error& error) {
     std::cerr << "Error : " << error.what() << std::endl;
     return false;
@@ -60,7 +60,7 @@ namespace {
       maidsafe::nfs::ExpectedBlobOperation<Result> operation) {
     while (!operation) {
       if (operation.error().code() != std::errc::network_down) {
-        std::cerr << 
+        std::cerr <<
             "Error: " << operation.error().code().message() << std::endl;
         return boost::none;
       }
@@ -96,7 +96,7 @@ This example starts from the `Container` object for brevity. It is identical to 
 ```c++
 bool HelloWorld(const maidsafe::nfs::Storage& storage) {
   namespace nfs = maidsafe::nfs;
-  
+
   return nfs::monadic(storage.OpenContainer("example_container").get()).bind(
 
       [](nfs::ContainerOperation<nfs::Container> open_operation) {
@@ -335,7 +335,7 @@ When a network operation has completed, the future will return a [`boost::expect
 
 ```c++
 template<typename T = void>
-using ExpectedContainerOperation = 
+using ExpectedContainerOperation =
     boost::expected<ContainerOperation<T>, OperationError<ContainerOperation<T>>>;
 ```
 
@@ -423,9 +423,9 @@ Represents the [`Container`](#container) abstraction listed above. Constructing 
 ```c++
 class Container {
   Future<ExpectedContainerOperation<std::vector<std::pair<std::string, BlobVersion>>>> GetBlobs();
-  
+
   Future<ExpectedContainerOperation<std::vector<BlobVersion>>> GetBlobVersions(std::string key);
-  
+
   Future<ExpectedBlobOperation<>>            PutMetadata(
       std::string key, std::string, ModifyBlobVersion);
   Future<ExpectedBlobOperation<std::string>> GetMetadata(std::string key, RetrieveBlobVersion);
@@ -433,7 +433,7 @@ class Container {
   Future<ExpectedBlobOperation<>>            Put(std::string key, std::string, ModifyBlobVersion);
   Future<ExpectedBlobOperation<std::string>> Get(std::string key, RetrieveBlobVersion);
   Future<ExpectedBlobOperation<>>            Delete(std::string key, RetrieveBlobVersion);
-  
+
   Future<ExpectedBlobOperation<>>            ModifyRange(
       std::string key, std::string, std::uint64_t offset, ModifyBlobVersion);
   Future<ExpectedBlobOperation<std::string>> GetRange(

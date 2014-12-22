@@ -40,31 +40,31 @@ Network operations in the Posix API are done asynchronously so that client code 
 bool HelloWorld(maidsafe::nfs::Storage& storage) {
   using ExpectedContainer =
       boost::expected<maidsafe::nfs::Container, std::error_code>;
-  using ExpectedBlob = 
+  using ExpectedBlob =
       boost::expected<maidsafe::nfs::LocalBlob, std::error_code>;
   using ExpectedVersion =
       boost::expected<maidsafe::nfs::BlobVersion, std::error_code>;
   using FutureExpectedString =
       maidsafe::nfs::Future<maidsafe::nfs::ExpectedBlobOperation<std::string>>;
-      
+
 
   boost::promise<boost::expected<std::string, std::error_code>> result;
-  
+
   storage.OpenContainer(
       "example_container",
       maidsafe::nfs::ModifyContainerVersion::Create(),
       [&result](ExpectedContainer container) {
-      
+
         if (!container) {
           result.set_value(boost::make_unexpected(container.error()));
           return;
         }
-        
+
         container->OpenBlob(
             "example_blob",
             maidsafe::nfs::ModifyBlobVersion::Create(),
             [&result, container](ExpectedBlob blob) {
-              
+
               if (!blob) {
                 result.set_value(boost::make_unexpected(blob.error()));
                 return;
@@ -73,33 +73,33 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
               blob->Write(boost::asio::buffer("hello world"), []{});
               blob->Commit(
                   [&result, container](ExpectedVersion version) {
-                  
+
                     if (!version) {
                       result.set_value(boost::make_unexpected(version.error()));
                       return;
                     }
-                    
+
                     container->Read("example_blob", *std::move(version)).then(
                         [&result](FutureExpectedString future_read) {
-                        
+
                           const auto read = future_read.get();
                           if (!read) {
                             result.set_value(boost::make_unexpected(read.error().code());
                             return;
                           }
-                          
+
                           result.set_value(std::move(read)->result());
                         });
                   });
             });
       });
-  
+
   const auto value = result.get_promise().get();
   if (!value) {
     std::cerr << value.error().message() << std::endl;
     return false;
   }
-    
+
    std::cout << *value << std::endl;
    return true;
 }
@@ -108,26 +108,26 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
 ```c++
 bool HelloWorld(maidsafe::nfs::Storage& storage) {
   maidsafe::nfs::Future<boost::expected<std::string, std::error_code>> result;
-  
+
   boost::asio::spawn([]{}, [&result](boost::asio::yield_context yield) {
-    result.set_value( 
+    result.set_value(
         storage.OpenContainer(
             "example_container", maidsafe::nfs::ModifyContainerVersion::Create(), yield).bind(
-            
+
                 [&yield](maidsafe::nfs::Container container) {
                   return container.OpenBlob(
                       "example_blob", maidsafe::nfs::ModifyBlobVersion::Create(), yield);
                 }
-            
+
         ).bind([&yield](maidsafe::nfs::LocalBlob blob) {
           blob.Write(boost::asio::buffer("hello world"), []{});
           return blob.Commit(yield).bind(
-          
+
               [&yield, &blob](maidsafe::nfs::BlobVersion) {
                 std::string buffer;
                 buffer.resize(blob.size());
                 return blob.Read(boost::asio::buffer(&buffer[0], buffer.size()), yield).bind(
-                
+
                     [&yield, &buffer](const std::size_t read_size) {
                       buffer.resize(read_size);
                       return buffer;
@@ -135,13 +135,13 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
               });
         }));
     });
-    
+
   const auto value = result.get();
   if (!value) {
     std::cerr << "Error: " << value.error().message() << std::endl;
     return false;
   }
-  
+
   std::cout << *value << std::endl;
   return true;
 }
@@ -318,7 +318,7 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 ```c++
 class Storage {
   unspecified GetVersions(AsyncResult<std::vector<ContainerVersion>>);
-  
+
   unspecified GetContainers(
       RetrieveContainerVersion, AsyncResult<std::vector<std::string>>);
 
@@ -357,20 +357,20 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 ```c++
 class Container {
   unspecified GetVersions(AsyncResult<std::vector<ContainerVersion>>);
-  
+
   unspecified GetContainers(
       RetrieveContainerVersion, AsyncResult<std::vector<std::string>>);
 
   unspecified GetBlobs(
       RetreieveContainerVersion,
       AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>);
-  
+
   unspecified OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>);
   unspecified OpenBlob(std::string, ModifyBlobVersion, AsyncResult<LocalBlob>);
-  
+
   unspecified DeleteContainer(std::string, RetrieveContainerVersion, AsyncResult<>);
   unspecified DeleteBlob(std:string, ModifyBlobVersion, AsyncResult<>);
-  
+
   unspecified Copy(
       const LocalBlob& from, std::string to, ModifyVersion, AsyncResult<LocalBlob>);
 };
@@ -419,7 +419,7 @@ Commit   | Valid and Unchanged. | Unchanged.                                    
 Since write operations are reflected immediately in the `LocalBlob` object, users do not have to wait for the previous operation to complete to make additional read or write calls. The `AsyncResult` object provided to `LocalBlob::Write` calls is notified when the data has been safely copied. Writes stored on the network are hidden from other clients until the async operation for `LocalBlob::Commit` succeeds.
 
 If a `LocalBlob` is unversioned, the async operation for `LocalBlob::Commit` will wait for all uncompleted `LocalBlob::Write` or `LocalBlob::Truncate` calls to complete, and then try to store the new Blob version. If `LocalBlob::Commit` signals failure to the `AsyncResult<>`, all subsequent calls to `LocalBlob::Commit` will continue to fail, however subsequent `LocalBlob::Write` or `LocalBlob::Truncate` operations can succeed. Changes to the `LocalBlob` object can always be be stored with `Container::Copy`, which will wait for any remaining write calls to complete, and then commit a new version.
- 
+
 If multiple `LocalBlob` objects are opened within the same process, they are treated no differently than `LocalBlob` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `LocalBlob` objects successfully writing to the network (the first to successfully call `LocalBlob::Commit`). All other `LocalBlob` objects become permanently unversioned.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
@@ -431,12 +431,12 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 class LocalBlob {
  public:
   typedef detail::MetaData::TimePoint TimePoint;
-  
+
   const std::string& key() const; // key associated with Blob
   std::uint64_t size() const;
   TimePoint creation_time() const;
   TimePoint head_write_time() const; // write time of this revision
-  
+
   const std::string& user_metadata() const;
   void set_user_metadata(std::string);
 
