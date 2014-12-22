@@ -313,7 +313,7 @@ Represents the [`Storage`](#storage) abstraction listed above. Constructing a `S
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback in the form `void(boost::expected<T, std::error_code>)`; return type is void
 - A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
-- A maidsafe::nfs::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`.
+- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::Future<boost::expected<T, std::error_code>>`.
 
 ```c++
 class Storage {
@@ -352,7 +352,7 @@ Represents the [`Container`](#container) abstraction listed above. Constructing 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback in the form `void(boost::expected<T, std::error_code>)`; return type is void
 - A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
-- A maidsafe::nfs::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`.
+- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::Future<boost::expected<T, std::error_code>>`.
 
 ```c++
 class Container {
@@ -425,7 +425,7 @@ If multiple `LocalBlob` objects are opened within the same process, they are tre
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback in the form `void(boost::expected<T, std::error_code>)`; return type is void
 - A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
-- A maidsafe::nfs::use_future; return type is `boost::future<boost::expected<T, std::error_code>>`
+- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::Future<boost::expected<T, std::error_code>>`
 
 ```C++
 class LocalBlob {
