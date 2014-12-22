@@ -128,8 +128,9 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
                 buffer.resize(blob.size());
                 return blob.Read(boost::asio::buffer(&buffer[0], buffer.size()), yield).bind(
                 
-                    [&yield, &buffer]() {
-                      return std::move(buffer);
+                    [&yield, &buffer](const std::size_t read_size) {
+                      buffer.resize(read_size);
+                      return buffer;
                     });
               });
         }));
