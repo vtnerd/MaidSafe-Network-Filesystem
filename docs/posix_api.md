@@ -104,7 +104,7 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
    return true;
 }
 ```
-### Hello World (Stackful Co-routines) ###
+### Hello World (Stackful Co-routines and Monadic) ###
 ```c++
 bool HelloWorld(maidsafe::nfs::Storage& storage) {
   maidsafe::nfs::Future<boost::expected<std::string, std::error_code>> result;
