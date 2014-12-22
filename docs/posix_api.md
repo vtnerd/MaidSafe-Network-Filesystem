@@ -32,10 +32,8 @@ Storage has 0 more Containers. The Storage can be public, private, or privately-
 ### StorageID ###
 A StorageID identifies a particular Storage instance on the SAFE network, and contains the necessary information to decrypt the contents.
 
-
-
 ## Posix Style API ##
-All public functions in this API provide the strong exception guarantee.
+All public functions in this API provide the strong exception guarantee. All public const methods are thread-safe.
 
 ### StorageID ###
 > maidsafe/nfs/storage_id.h
@@ -57,7 +55,7 @@ class StorageID { /* No Public Elements */ };
 - [x] Copyable
 - [x] Movable
 
-Blobs stored at the same key are differentiated/identified by a `BlobVersion` object. The `BlobVersion` allows REST API users to retrieve older revisions of Blobs, or place constraints on operations that change the blob associated with a key.
+Blobs stored at the same key are differentiated/identified by a `BlobVersion` object. The `BlobVersion` allows Posix API users to retrieve older revisions of Blobs, or place constraints on operations that change the blob associated with a key.
 
 ```c++
 class BlobVersion {
@@ -65,7 +63,7 @@ class BlobVersion {
 };
 ```
 - **Defunct()**
-  - Returns a `BlobVersion` that is used to indicate a deleted Blob. This is never returned by a [`BlobOperation`](#bloboperation), and is only used when retrieving the history of the Blobs stored at a key.
+  - Returns a `BlobVersion` that is used to indicate a deleted Blob. This is only used when retrieving the history of the Blobs.
 
 ### ContainerVersion ###
 > maidsafe/nfs/container_version.h
@@ -74,11 +72,15 @@ class BlobVersion {
 - [x] Copyable
 - [x] Movable
 
-Containers are also versioned, but none of the REST API functions accept a ContainerVersion. This class is mentioned/returned by `Container` operations for users that wish to use the [Posix API](posix_api.md) in some situations.
+Each time a Blob is stored, or a container pointer is modified, a new version of the parent Container is created. The ContainerVersion object allows users of the Posix API to reference specific versions of the Container.
 
 ```c++
-class ContainerVersion { /* No Public Elements */ };
+class ContainerVersion {
+  static ContainerVersion Defunct();
+};
 ```
+- **Defunct()**
+  - Returns a `ContainerVersion` that is used to indicate a deleted Container. This is only used when retrieving the history of Containers.
 
 ### ModifyBlobVersion ###
 > maidsafe/nfs/modfy_blob_version.h
@@ -91,17 +93,17 @@ Operations in [`Container`](#container-1) that change the Blob stored at a key r
 
 ```c++
 class ModifyBlobVersion {
-  static ModifyBlobVersion New();
+  static ModifyBlobVersion Create();
   static ModifyBlobVersion Latest();
   ModifyBlobVersion(BlobVersion);
 };
 ```
-- **New()**
-  - Returns an object that indicates the REST API should only succeed if the specified key is unused.
+- **Create()**
+  - Returns an object that indicates the Posix API should only succeed if the specified key is unused.
 - **Latest()**
-  - Returns an object that indicates the REST API should overwrite any existing Blob at the specified key.
+  - Returns an object that indicates the Posix API should overwrite any existing Blob at the specified key.
 - **ModifyBlobVersion(BlobVersion)**
-  - Creates an object that indicates the REST API should only overwrite the Blob at the specified key if it matches the BlobVersion.
+  - Creates an object that indicates the Posix API should only overwrite the Blob at the specified key if it matches the BlobVersion.
 
 ### RetrieveBlobVersion ###
 > maidsafe/nfs/retrieve_blob_version.h
@@ -119,9 +121,52 @@ class RetrieveBlobVersion {
 };
 ```
 - **Latest()**
-  - Returns an object that indicates the REST API should retrieve the latest Blob stored at the specified key.
+  - Returns an object that indicates the Posix API should retrieve the latest Blob stored at the specified key.
 - **RetrieveBlobVersion(BlobVersion)**
-  - Creates an object that indicates the REST API needs to retrieve a specific Blob version stored at the specified key.
+  - Creates an object that indicates the Posix API needs to retrieve a specific Blob version stored at the specified key.
+
+### ModifyContainerVersion ###
+> maidsafe/nfs/modfy_container_version.h
+
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
+Operations in [`Container`](#container-1) or [`Storage`](#storage-1) that change the Container stored at a key require a ModifyContainerVersion object.
+
+```c++
+class ModifyContainerVersion {
+  static ModifyContainerVersion Create();
+  static ModifyContainerVersion Latest();
+  ModifyContainerVersion(ContainerVersion);
+};
+```
+- **Create()**
+  - Returns an object that indicates the Posix API should only succeed if the specified key is unused.
+- **Latest()**
+  - Returns an object that indicates the Posix API should overwrite any existing Container at the specified key.
+- **ModifyBlobVersion(BlobVersion)**
+  - Creates an object that indicates the Posix API should only overwrite the Container at the specified key if it matches the ContainerVersion.
+
+### RetrieveContainerVersion ###
+> maidsafe/nfs/retrieve_container_version.h
+
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
+Operations in [`Container`](#container-1) or [`Storage`](#storage-1) that retrieve a Container stored at a key require a RetrieveContainerVersion object.
+
+```c++
+class RetrieveContainerVersion {
+  static RetrieveContainerVersion Latest();
+  RetrieveContainerVersion(ContainerVersion);
+};
+```
+- **Latest()**
+  - Returns an object that indicates the Posix API should retrieve the latest Container stored at the specified key.
+- **RetrieveBlobVersion(BlobVersion)**
+  - Creates an object that indicates the Posix API needs to retrieve a specific Container version stored at the specified key.
 
 ### maidsafe::nfs::Future<T> ###
 > maidsafe/nfs/future.h
