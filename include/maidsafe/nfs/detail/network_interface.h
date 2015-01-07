@@ -208,7 +208,10 @@ class Network {
     Bridge(Handler handler) : handler_(std::move(handler)) {}
 
     Bridge(const Bridge&) = default;
-    Bridge(Bridge&&) = default;
+    Bridge(Bridge&& other) : handler_(std::move(other.handler_)) {}
+
+    Bridge& operator=(const Bridge&) = delete;
+    Bridge& operator=(Bridge&&) = delete;
 
     template<typename Result>
     void operator()(boost::future<Result> result) {

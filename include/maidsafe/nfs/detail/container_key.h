@@ -30,10 +30,10 @@ class ContainerKey {
   ContainerKey();
 
   ContainerKey(const ContainerKey&) = default;
-  ContainerKey(ContainerKey&&) = default;
+  ContainerKey(ContainerKey&& other);
 
   ContainerKey& operator=(const ContainerKey&) = default;
-  ContainerKey& operator=(ContainerKey&&) = default;
+  ContainerKey& operator=(ContainerKey&& other);
 
   ContainerId GetId() const;
 

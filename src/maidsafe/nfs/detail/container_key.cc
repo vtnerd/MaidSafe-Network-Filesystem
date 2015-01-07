@@ -17,6 +17,9 @@
     use of the MaidSafe Software.                                                                 */
 #include "maidsafe/nfs/detail/container_key.h"
 
+#include <array>
+#include <string>
+
 #include "maidsafe/common/config.h"
 #include "maidsafe/common/crypto.h"
 
@@ -26,18 +29,22 @@ namespace detail {
 
 namespace {
 std::string MakeContainerKey() {
-  std::string new_id;
-  new_id.resize(64);
+  std::array<byte, 64> new_id;
 
   auto& random = maidsafe::crypto::random_number_generator();
-  random.GenerateBlock(reinterpret_cast<unsigned char*>(&new_id[0]), new_id.size());
+  random.GenerateBlock(&new_id[0], new_id.size());
 
-  return new_id;
+  return std::string(new_id.begin(), new_id.end());
 }
 }  // namespace
 
-ContainerKey::ContainerKey()
-  : key_(Identity(MakeContainerKey())) {
+ContainerKey::ContainerKey() : key_(Identity(MakeContainerKey())) {}
+
+ContainerKey::ContainerKey(ContainerKey&& other) : key_(std::move(other.key_)) {}
+
+ContainerKey& ContainerKey::operator=(ContainerKey&& other) {
+  key_ = std::move(other.key_);
+  return *this;
 }
 
 ContainerId ContainerKey::GetId() const {
