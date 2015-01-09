@@ -34,10 +34,16 @@ namespace detail {
 
 // For legacy reasons, the network and disk versions are not using virtual dispatch
 template<typename Backend>
-class NetworkImplementation : public NetworkInterface {
+class NetworkImplementation : public Network::Interface {
  public:
   template<typename... Args>
-  NetworkImplementation(Args... args) : NetworkInterface(), backend_(std::forward<Args>(args)...) {}
+  explicit NetworkImplementation(Args... args)
+    : Network::Interface(),
+      backend_(std::forward<Args>(args)...) {
+  }
+
+  NetworkImplementation(NetworkImplementation&&) = default;
+  NetworkImplementation& operator=(NetworkImplementation&&) = default;
 
   virtual ~NetworkImplementation() {}
 

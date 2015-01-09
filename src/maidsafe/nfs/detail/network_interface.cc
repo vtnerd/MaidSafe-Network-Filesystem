@@ -17,11 +17,118 @@
     use of the MaidSafe Software.                                                                 */
 #include "maidsafe/nfs/detail/network_interface.h"
 
+#include <algorithm>
+#include <functional>
+#include <type_traits>
+
+#include "maidsafe/common/log.h"
+#include "maidsafe/common/utils.h"
+
 namespace maidsafe {
 namespace nfs {
 namespace detail {
 
-NetworkInterface::~NetworkInterface() {}
+namespace {
+void ReduceMemoryUsed(std::vector<boost::future<void>>& tokens) {
+  MAIDSAFE_CONSTEXPR_OR_CONST Bytes token_size(
+      sizeof(std::remove_reference<decltype(tokens)>::type::value_type));
+
+  if (token_size * tokens.capacity() > MegaBytes(1)) {
+    if (tokens.capacity() - tokens.size() >= tokens.size() / 2) {
+      tokens.shrink_to_fit();
+    }
+  }
+}
+
+}  // namespace
+
+Network::Interface::~Interface() {}
+
+Network::Network(std::shared_ptr<Interface> interface)
+  : interface_(std::move(interface)),
+    waiting_tokens_(),
+    waiting_thread_(),
+    waiting_notification_(),
+    waiting_mutex_(),
+    continue_waiting_(true) {
+  if (interface_ == nullptr) {
+    BOOST_THROW_EXCEPTION(std::runtime_error("Unexpected nullptr"));
+  }
+  waiting_thread_ = std::thread(std::bind(&Network::WaitForTokens, this));
+}
+
+Network::~Network() {
+  try {
+    interface_.reset(); // cancels existing operations
+    continue_waiting_ = false;
+    waiting_notification_.notify_one();
+    waiting_thread_.join();
+    boost::wait_for_all(waiting_tokens_.begin(), waiting_tokens_.end());
+  }
+  catch (...) {
+  }
+}
+
+void Network::WaitForTokens() {
+  try {
+    std::vector<boost::future<void>> moved_tokens;
+    while (continue_waiting_) {
+      {
+        std::unique_lock<std::mutex> lock(waiting_mutex_);
+        waiting_notification_.wait(
+            lock,
+            [this, &moved_tokens] {
+              return !moved_tokens.empty() || !waiting_tokens_.empty() || !continue_waiting_;
+            });
+
+        moved_tokens.reserve(moved_tokens.size() + waiting_tokens_.size());
+        std::move(
+            waiting_tokens_.begin(),
+            waiting_tokens_.end(),
+            std::back_inserter(moved_tokens));
+        waiting_tokens_.clear();
+        ReduceMemoryUsed(waiting_tokens_);
+      }
+
+      auto token = boost::wait_for_any(moved_tokens.begin(), moved_tokens.end());
+      if (token != moved_tokens.end()) {
+        token->get();
+        moved_tokens.erase(token);
+      }
+
+      ReduceMemoryUsed(moved_tokens);
+    }
+
+    const std::lock_guard<std::mutex> lock(waiting_mutex_);
+    waiting_tokens_.reserve(moved_tokens.size() + waiting_tokens_.size());
+    std::move(
+        moved_tokens.begin(),
+        moved_tokens.end(),
+        std::back_inserter(waiting_tokens_));
+  }
+  catch (const std::exception& exception) {
+    LOG(kError) << exception.what();
+    throw; // abort process
+  }
+  catch (...) {
+    LOG(kError) << "Unknown exception";
+    throw; // abort process
+  }
+}
+
+void Network::AddToWaitList(boost::future<void> completion_token) {
+  try {
+    {
+      const std::lock_guard<std::mutex> lock(waiting_mutex_);
+      waiting_tokens_.push_back(std::move(completion_token));
+    }
+    waiting_notification_.notify_one();
+  }
+  catch (...) {
+    completion_token.get();
+    throw;
+  }
+}
 
 }  // namespace detail
 }  // namespace nfs

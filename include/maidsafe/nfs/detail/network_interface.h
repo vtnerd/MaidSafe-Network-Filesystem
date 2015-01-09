@@ -18,7 +18,10 @@
 #ifndef MAIDSAFE_NFS_DETAIL_NETWORK_INTERFACE_H_
 #define MAIDSAFE_NFS_DETAIL_NETWORK_INTERFACE_H_
 
+#include <condition_variable>
+#include <mutex>
 #include <utility>
+#include <thread>
 #include <vector>
 
 #include "boost/thread/future.hpp"
@@ -34,26 +37,51 @@ namespace maidsafe {
 namespace nfs {
 namespace detail {
 
-class NetworkInterface {
+class Network {
  private:
   MAIDSAFE_CONSTEXPR_OR_CONST static std::uint32_t kMaxBranches = 1;
   MAIDSAFE_CONSTEXPR_OR_CONST static std::uint32_t kMaxVersions = 100;
 
  public:
-  virtual ~NetworkInterface() = 0;
+  class Interface {
+   public:
+    virtual ~Interface() = 0;
+
+    virtual boost::future<void> DoCreateSDV(
+        const ContainerId& container_id,
+        const ContainerVersion& initial_version,
+        std::uint32_t max_versions,
+        std::uint32_t max_branches) = 0;
+    virtual boost::future<void> DoPutSDVVersion(
+        const ContainerId& container_id,
+        const ContainerVersion& old_version,
+        const ContainerVersion& new_version) = 0;
+    virtual boost::future<std::vector<ContainerVersion>> DoGetBranches(
+        const ContainerId& container_id) = 0;
+    virtual boost::future<std::vector<ContainerVersion>> DoGetBranchVersions(
+        const ContainerId& container_id, const ContainerVersion& tip) = 0;
+
+    virtual boost::future<void> DoPutChunk(const ImmutableData& data) = 0;
+    virtual boost::future<ImmutableData> DoGetChunk(const ImmutableData::Name& name) = 0;
+  };
+
+  explicit Network(std::shared_ptr<Interface> interface);
+  ~Network();
 
   template<typename Token>
   AsyncResultReturn<Token, void> CreateSDV(
       const ContainerId& container_id,
       const ContainerVersion& initial_version,
       Token token) {
+    assert(interface_ != nullptr);
     using Handler = AsyncHandler<Token, void>;
 
     Handler handler(std::move(token));
     asio::async_result<Handler> result(handler);
 
-    DoCreateSDV(container_id, initial_version, kMaxVersions, kMaxBranches)
-      .then(Bridge<Handler>{std::move(handler)});
+    AddToWaitList(
+        interface_->DoCreateSDV(container_id, initial_version, kMaxVersions, kMaxBranches)
+        .then(boost::launch::async, Bridge<Handler>{std::move(handler)}));
 
     return result.get();
   }
@@ -64,78 +92,92 @@ class NetworkInterface {
       const ContainerVersion& previous_version,
       const ContainerVersion& new_version,
       Token token) {
+    assert(interface_ != nullptr);
     using Handler = AsyncHandler<Token, void>;
 
-    Handler handler(std::move(token));
-    asio::async_result<Handler> result(handler);
+    Handler handler{std::move(token)};
+    asio::async_result<Handler> result{handler};
 
-    DoPutSDVVersion(container_id, previous_version, new_version)
-      .then(Bridge<Handler>{std::move(handler)});
+    AddToWaitList(
+        interface_->DoPutSDVVersion(container_id, previous_version, new_version)
+        .then(boost::launch::async, Bridge<Handler>{std::move(handler)}));
 
     return result.get();
   }
 
   template<typename Token>
-  static AsyncResultReturn<Token, std::vector<ContainerVersion>> GetSDVVersions(
-      const std::shared_ptr<NetworkInterface>& self,
-      const ContainerId& container_id,
-      Token token) {
+  AsyncResultReturn<Token, std::vector<ContainerVersion>> GetSDVVersions(
+      const ContainerId& container_id, Token token) {
+    assert(interface_ != nullptr);
     using Handler = AsyncHandler<Token, std::vector<ContainerVersion>>;
 
-    if (self == nullptr) {
-      BOOST_THROW_EXCEPTION(std::runtime_error("Unexpected nullptr"));
-    }
+    Handler handler{std::move(token)};
+    asio::async_result<Handler> result{handler};
 
-    Handler handler(std::move(token));
-    asio::async_result<Handler> result(handler);
-    
-    self->DoGetBranches(container_id).then(
-        [self, container_id, handler] (boost::future<std::vector<ContainerVersion>> future) mutable {
-          const auto branches = ConvertToExpected(std::move(future));
+    std::weak_ptr<Interface> weak_interface{interface_};
 
-          if (!branches) {
-            handler(branches);
-          } else {
-            if (branches->size() == 1) {
-              self->DoGetBranchVersions(container_id, branches->front())
-                .then(Bridge<Handler>{std::move(handler)});
-            } else {
-              /* A fork in the SDV. A bug in the code, or someone using rogue
-                 software. Do not alert via Expected, this should never
-               happen currently. */
-              BOOST_THROW_EXCEPTION(std::runtime_error("Unexpected fork in NFS SDV history"));
-            }
-          }
-        });
+    AddToWaitList(
+        interface_->DoGetBranches(container_id)
+        .then(boost::launch::async,
+              [weak_interface, container_id]
+              (boost::future<std::vector<ContainerVersion>> future) mutable {
+                const auto branches = future.get();
+
+                const std::shared_ptr<Interface> interface{weak_interface.lock()};
+                if (interface == nullptr) {
+                  BOOST_THROW_EXCEPTION(
+                      std::system_error(std::make_error_code(std::errc::operation_canceled)));
+                }
+
+                if (branches.size() == 1) {
+                  return interface->DoGetBranchVersions(
+                      std::move(container_id), branches.front()).get();
+                } else {
+                  /* A fork in the SDV. A bug in the code, or someone using rogue
+                     software. Do not alert via Expected, this should never
+                     happen currently. */
+                  BOOST_THROW_EXCEPTION(std::runtime_error("Unexpected fork in NFS SDV history"));
+                }
+              })
+        .then(boost::launch::async, Bridge<Handler>{std::move(handler)}));
 
     return result.get();
   }
 
   template<typename Token>
   AsyncResultReturn<Token, void> PutChunk(const ImmutableData& data, Token token) {
+    assert(interface_ != nullptr);
     using Handler = AsyncHandler<Token, void>;
 
-    Handler handler(std::move(token));
-    asio::async_result<Handler> result(handler);
+    Handler handler{std::move(token)};
+    asio::async_result<Handler> result{handler};
 
-    DoPutChunk(data).then(Bridge<Handler>{std::move(handler)});
+    AddToWaitList(
+        interface_->DoPutChunk(data).then(
+            boost::launch::async, Bridge<Handler>{std::move(handler)}));
 
     return result.get();
   }
 
   template<typename Token>
   AsyncResultReturn<Token, ImmutableData> GetChunk(const ImmutableData::Name& name, Token token) {
+    assert(interface_ != nullptr);
     using Handler = AsyncHandler<Token, ImmutableData>;
 
-    Handler handler(std::move(token));
-    asio::async_result<Handler> result(handler);
+    Handler handler{std::move(token)};
+    asio::async_result<Handler> result{handler};
 
-    DoGetChunk(name).then(Bridge<Handler>{std::move(handler)});
+    AddToWaitList(
+        interface_->DoGetChunk(name).then(
+            boost::launch::async, Bridge<Handler>{std::move(handler)}));
 
     return result.get();
   }
 
  private:
+  void WaitForTokens();
+  void AddToWaitList(boost::future<void> completion_token);
+
   template<typename Result>
   static Expected<Result> ConvertToExpected(boost::future<Result> result) {
     try {
@@ -178,22 +220,17 @@ class NetworkInterface {
   };
 
  private:
-  virtual boost::future<void> DoCreateSDV(
-      const ContainerId& container_id,
-      const ContainerVersion& initial_version,
-      std::uint32_t max_versions,
-      std::uint32_t max_branches) = 0;
-  virtual boost::future<void> DoPutSDVVersion(
-      const ContainerId& container_id,
-      const ContainerVersion& old_version,
-      const ContainerVersion& new_version) = 0;
-  virtual boost::future<std::vector<ContainerVersion>> DoGetBranches(
-      const ContainerId& container_id) = 0;
-  virtual boost::future<std::vector<ContainerVersion>> DoGetBranchVersions(
-      const ContainerId& container_id, const ContainerVersion& tip) = 0;
+  Network(const Network&) = delete;
+  Network(Network&&) = delete;
+  Network& operator=(const Network&) = delete;
+  Network& operator=(Network&&) = delete;
 
-  virtual boost::future<void> DoPutChunk(const ImmutableData& data) = 0;
-  virtual boost::future<ImmutableData> DoGetChunk(const ImmutableData::Name& name) = 0;
+  std::shared_ptr<Interface> interface_;
+  std::vector<boost::future<void>> waiting_tokens_;
+  std::thread waiting_thread_;
+  std::condition_variable waiting_notification_;
+  std::mutex waiting_mutex_;
+  std::atomic<bool> continue_waiting_;
 };
 
 }  // detail
