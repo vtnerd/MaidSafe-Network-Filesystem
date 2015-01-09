@@ -260,29 +260,32 @@ TEST_F(BackendTest, BEH_TwoSDVs) {
       DoPutSDVVersion(container_key2.GetId(), container_version1, container_version2)).Times(1);
 
 
-  auto sdv = network().CreateSDV(container_key1.GetId(), container_version1, asio::use_future).get();
-  EXPECT_TRUE(sdv.valid());
+  auto sdv1 = network().CreateSDV(container_key1.GetId(), container_version1, asio::use_future);
+  auto sdv2 = network().CreateSDV(container_key2.GetId(), container_version1, asio::use_future);
 
-  sdv = network().CreateSDV(container_key2.GetId(), container_version1, asio::use_future).get();
-  EXPECT_TRUE(sdv.valid());
-
-
-  sdv = network().PutSDVVersion(
-      container_key1.GetId(), container_version1, container_version2, asio::use_future).get();
-  EXPECT_TRUE(sdv.valid());
-
-  sdv = network().PutSDVVersion(
-      container_key2.GetId(), container_version1, container_version2, asio::use_future).get();
-  EXPECT_TRUE(sdv.valid());
+  EXPECT_TRUE(sdv1.get().valid());
+  EXPECT_TRUE(sdv2.get().valid());
 
 
-  auto versions = network().GetSDVVersions(container_key1.GetId(), asio::use_future).get();
+  sdv1 = network().PutSDVVersion(
+      container_key1.GetId(), container_version1, container_version2, asio::use_future);
+  sdv2 = network().PutSDVVersion(
+      container_key2.GetId(), container_version1, container_version2, asio::use_future);
+
+  EXPECT_TRUE(sdv1.get().valid());
+  EXPECT_TRUE(sdv2.get().valid());
+
+
+  auto future_versions1 = network().GetSDVVersions(container_key1.GetId(), asio::use_future);
+  auto future_versions2 = network().GetSDVVersions(container_key2.GetId(), asio::use_future);
+
+  auto versions = future_versions1.get();
   ASSERT_TRUE(versions.valid());
   EXPECT_EQ(2u, versions->size());
   EXPECT_EQ(container_version2, (*versions)[0]);
   EXPECT_EQ(container_version1, (*versions)[1]);
 
-  versions = network().GetSDVVersions(container_key2.GetId(), asio::use_future).get();
+  versions = future_versions2.get();
   ASSERT_TRUE(versions.valid());
   EXPECT_EQ(2u, versions->size());
   EXPECT_EQ(container_version2, (*versions)[0]);
@@ -314,11 +317,11 @@ TEST_F(BackendTest, BEH_PutChunkTwice) {
   EXPECT_CALL(GetNetworkMock(), DoPutChunk(_)).Times(2);
   EXPECT_CALL(GetNetworkMock(), DoGetChunk(chunk_data.name())).Times(1);
 
-  auto put_chunk = network().PutChunk(chunk_data, asio::use_future).get();
-  EXPECT_TRUE(put_chunk.valid());
+  auto put_chunk1 = network().PutChunk(chunk_data, asio::use_future);
+  auto put_chunk2 = network().PutChunk(chunk_data, asio::use_future);
 
-  put_chunk = network().PutChunk(chunk_data, asio::use_future).get();
-  EXPECT_TRUE(put_chunk.valid());
+  EXPECT_TRUE(put_chunk1.get().valid());
+  EXPECT_TRUE(put_chunk2.get().valid());
 
   const auto get_chunk = network().GetChunk(chunk_data.name(), asio::use_future).get();
   ASSERT_TRUE(get_chunk.valid());
