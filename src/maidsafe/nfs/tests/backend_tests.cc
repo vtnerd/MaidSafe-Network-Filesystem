@@ -19,6 +19,8 @@
 
 #include "asio/use_future.hpp"
 
+#include "mock_backend.h"
+
 #include "maidsafe/common/test.h"
 #include "maidsafe/nfs/detail/disk_backend.h"
 #include "maidsafe/nfs/detail/container_key.h"
@@ -37,7 +39,12 @@ class BackendTest : public ::testing::Test {
   BackendTest()
     : ::testing::Test(),
       storage_location_(::maidsafe::test::CreateTestPath("MaidSafe_Test_FakeStore")),
-      network_(std::make_shared<DiskBackend>(*storage_location_, kDefaultMaxDiskUsage)) {
+      mock_(
+          std::make_shared<MockBackend>(
+              std::make_shared<DiskBackend>(*storage_location_, kDefaultMaxDiskUsage))),
+      network_(mock_) {
+
+    GetNetworkMock().SetDefaults();
   }
 
   static ContainerVersion MakeContainerVersion() {
@@ -49,10 +56,13 @@ class BackendTest : public ::testing::Test {
     return ImmutableData{NonEmptyString{RandomString(100)}};
   }
 
+  const MockBackend::Mock& GetNetworkMock() const { return mock_->mock_; }
+  MockBackend::Mock& GetNetworkMock() { return mock_->mock_; }
   Network& network() { return network_; }
 
  private:
   const ::maidsafe::test::TestPath storage_location_;
+  const std::shared_ptr<MockBackend> mock_;
   Network network_;
 };
 }  // namespace
@@ -60,24 +70,36 @@ class BackendTest : public ::testing::Test {
 TEST_F(BackendTest, BEH_CreateSDV) {
   const ContainerKey container_key{};
   const ContainerVersion container_version{MakeContainerVersion()};
-  /*{
+
+  EXPECT_CALL(
+      GetNetworkMock(), DoCreateSDV(container_key.GetId(), container_version, 100, 1)).Times(1);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranches(container_key.GetId())).Times(2);
+  EXPECT_CALL(
+      GetNetworkMock(), DoGetBranchVersions(container_key.GetId(), container_version)).Times(1);
+  {
     const auto versions =
       network().GetSDVVersions(container_key.GetId(), asio::use_future).get();
     ASSERT_FALSE(versions.valid());
     EXPECT_EQ(make_error_code(CommonErrors::no_such_element), versions.error());
-    }*/
+  }
   auto sdv = network().CreateSDV(container_key.GetId(), container_version, asio::use_future).get();
   EXPECT_TRUE(sdv.valid());
-/*
+
   const auto versions = network().GetSDVVersions(container_key.GetId(), asio::use_future).get();
   ASSERT_TRUE(versions.valid());
   ASSERT_EQ(1u, versions->size());
-  EXPECT_EQ(container_version, versions->front());*/
+  EXPECT_EQ(container_version, versions->front());
 }
 
 TEST_F(BackendTest, BEH_ExistingSDVFailure) {
   const ContainerKey container_key{};
   const ContainerVersion container_version{MakeContainerVersion()};
+
+  EXPECT_CALL(
+      GetNetworkMock(), DoCreateSDV(container_key.GetId(), container_version, 100, 1)).Times(2);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranches(container_key.GetId())).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(), DoGetBranchVersions(container_key.GetId(), container_version)).Times(1);
 
   auto sdv = network().CreateSDV(container_key.GetId(), container_version, asio::use_future).get();
   EXPECT_TRUE(sdv.valid());
@@ -96,6 +118,15 @@ TEST_F(BackendTest, BEH_UpdateExistingSDV) {
   const ContainerKey container_key{};
   const ContainerVersion container_version1{MakeContainerVersion()};
   const ContainerVersion container_version2{MakeContainerVersion()};
+
+  EXPECT_CALL(
+      GetNetworkMock(), DoCreateSDV(container_key.GetId(), container_version1, 100, 1)).Times(1);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranches(container_key.GetId())).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(), DoGetBranchVersions(container_key.GetId(), container_version2)).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(),
+      DoPutSDVVersion(container_key.GetId(), container_version1, container_version2)).Times(1);
 
   auto sdv = network().CreateSDV(container_key.GetId(), container_version1, asio::use_future).get();
   EXPECT_TRUE(sdv.valid());
@@ -116,6 +147,18 @@ TEST_F(BackendTest, BEH_UpdateExistingSDVBranchFailure) {
   const ContainerVersion container_version1{MakeContainerVersion()};
   const ContainerVersion container_version2{MakeContainerVersion()};
   const ContainerVersion container_version3{MakeContainerVersion()};
+
+  EXPECT_CALL(
+      GetNetworkMock(), DoCreateSDV(container_key.GetId(), container_version1, 100, 1)).Times(1);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranches(container_key.GetId())).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(), DoGetBranchVersions(container_key.GetId(), container_version2)).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(),
+      DoPutSDVVersion(container_key.GetId(), container_version1, container_version2)).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(),
+      DoPutSDVVersion(container_key.GetId(), container_version1, container_version3)).Times(1);
 
   auto sdv = network().CreateSDV(container_key.GetId(), container_version1, asio::use_future).get();
   EXPECT_TRUE(sdv.valid());
@@ -143,6 +186,15 @@ TEST_F(BackendTest, BEH_UpdateExistingSDVBadRootFailure) {
   const ContainerVersion container_version2{MakeContainerVersion()};
   const ContainerVersion container_version3{MakeContainerVersion()};
 
+  EXPECT_CALL(
+      GetNetworkMock(), DoCreateSDV(container_key.GetId(), container_version1, 100, 1)).Times(1);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranches(container_key.GetId())).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(), DoGetBranchVersions(container_key.GetId(), container_version1)).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(),
+      DoPutSDVVersion(container_key.GetId(), container_version3, container_version2)).Times(1);
+
   auto sdv = network().CreateSDV(container_key.GetId(), container_version1, asio::use_future).get();
   EXPECT_TRUE(sdv.valid());
 
@@ -160,6 +212,15 @@ TEST_F(BackendTest, BEH_UpdateExistingSDVBadRootFailure) {
 TEST_F(BackendTest, BEH_UpdateExistingSDVSameTip) {
   const ContainerKey container_key{};
   const ContainerVersion container_version{MakeContainerVersion()};
+
+  EXPECT_CALL(
+      GetNetworkMock(), DoCreateSDV(container_key.GetId(), container_version, 100, 1)).Times(1);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranches(container_key.GetId())).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(), DoGetBranchVersions(container_key.GetId(), container_version)).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(),
+      DoPutSDVVersion(container_key.GetId(), container_version, container_version)).Times(1);
 
   auto sdv = network().CreateSDV(container_key.GetId(), container_version, asio::use_future).get();
   EXPECT_TRUE(sdv.valid());
@@ -180,6 +241,24 @@ TEST_F(BackendTest, BEH_TwoSDVs) {
   const ContainerKey container_key2{};
   const ContainerVersion container_version1{MakeContainerVersion()};
   const ContainerVersion container_version2{MakeContainerVersion()};
+
+  EXPECT_CALL(
+      GetNetworkMock(), DoCreateSDV(container_key1.GetId(), container_version1, 100, 1)).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(), DoCreateSDV(container_key2.GetId(), container_version1, 100, 1)).Times(1);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranches(container_key1.GetId())).Times(1);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranches(container_key2.GetId())).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(), DoGetBranchVersions(container_key1.GetId(), container_version2)).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(), DoGetBranchVersions(container_key2.GetId(), container_version2)).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(),
+      DoPutSDVVersion(container_key1.GetId(), container_version1, container_version2)).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(),
+      DoPutSDVVersion(container_key2.GetId(), container_version1, container_version2)).Times(1);
+
 
   auto sdv = network().CreateSDV(container_key1.GetId(), container_version1, asio::use_future).get();
   EXPECT_TRUE(sdv.valid());
@@ -211,7 +290,13 @@ TEST_F(BackendTest, BEH_TwoSDVs) {
 }
 
 TEST_F(BackendTest, BEH_PutChunk) {
+  using ::testing::_;
+
   const ImmutableData chunk_data{MakeChunk()};
+
+  EXPECT_CALL(GetNetworkMock(), DoPutChunk(_)).Times(1);
+  EXPECT_CALL(GetNetworkMock(), DoGetChunk(chunk_data.name())).Times(1);
+
   const auto put_chunk = network().PutChunk(chunk_data, asio::use_future).get();
   EXPECT_TRUE(put_chunk.valid());
 
@@ -222,7 +307,12 @@ TEST_F(BackendTest, BEH_PutChunk) {
 }
 
 TEST_F(BackendTest, BEH_PutChunkTwice) {
+  using ::testing::_;
+
   const ImmutableData chunk_data{MakeChunk()};
+
+  EXPECT_CALL(GetNetworkMock(), DoPutChunk(_)).Times(2);
+  EXPECT_CALL(GetNetworkMock(), DoGetChunk(chunk_data.name())).Times(1);
 
   auto put_chunk = network().PutChunk(chunk_data, asio::use_future).get();
   EXPECT_TRUE(put_chunk.valid());
