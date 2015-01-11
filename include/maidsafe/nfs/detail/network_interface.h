@@ -24,7 +24,14 @@
 #include <thread>
 #include <vector>
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4702)
+#endif
 #include "boost/thread/future.hpp"
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #include "maidsafe/common/config.h"
 #include "maidsafe/common/data_types/immutable_data.h"
