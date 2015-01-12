@@ -19,14 +19,50 @@
 #define MAIDSAFE_NFS_DETAIL_DISK_BACKEND_H_
 
 #include "maidsafe/nfs/client/fake_store.h"
-#include "maidsafe/nfs/detail/network_implementation.h"
+#include "maidsafe/nfs/detail/network_interface.h"
 
 namespace maidsafe {
 namespace nfs {
 namespace detail {
 
 // For legacy reasons, the network and disk versions are not using virtual dispatch
-using DiskBackend = NetworkImplementation<FakeStore>;
+class DiskBackend : public Network::Interface {
+ public:
+  template<typename... Args>
+  explicit DiskBackend(Args... args)
+    : Network::Interface(),
+      backend_(std::forward<Args>(args)...) {
+  }
+
+  DiskBackend(DiskBackend&&) = default;
+  DiskBackend& operator=(DiskBackend&&) = default;
+
+  virtual ~DiskBackend();
+
+ private:
+  DiskBackend(const DiskBackend&) = delete;
+  DiskBackend& operator=(const DiskBackend&) = delete;
+
+  virtual boost::future<void> DoCreateSDV(
+      const ContainerId& container_id,
+      const ContainerVersion& initial_version,
+      std::uint32_t max_versions,
+      std::uint32_t max_branches) override final;
+  virtual boost::future<void> DoPutSDVVersion(
+      const ContainerId& container_id,
+      const ContainerVersion& old_version,
+      const ContainerVersion& new_version) override final;
+  virtual boost::future<std::vector<ContainerVersion>> DoGetBranches(
+      const ContainerId& container_id) override final;
+  virtual boost::future<std::vector<ContainerVersion>> DoGetBranchVersions(
+      const ContainerId& container_id, const ContainerVersion& tip) override final;
+
+  virtual boost::future<void> DoPutChunk(const ImmutableData& data) override final;
+  virtual boost::future<ImmutableData> DoGetChunk(const ImmutableData::Name& name) override final;
+
+ private:
+  FakeStore backend_;
+};
 
 }  // detail
 }  // nfs
