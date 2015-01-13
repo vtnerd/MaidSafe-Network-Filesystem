@@ -69,7 +69,7 @@ TEST_F(BackendTest, BEH_CreateSDV) {
   {
     const auto versions = network()->GetSDVVersions(container_key.GetId(), asio::use_future).get();
     ASSERT_FALSE(versions.valid());
-    EXPECT_EQ(make_error_code(CommonErrors::no_such_element), versions.error());
+    EXPECT_EQ(make_error_code(VaultErrors::no_such_account), versions.error());
   }
   auto sdv = network()->CreateSDV(container_key.GetId(), container_version, asio::use_future).get();
   EXPECT_TRUE(sdv.valid());
