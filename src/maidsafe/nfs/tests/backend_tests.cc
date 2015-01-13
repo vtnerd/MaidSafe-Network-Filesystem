@@ -94,7 +94,8 @@ TEST_F(BackendTest, BEH_ExistingSDVFailure) {
   EXPECT_TRUE(sdv.valid());
 
   sdv = network()->CreateSDV(container_key.GetId(), container_version, asio::use_future).get();
-  EXPECT_TRUE(sdv.valid());
+  ASSERT_FALSE(sdv.valid());
+  EXPECT_EQ(make_error_code(VaultErrors::data_already_exists), sdv.error());
 
   const auto versions = network()->GetSDVVersions(container_key.GetId(), asio::use_future).get();
   ASSERT_TRUE(versions.valid());

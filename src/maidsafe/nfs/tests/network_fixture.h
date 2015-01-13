@@ -41,7 +41,7 @@ class NetworkFixture {
 
   // Create a NetworkInterface instance, as selected by command args
   static std::shared_ptr<Network::Interface> Create();
-  
+
   const MockBackend::Mock& GetNetworkMock() const { return mock_->mock_; }
   MockBackend::Mock& GetNetworkMock() { return mock_->mock_; }
   const std::shared_ptr<Network>& network() const { return network_; }
