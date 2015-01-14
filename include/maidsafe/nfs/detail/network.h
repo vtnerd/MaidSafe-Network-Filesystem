@@ -198,8 +198,6 @@ class Network {
       return result.get();
     } catch (const std::system_error& error) {
       return boost::make_unexpected(error.code());
-    } catch (...) {
-      throw;
     }
   }
 
@@ -209,8 +207,6 @@ class Network {
       return Expected<void>(boost::expect);
     } catch (const std::system_error& error) {
       return boost::make_unexpected(error.code());
-    } catch (...) {
-      throw;
     }
   }
 
