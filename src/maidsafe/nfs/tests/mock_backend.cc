@@ -36,8 +36,8 @@ Return SafeReturn(std::shared_ptr<Return> value) {
 }  // namespace
 
 MockBackend::MockBackend(std::shared_ptr<Network::Interface> real)
-  :  Network::Interface(),
-     mock_(std::move(real)) {  
+  : Network::Interface(),
+    mock_(std::move(real)) {
 }
 
 MockBackend::Mock::Mock(std::shared_ptr<Network::Interface> real)
