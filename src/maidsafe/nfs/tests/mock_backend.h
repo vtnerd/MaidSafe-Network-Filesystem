@@ -23,7 +23,7 @@
 #include "gmock/gmock.h"
 
 #include "maidsafe/common/test.h"
-#include "maidsafe/nfs/detail/network_interface.h"
+#include "maidsafe/nfs/detail/network.h"
 
 namespace maidsafe {
 namespace nfs {
@@ -32,14 +32,14 @@ namespace test {
 
 class MockBackend : public Network::Interface {
  public:
-  MockBackend(std::shared_ptr<Network::Interface> real);
+  explicit MockBackend(std::shared_ptr<Network::Interface> real);
   virtual ~MockBackend();
 
   /* GoogleMock 1.7 doesn't support move only return values. A bridge
      was created to get around this issue. */
   class Mock {
    public:
-    Mock(std::shared_ptr<Network::Interface> real);
+    explicit Mock(std::shared_ptr<Network::Interface> real);
 
     // Set mock interface behavior to invoke real version
     void SetDefaultDoCreateSDV();

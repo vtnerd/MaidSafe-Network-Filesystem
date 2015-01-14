@@ -166,7 +166,8 @@ TEST_F(BackendTest, BEH_UpdateExistingSDVBranchFailure) {
   EXPECT_EQ(container_version1, (*versions)[1]);
 }
 
-TEST_F(BackendTest, BEH_UpdateExistingSDVBadRootFailure) {
+// See MAID-658 for DISABLED_
+TEST_F(BackendTest, DISABLED_BEH_UpdateExistingSDVBadRootFailure) {
   const ContainerKey container_key{};
   const ContainerVersion container_version1{MakeContainerVersion(0)};
   const ContainerVersion container_version2{MakeContainerVersion(1)};
@@ -276,7 +277,8 @@ TEST_F(BackendTest, BEH_TwoSDVs) {
   EXPECT_EQ(container_version1, (*versions)[1]);
 }
 
-TEST_F(BackendTest, BEH_GetChunkFailure) {
+// See MAID-657 for DISABLED_
+TEST_F(BackendTest, DISABLED_BEH_GetChunkFailure) {
   const ImmutableData chunk_data{MakeChunk()};
   EXPECT_CALL(GetNetworkMock(), DoGetChunk(chunk_data.name())).Times(1);
 

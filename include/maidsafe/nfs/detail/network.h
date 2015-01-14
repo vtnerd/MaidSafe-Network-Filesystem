@@ -52,6 +52,7 @@ class Network {
  public:
   class Interface {
    public:
+    Interface();
     virtual ~Interface() = 0;
 
     virtual boost::future<void> DoCreateSDV(
@@ -70,6 +71,12 @@ class Network {
 
     virtual boost::future<void> DoPutChunk(const ImmutableData& data) = 0;
     virtual boost::future<ImmutableData> DoGetChunk(const ImmutableData::Name& name) = 0;
+  private:
+    Interface(const Interface&) = delete;
+    Interface(Interface&&) = delete;
+
+    Interface& operator=(const Interface&) = delete;
+    Interface& operator=(Interface&&) = delete;
   };
 
   explicit Network(std::shared_ptr<Interface> interface);

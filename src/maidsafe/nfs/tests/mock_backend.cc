@@ -17,6 +17,8 @@
     use of the MaidSafe Software.                                                                 */
 #include "mock_backend.h"
 
+#include "maidsafe/common/error.h"
+
 namespace maidsafe {
 namespace nfs {
 namespace detail {
@@ -34,11 +36,15 @@ Return SafeReturn(std::shared_ptr<Return> value) {
 }  // namespace
 
 MockBackend::MockBackend(std::shared_ptr<Network::Interface> real)
-  : mock_(std::move(real)) {
+  :  Network::Interface(),
+     mock_(std::move(real)) {  
 }
 
 MockBackend::Mock::Mock(std::shared_ptr<Network::Interface> real)
   : real_(std::move(real)) {
+  if (real_ == nullptr) {
+    BOOST_THROW_EXCEPTION(std::system_error(make_error_code(CommonErrors::null_pointer)));
+  }
 }
 
 void MockBackend::Mock::SetDefaultDoCreateSDV() {

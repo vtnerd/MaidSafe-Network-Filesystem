@@ -22,8 +22,9 @@
 
 #include "boost/throw_exception.hpp"
 
+#include "maidsafe/common/error.h"
 #include "maidsafe/nfs/client/maid_node_nfs.h"
-#include "maidsafe/nfs/detail/network_interface.h"
+#include "maidsafe/nfs/detail/network.h"
 
 namespace maidsafe {
 namespace nfs {
@@ -37,18 +38,18 @@ class NetworkBackend : public Network::Interface {
     : Network::Interface(),
       backend_(nfs_client::MaidNodeNfs::MakeShared(std::forward<Args>(args)...)) {
     if (backend_ == nullptr) {
-      BOOST_THROW_EXCEPTION(std::runtime_error("Unexpected nullptr"));
+      BOOST_THROW_EXCEPTION(std::system_error(make_error_code(CommonErrors::null_pointer)));
     }
   }
-
-  NetworkBackend(NetworkBackend&&) = default;
-  NetworkBackend& operator=(NetworkBackend&&) = default;
 
   virtual ~NetworkBackend();
 
  private:
   NetworkBackend(const NetworkBackend&) = delete;
+  NetworkBackend(NetworkBackend&&) = delete;
+  
   NetworkBackend& operator=(const NetworkBackend&) = delete;
+  NetworkBackend& operator=(NetworkBackend&&) = delete;
 
   virtual boost::future<void> DoCreateSDV(
       const ContainerId& container_id,

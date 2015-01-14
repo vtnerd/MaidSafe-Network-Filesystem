@@ -23,7 +23,7 @@
 
 #include "mock_backend.h"
 #include "maidsafe/common/test.h"
-#include "maidsafe/nfs/detail/network_interface.h"
+#include "maidsafe/nfs/detail/network.h"
 
 namespace maidsafe {
 namespace nfs {

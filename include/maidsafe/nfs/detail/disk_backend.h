@@ -19,7 +19,7 @@
 #define MAIDSAFE_NFS_DETAIL_DISK_BACKEND_H_
 
 #include "maidsafe/nfs/client/fake_store.h"
-#include "maidsafe/nfs/detail/network_interface.h"
+#include "maidsafe/nfs/detail/network.h"
 
 namespace maidsafe {
 namespace nfs {
@@ -34,14 +34,14 @@ class DiskBackend : public Network::Interface {
       backend_(std::forward<Args>(args)...) {
   }
 
-  DiskBackend(DiskBackend&&) = default;
-  DiskBackend& operator=(DiskBackend&&) = default;
-
   virtual ~DiskBackend();
 
  private:
   DiskBackend(const DiskBackend&) = delete;
+  DiskBackend(DiskBackend&&) = delete;
+
   DiskBackend& operator=(const DiskBackend&) = delete;
+  DiskBackend& operator=(DiskBackend&&) = delete;
 
   virtual boost::future<void> DoCreateSDV(
       const ContainerId& container_id,

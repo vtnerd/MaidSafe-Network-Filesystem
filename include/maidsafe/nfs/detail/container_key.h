@@ -18,6 +18,8 @@
 #ifndef MAIDSAFE_NFS_DETAIL_CONTAINER_KEY_H_
 #define MAIDSAFE_NFS_DETAIL_CONTAINER_KEY_H_
 
+#include <utility>
+
 #include "maidsafe/common/types.h"
 #include "maidsafe/nfs/detail/container_id.h"
 
@@ -30,10 +32,13 @@ class ContainerKey {
   ContainerKey();
 
   ContainerKey(const ContainerKey&) = default;
-  ContainerKey(ContainerKey&& other);
+  ContainerKey(ContainerKey&& other) : key_(std::move(other.key_)) {}
 
   ContainerKey& operator=(const ContainerKey&) = default;
-  ContainerKey& operator=(ContainerKey&& other);
+  ContainerKey& operator=(ContainerKey&& other) {
+    key_ = std::move(other.key_);
+    return *this;
+  }
 
   ContainerId GetId() const;
 

@@ -15,12 +15,13 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#include "maidsafe/nfs/detail/network_interface.h"
+#include "maidsafe/nfs/detail/network.h"
 
 #include <algorithm>
 #include <functional>
 #include <type_traits>
 
+#include "maidsafe/common/error.h"
 #include "maidsafe/common/log.h"
 #include "maidsafe/common/utils.h"
 
@@ -42,6 +43,7 @@ void ReduceMemoryUsed(std::vector<boost::future<void>>& tokens) {
 
 }  // namespace
 
+Network::Interface::Interface() {}
 Network::Interface::~Interface() {}
 
 Network::Network(std::shared_ptr<Interface> interface)
@@ -52,7 +54,7 @@ Network::Network(std::shared_ptr<Interface> interface)
     waiting_mutex_(),
     continue_waiting_(true) {
   if (interface_ == nullptr) {
-    BOOST_THROW_EXCEPTION(std::runtime_error("Unexpected nullptr"));
+    BOOST_THROW_EXCEPTION(std::system_error(make_error_code(CommonErrors::null_pointer)));
   }
   waiting_thread_ = std::thread(std::bind(&Network::WaitForTokens, this));
 }

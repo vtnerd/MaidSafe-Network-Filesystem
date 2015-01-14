@@ -17,6 +17,8 @@
     use of the MaidSafe Software.                                                                 */
 #include "network_fixture.h"
 
+#include "maidsafe/common/error.h"
+
 namespace maidsafe {
 namespace nfs {
 namespace detail {
@@ -43,7 +45,7 @@ void NetworkFixture::SetCreator(std::function<std::shared_ptr<Network::Interface
 std::shared_ptr<Network::Interface> NetworkFixture::Create() {
   const auto& creator = GetCreator();
   if (!creator) {
-    BOOST_THROW_EXCEPTION(std::runtime_error("NetworkCreator not set"));
+    BOOST_THROW_EXCEPTION(std::system_error(make_error_code(CommonErrors::null_pointer)));
   }
 
   return creator();

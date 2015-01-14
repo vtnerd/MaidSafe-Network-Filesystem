@@ -29,7 +29,7 @@ namespace detail {
 
 namespace {
 std::string MakeContainerKey() {
-  std::array<byte, 64> new_id;
+  std::array<byte, 64> new_id{{}};
 
   auto& random = maidsafe::crypto::random_number_generator();
   random.GenerateBlock(&new_id[0], new_id.size());
@@ -39,13 +39,6 @@ std::string MakeContainerKey() {
 }  // namespace
 
 ContainerKey::ContainerKey() : key_(Identity(MakeContainerKey())) {}
-
-ContainerKey::ContainerKey(ContainerKey&& other) : key_(std::move(other.key_)) {}
-
-ContainerKey& ContainerKey::operator=(ContainerKey&& other) {
-  key_ = std::move(other.key_);
-  return *this;
-}
 
 ContainerId ContainerKey::GetId() const {
   return ContainerId(MutableData::Name(crypto::Hash<crypto::SHA512>(key_)));
