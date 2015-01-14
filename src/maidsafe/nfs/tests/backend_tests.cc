@@ -130,6 +130,27 @@ TEST_F(BackendTest, BEH_UpdateExistingSDV) {
   EXPECT_EQ(container_version1, (*versions)[1]);
 }
 
+TEST_F(BackendTest, BEH_PutNonExistingSDVFailure) {
+  const ContainerKey container_key{};
+  const ContainerVersion container_version1{MakeContainerVersion(0)};
+  const ContainerVersion container_version2{MakeContainerVersion(1)};
+
+  EXPECT_CALL(GetNetworkMock(), DoGetBranches(container_key.GetId())).Times(1);
+  EXPECT_CALL(
+      GetNetworkMock(),
+      DoPutSDVVersion(container_key.GetId(), container_version1, container_version2))
+    .Times(1);
+
+  const auto sdv = network()->PutSDVVersion(
+      container_key.GetId(), container_version1, container_version2, asio::use_future).get();
+  ASSERT_FALSE(sdv.valid());
+  EXPECT_EQ(make_error_code(VaultErrors::no_such_account), sdv.error());
+
+  const auto versions = network()->GetSDVVersions(container_key.GetId(), asio::use_future).get();
+  ASSERT_FALSE(versions.valid());
+  EXPECT_EQ(make_error_code(VaultErrors::no_such_account), versions.error());
+}
+
 TEST_F(BackendTest, BEH_UpdateExistingSDVBranchFailure) {
   const ContainerKey container_key{};
   const ContainerVersion container_version1{MakeContainerVersion(0)};

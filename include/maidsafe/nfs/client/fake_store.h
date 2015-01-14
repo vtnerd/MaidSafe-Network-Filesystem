@@ -283,7 +283,7 @@ boost::future<void> FakeStore::PutVersion(
     auto versions(ReadVersions(key));
     if (!versions) {
       LOG(kError) << "Failed to read versions";
-      return boost::make_exceptional_future<void>(MakeError(CommonErrors::uninitialised));
+      return boost::make_exceptional_future<void>(MakeError(VaultErrors::no_such_account));
     }
     versions->Put(old_version_name, new_version_name);
     WriteVersions(key, *versions, false);
