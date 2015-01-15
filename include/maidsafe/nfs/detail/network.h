@@ -87,6 +87,9 @@ class Network {
   explicit Network(std::shared_ptr<Interface> interface);
   ~Network();
 
+  // Return max number of SDV versions stored on the network
+  static MAIDSAFE_CONSTEXPR std::uint32_t GetMaxVersions() { return kMaxVersions; }
+
   template<typename Token>
   AsyncResultReturn<Token, void> CreateSDV(
       const ContainerId& container_id,
