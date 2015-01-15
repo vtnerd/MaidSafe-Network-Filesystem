@@ -15,8 +15,8 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#ifndef MAIDSAFE_NFS_DETAIL_NETWORK_INTERFACE_H_
-#define MAIDSAFE_NFS_DETAIL_NETWORK_INTERFACE_H_
+#ifndef MAIDSAFE_NFS_DETAIL_NETWORK_H_
+#define MAIDSAFE_NFS_DETAIL_NETWORK_H_
 
 #include <condition_variable>
 #include <mutex>
@@ -50,6 +50,11 @@ class Network {
   MAIDSAFE_CONSTEXPR_OR_CONST static std::uint32_t kMaxVersions = 100;
 
  public:
+  /* This inner class exists so that on destruction the interface can be
+     destroyed first, and then the internal thread can wait for all of the
+     outstanding requests to be canceled. If routing_v2 provides an async_result
+     interface, the extra thread here can be dropped and these interface
+     functions can be moved to the outter class. */
   class Interface {
    public:
     Interface();
@@ -71,7 +76,7 @@ class Network {
 
     virtual boost::future<void> DoPutChunk(const ImmutableData& data) = 0;
     virtual boost::future<ImmutableData> DoGetChunk(const ImmutableData::Name& name) = 0;
-  private:
+   private:
     Interface(const Interface&) = delete;
     Interface(Interface&&) = delete;
 
@@ -250,4 +255,4 @@ class Network {
 }  // nfs
 }  // maidsafe
 
-#endif  // MAIDSAFE_NFS_DETAIL_NETWORK_INTERFACE_H_
+#endif  // MAIDSAFE_NFS_DETAIL_NETWORK_H_
