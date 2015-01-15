@@ -68,8 +68,8 @@ int main(int argc, char** argv) {
           options);
       po::notify(options);
 
-      const bool local_test = options.count("local");
-      const bool network_test = options.count("network");
+      const bool local_test = (options.count("local") != 0);
+      const bool network_test = (options.count("network") != 0);
       if (local_test && network_test) {
         throw po::error("Cannot specify --local and --network");
       }
