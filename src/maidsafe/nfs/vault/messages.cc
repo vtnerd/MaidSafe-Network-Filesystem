@@ -20,6 +20,7 @@
 
 #include <cstdint>
 
+#include "maidsafe/common/serialisation/serialisation.h"
 #include "maidsafe/nfs/utils.h"
 #include "maidsafe/nfs/vault/messages.pb.h"
 

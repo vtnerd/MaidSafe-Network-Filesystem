@@ -129,7 +129,7 @@ class FakeStore {
   void WriteVersions(
       const KeyType& key, const StructuredDataVersions& versions, const bool creation);
 
-  AsioService asio_service_;
+  BoostAsioService asio_service_;
   const boost::filesystem::path kDiskPath_;
   DiskUsage max_disk_usage_, current_disk_usage_;
   const uint32_t kDepth_;
