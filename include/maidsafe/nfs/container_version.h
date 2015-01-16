@@ -25,7 +25,18 @@ namespace nfs {
 
 using ContainerVersion = StructuredDataVersions::VersionName;
 
-}  // nfs
-}  // maidsafe
+namespace detail {
+inline ContainerVersion MakeContainerVersionRoot(ImmutableData::Name name) {
+  return ContainerVersion{0, std::move(name)};
+}
+
+inline ContainerVersion MakeContainerVersionChild(
+    const ContainerVersion& parent, ImmutableData::Name name) {
+  return ContainerVersion{parent.index + 1, std::move(name)};
+}
+}  // namespace detail
+
+}  // namespace nfs
+}  // namespace maidsafe
 
 #endif  // MAIDSAFE_NFS_CONTAINER_VERSION_H_

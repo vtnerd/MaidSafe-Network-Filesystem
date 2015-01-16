@@ -21,6 +21,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <utility>
+#include <system_error>
 #include <thread>
 #include <vector>
 
@@ -32,6 +33,8 @@
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
+
+#include "boost/throw_exception.hpp"
 
 #include "maidsafe/common/config.h"
 #include "maidsafe/common/data_types/immutable_data.h"
@@ -90,56 +93,85 @@ class Network {
   // Return max number of SDV versions stored on the network
   static MAIDSAFE_CONSTEXPR std::uint32_t GetMaxVersions() { return kMaxVersions; }
 
+  /*
+    The async functions are static to help prevent cycles in the callbacks.
+    This class is similar to asio::io_service in that it must be constructed
+    first, and destructed last. Classes that leverage the network 
+    (Container, Blob, etc.) need a handle to the Network. Asio stores references
+    in those classes (socket, etc.), and forces the user to keep the io_service
+    object valid until they are destroyed. This can result in undefined
+    behavior. Instead, our internal classes (Container, etc.) that need a
+    network object store a weak_ptr to the network (which prevents cycles), and
+    then sends the weak_ptr.lock() here. If the user destroyed the Network
+    object before the Container, etc., an exception is thrown, which is defined
+    behavior (and noticeable to the end user!).
+   */
+
   template<typename Token>
-  AsyncResultReturn<Token, void> CreateSDV(
+  static AsyncResultReturn<Token, void> CreateSDV(
+      std::shared_ptr<Network> network,
       const ContainerId& container_id,
       const ContainerVersion& initial_version,
       Token token) {
-    assert(interface_ != nullptr);
+    if (network == nullptr) {
+      BOOST_THROW_EXCEPTION(MakeNullPointerException());
+    }
+    
+    assert(network->interface_ != nullptr);
     using Handler = AsyncHandler<Token, void>;
 
     Handler handler(std::move(token));
     asio::async_result<Handler> result(handler);
 
-    AddToWaitList(
-        interface_->DoCreateSDV(container_id, initial_version, kMaxVersions, kMaxBranches)
+    network->AddToWaitList(
+        network->interface_->DoCreateSDV(container_id, initial_version, kMaxVersions, kMaxBranches)
         .then(boost::launch::async, Bridge<Handler>{std::move(handler)}));
 
     return result.get();
   }
 
   template<typename Token>
-  AsyncResultReturn<Token, void> PutSDVVersion(
+  static AsyncResultReturn<Token, void> PutSDVVersion(
+      std::shared_ptr<Network> network,
       const ContainerId& container_id,
       const ContainerVersion& previous_version,
       const ContainerVersion& new_version,
       Token token) {
-    assert(interface_ != nullptr);
+    if (network == nullptr) {
+      BOOST_THROW_EXCEPTION(MakeNullPointerException());
+    }
+    
+    assert(network->interface_ != nullptr);
     using Handler = AsyncHandler<Token, void>;
 
     Handler handler{std::move(token)};
     asio::async_result<Handler> result{handler};
 
-    AddToWaitList(
-        interface_->DoPutSDVVersion(container_id, previous_version, new_version)
+    network->AddToWaitList(
+        network->interface_->DoPutSDVVersion(container_id, previous_version, new_version)
         .then(boost::launch::async, Bridge<Handler>{std::move(handler)}));
 
     return result.get();
   }
 
   template<typename Token>
-  AsyncResultReturn<Token, std::vector<ContainerVersion>> GetSDVVersions(
-      const ContainerId& container_id, Token token) {
-    assert(interface_ != nullptr);
+  static AsyncResultReturn<Token, std::vector<ContainerVersion>> GetSDVVersions(
+      std::shared_ptr<Network> network, const ContainerId& container_id, Token token) {
+    if (network == nullptr) {
+      BOOST_THROW_EXCEPTION(MakeNullPointerException());
+    }
+    
+    assert(network->interface_ != nullptr);
     using Handler = AsyncHandler<Token, std::vector<ContainerVersion>>;
 
     Handler handler{std::move(token)};
     asio::async_result<Handler> result{handler};
 
-    std::weak_ptr<Interface> weak_interface{interface_};
+    // Network destructor resets this pointer during destruction!
+    std::weak_ptr<Network::Interface> weak_interface{network->interface_};
 
-    AddToWaitList(
-        interface_->DoGetBranches(container_id)
+    network->AddToWaitList(
+        network->interface_->DoGetBranches(container_id)
         .then(boost::launch::async,
               [weak_interface, container_id]
               (boost::future<std::vector<ContainerVersion>> future) mutable {
@@ -167,30 +199,40 @@ class Network {
   }
 
   template<typename Token>
-  AsyncResultReturn<Token, void> PutChunk(const ImmutableData& data, Token token) {
-    assert(interface_ != nullptr);
+  static AsyncResultReturn<Token, void> PutChunk(
+        std::shared_ptr<Network> network, const ImmutableData& data, Token token) {
+    if (network == nullptr) {
+      BOOST_THROW_EXCEPTION(MakeNullPointerException());
+    }
+    
+    assert(network->interface_ != nullptr);
     using Handler = AsyncHandler<Token, void>;
 
     Handler handler{std::move(token)};
     asio::async_result<Handler> result{handler};
 
-    AddToWaitList(
-        interface_->DoPutChunk(data).then(
+    network->AddToWaitList(
+        network->interface_->DoPutChunk(data).then(
             boost::launch::async, Bridge<Handler>{std::move(handler)}));
 
     return result.get();
   }
 
   template<typename Token>
-  AsyncResultReturn<Token, ImmutableData> GetChunk(const ImmutableData::Name& name, Token token) {
-    assert(interface_ != nullptr);
+  static AsyncResultReturn<Token, ImmutableData> GetChunk(
+      std::shared_ptr<Network> network, const ImmutableData::Name& name, Token token) {
+    if (network == nullptr) {
+      BOOST_THROW_EXCEPTION(MakeNullPointerException());
+    }
+
+    assert(network->interface_ != nullptr);
     using Handler = AsyncHandler<Token, ImmutableData>;
 
     Handler handler{std::move(token)};
     asio::async_result<Handler> result{handler};
 
-    AddToWaitList(
-        interface_->DoGetChunk(name).then(
+    network->AddToWaitList(
+        network->interface_->DoGetChunk(name).then(
             boost::launch::async, Bridge<Handler>{std::move(handler)}));
 
     return result.get();
@@ -199,6 +241,8 @@ class Network {
  private:
   void WaitForTokens();
   void AddToWaitList(boost::future<void> completion_token);
+
+  static std::system_error MakeNullPointerException();
 
   template<typename Result>
   static Expected<Result> ConvertToExpected(boost::future<Result> result) {
