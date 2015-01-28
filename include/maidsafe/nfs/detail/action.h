@@ -15,21 +15,12 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#ifndef MAIDSAFE_NFS_DETAIL_CONTAINER_ID_H_
-#define MAIDSAFE_NFS_DETAIL_CONTAINER_ID_H_
+#ifndef MAIDSAFE_NFS_DETAIL_ACTION_H_
+#define MAIDSAFE_NFS_DETAIL_ACTION_H_
 
-#include "maidsafe/common/tagged_value.h"
-#include "maidsafe/common/data_types/mutable_data.h"
+#include "maidsafe/nfs/detail/action/action_abort.h"
+#include "maidsafe/nfs/detail/action/action_call_once.h"
+#include "maidsafe/nfs/detail/action/action_resume.h"
+#include "maidsafe/nfs/detail/action/action_store.h"
 
-namespace maidsafe {
-namespace nfs {
-namespace detail {
-
-struct ContainerIdTag;
-typedef TaggedValue<MutableData::Name, ContainerIdTag> ContainerId;
-
-}  // namespace detail
-}  // namespace nfs
-}  // namespace maidsafe
-
-#endif  // MAIDSAFE_NFS_DETAIL_CONTAINER_ID_H_
+#endif  // MAIDSAFE_NFS_DETAIL_ACTION_H_

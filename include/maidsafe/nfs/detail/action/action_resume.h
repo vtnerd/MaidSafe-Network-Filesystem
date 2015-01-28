@@ -15,39 +15,55 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#ifndef MAIDSAFE_NFS_DETAIL_CONTAINER_KEY_H_
-#define MAIDSAFE_NFS_DETAIL_CONTAINER_KEY_H_
+#ifndef MAIDSAFE_NFS_DETAIL_ACTION_ACTION_RESUME_H_
+#define MAIDSAFE_NFS_DETAIL_ACTION_ACTION_RESUME_H_
 
 #include <utility>
 
-#include "maidsafe/common/types.h"
-#include "maidsafe/nfs/detail/container_id.h"
+#include "maidsafe/nfs/detail/action/action_continuation.h"
+#include "maidsafe/nfs/detail/coroutine.h"
 
 namespace maidsafe {
 namespace nfs {
 namespace detail {
+namespace action {
 
-class ContainerKey {
+template<typename Routine, typename Frame>
+class ActionResume : public ActionContinuation<ActionResume<Routine, Frame>> {
  public:
-  ContainerKey();
+  using ExpectedValue = void;
 
-  ContainerKey(const ContainerKey&) = default;
-  ContainerKey(ContainerKey&& other) : key_(std::move(other.key_)) {}
-
-  ContainerKey& operator=(const ContainerKey&) = default;
-  ContainerKey& operator=(ContainerKey&& other) {
-    key_ = std::move(other.key_);
-    return *this;
+  explicit ActionResume(Coroutine<Routine, Frame> coro)
+    : ActionContinuation<ActionResume<Routine, Frame>>(),
+      coro_(std::move(coro)) {
   }
 
-  ContainerId GetId() const;
+  ActionResume(const ActionResume&) = default;
+  ActionResume(ActionResume&& other)
+    : coro_(std::move(other.coro_)) {
+  }
+
+  void operator()() {
+    coro_.Execute();
+  }
 
  private:
-  Identity key_;
+  ActionResume& operator=(const ActionResume&) = delete;
+  ActionResume& operator=(ActionResume&&) = delete;
+
+ private:
+  Coroutine<Routine, Frame> coro_;
 };
 
-}  // namespace detail
-}  // namespace nfs
-}  // namespace maidsafe
+template<typename Routine, typename Frame>
+inline
+ActionResume<Routine, Frame> Resume(Coroutine<Routine, Frame> coro) {
+  return ActionResume<Routine, Frame>{std::move(coro)};
+}
 
-#endif  // MAIDSAFE_NFS_DETAIL_CONTAINER_KEY_H_
+}  // action
+}  // detail
+}  // nfs
+}  // maidsafe
+
+#endif  // MAIDSAFE_NFS_DETAIL_ACTION_ACTION_RESUME_H_

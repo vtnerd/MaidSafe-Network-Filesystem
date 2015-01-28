@@ -115,19 +115,15 @@ class Service {
     return impl_->HandleChurnEvent(close_nodes_change);
   }
 
+  void HandleChurnEvent(std::shared_ptr<routing::ClientNodesChange> client_nodes_change) {
+    return impl_->HandleChurnEvent(client_nodes_change);
+  }
+
   // Special case to handle relay messages from data getter to data manager
   void HandleMessage(
       const nfs::GetRequestFromDataGetterPartialToDataManager& message,
       const typename nfs::GetRequestFromDataGetterPartialToDataManager::Sender& sender,
       const typename nfs::GetRequestFromDataGetterPartialToDataManager::Receiver& receiver) {
-    impl_->HandleMessage(message, sender, receiver);
-  }
-
-  // Special case to handle relay messages from node to data manager
-  void HandleMessage(
-      const nfs::GetRequestFromMaidNodePartialToDataManager& message,
-      const typename nfs::GetRequestFromMaidNodePartialToDataManager::Sender& sender,
-      const typename nfs::GetRequestFromMaidNodePartialToDataManager::Receiver& receiver) {
     impl_->HandleMessage(message, sender, receiver);
   }
 

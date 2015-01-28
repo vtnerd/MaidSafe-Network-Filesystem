@@ -15,21 +15,52 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#ifndef MAIDSAFE_NFS_DETAIL_CONTAINER_ID_H_
-#define MAIDSAFE_NFS_DETAIL_CONTAINER_ID_H_
+#ifndef MAIDSAFE_NFS_DETAIL_ACTION_ACTION_ABORT_H_
+#define MAIDSAFE_NFS_DETAIL_ACTION_ACTION_ABORT_H_
 
-#include "maidsafe/common/tagged_value.h"
-#include "maidsafe/common/data_types/mutable_data.h"
+#include <utility>
+
+#include "maidsafe/nfs/detail/coroutine.h"
+#include "maidsafe/nfs/expected.h"
 
 namespace maidsafe {
 namespace nfs {
 namespace detail {
+namespace action {
 
-struct ContainerIdTag;
-typedef TaggedValue<MutableData::Name, ContainerIdTag> ContainerId;
+template<typename Routine, typename Frame>
+class ActionAbort {
+ public:
+  using ExpectedValue = std::error_code;
 
-}  // namespace detail
-}  // namespace nfs
-}  // namespace maidsafe
+  explicit ActionAbort(Coroutine<Routine, Frame> coro) : coro_(std::move(coro)) {}
 
-#endif  // MAIDSAFE_NFS_DETAIL_CONTAINER_ID_H_
+  ActionAbort(const ActionAbort&) = default;
+  ActionAbort(ActionAbort&& other)
+    : coro_(std::move(other.coro_)) {
+  }
+
+  void operator()(const std::error_code error) {
+    coro_.frame().handler(boost::make_unexpected(error));
+  }
+
+ private:
+  ActionAbort& operator=(const ActionAbort&) = delete;
+  ActionAbort& operator=(ActionAbort&&) = delete;
+
+ private:
+  Coroutine<Routine, Frame> coro_;
+};
+
+template<typename Routine, typename Frame>
+inline
+ActionAbort<Routine, Frame> Abort(Coroutine<Routine, Frame> coro) {
+  return ActionAbort<Routine, Frame>{std::move(coro)};
+}
+
+}  // action
+}  // detail
+}  // nfs
+}  // maidsafe
+
+#endif  // MAIDSAFE_NFS_DETAIL_ACTION_ACTION_ABORT_H_

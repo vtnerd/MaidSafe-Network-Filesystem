@@ -47,6 +47,7 @@ namespace maidsafe {
 namespace nfs {
 namespace detail {
 
+// All public functions are thread-safe !
 class Network {
  private:
   MAIDSAFE_CONSTEXPR_OR_CONST static std::uint32_t kMaxBranches = 1;
@@ -79,6 +80,7 @@ class Network {
 
     virtual boost::future<void> DoPutChunk(const ImmutableData& data) = 0;
     virtual boost::future<ImmutableData> DoGetChunk(const ImmutableData::Name& name) = 0;
+
    private:
     Interface(const Interface&) = delete;
     Interface(Interface&&) = delete;
@@ -96,7 +98,7 @@ class Network {
   /*
     The async functions are static to help prevent cycles in the callbacks.
     This class is similar to asio::io_service in that it must be constructed
-    first, and destructed last. Classes that leverage the network 
+    first, and destructed last. Classes that leverage the network
     (Container, Blob, etc.) need a handle to the Network. Asio stores references
     in those classes (socket, etc.), and forces the user to keep the io_service
     object valid until they are destroyed. This can result in undefined
@@ -116,7 +118,7 @@ class Network {
     if (network == nullptr) {
       BOOST_THROW_EXCEPTION(MakeNullPointerException());
     }
-    
+
     assert(network->interface_ != nullptr);
     using Handler = AsyncHandler<Token, void>;
 
@@ -140,7 +142,7 @@ class Network {
     if (network == nullptr) {
       BOOST_THROW_EXCEPTION(MakeNullPointerException());
     }
-    
+
     assert(network->interface_ != nullptr);
     using Handler = AsyncHandler<Token, void>;
 
@@ -160,7 +162,7 @@ class Network {
     if (network == nullptr) {
       BOOST_THROW_EXCEPTION(MakeNullPointerException());
     }
-    
+
     assert(network->interface_ != nullptr);
     using Handler = AsyncHandler<Token, std::vector<ContainerVersion>>;
 
@@ -204,7 +206,7 @@ class Network {
     if (network == nullptr) {
       BOOST_THROW_EXCEPTION(MakeNullPointerException());
     }
-    
+
     assert(network->interface_ != nullptr);
     using Handler = AsyncHandler<Token, void>;
 
@@ -239,10 +241,10 @@ class Network {
   }
 
  private:
+  static std::system_error MakeNullPointerException();
+
   void WaitForTokens();
   void AddToWaitList(boost::future<void> completion_token);
-
-  static std::system_error MakeNullPointerException();
 
   template<typename Result>
   static Expected<Result> ConvertToExpected(boost::future<Result> result) {
@@ -267,7 +269,7 @@ class Network {
   template<typename Handler>
   class Bridge {
    public:
-    Bridge(Handler handler) : handler_(std::move(handler)) {}
+    explicit Bridge(Handler handler) : handler_(std::move(handler)) {}
 
     Bridge(const Bridge&) = default;
     Bridge(Bridge&& other) : handler_(std::move(other.handler_)) {}
@@ -298,8 +300,8 @@ class Network {
   std::atomic<bool> continue_waiting_;
 };
 
-}  // detail
-}  // nfs
-}  // maidsafe
+}  // namespace detail
+}  // namespace nfs
+}  // namespace maidsafe
 
 #endif  // MAIDSAFE_NFS_DETAIL_NETWORK_H_

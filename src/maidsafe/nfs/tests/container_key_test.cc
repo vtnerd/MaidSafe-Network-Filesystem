@@ -1,4 +1,4 @@
-/*  Copyright 2014 MaidSafe.net limited
+/*  Copyright 2013 MaidSafe.net limited
 
     This MaidSafe Software is licensed to you under (1) the MaidSafe.net Commercial License,
     version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -15,21 +15,18 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#ifndef MAIDSAFE_NFS_DETAIL_CONTAINER_ID_H_
-#define MAIDSAFE_NFS_DETAIL_CONTAINER_ID_H_
+#include "maidsafe/common/test.h"
+#include "maidsafe/nfs/detail/container_key.h"
 
-#include "maidsafe/common/tagged_value.h"
-#include "maidsafe/common/data_types/mutable_data.h"
+TEST(ContainerKey, BEH_SameId) {
+  maidsafe::nfs::detail::ContainerKey key{};
 
-namespace maidsafe {
-namespace nfs {
-namespace detail {
+  EXPECT_EQ(key.GetId(), key.GetId());
+}
 
-struct ContainerIdTag;
-typedef TaggedValue<MutableData::Name, ContainerIdTag> ContainerId;
+TEST(ContainerKey, BEH_DifferentId) {
+  maidsafe::nfs::detail::ContainerKey key1{};
+  maidsafe::nfs::detail::ContainerKey key2{};
 
-}  // namespace detail
-}  // namespace nfs
-}  // namespace maidsafe
-
-#endif  // MAIDSAFE_NFS_DETAIL_CONTAINER_ID_H_
+  EXPECT_NE(key1.GetId(), key2.GetId());
+}

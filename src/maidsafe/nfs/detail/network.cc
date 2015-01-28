@@ -54,14 +54,14 @@ Network::Network(std::shared_ptr<Interface> interface)
     waiting_mutex_(),
     continue_waiting_(true) {
   if (interface_ == nullptr) {
-    BOOST_THROW_EXCEPTION(std::system_error(make_error_code(CommonErrors::null_pointer)));
+    BOOST_THROW_EXCEPTION(MakeNullPointerException());
   }
   waiting_thread_ = std::thread(std::bind(&Network::WaitForTokens, this));
 }
 
 Network::~Network() {
   try {
-    interface_.reset(); // cancels existing operations
+    interface_.reset();  // cancels existing operations
     continue_waiting_ = false;
     waiting_notification_.notify_one();
     waiting_thread_.join();
@@ -69,6 +69,10 @@ Network::~Network() {
   }
   catch (...) {
   }
+}
+
+std::system_error Network::MakeNullPointerException() {
+  return std::system_error(make_error_code(CommonErrors::null_pointer));
 }
 
 void Network::WaitForTokens() {
@@ -110,11 +114,11 @@ void Network::WaitForTokens() {
   }
   catch (const std::exception& exception) {
     LOG(kError) << exception.what();
-    throw; // abort process
+    throw;  // abort process
   }
   catch (...) {
     LOG(kError) << "Unknown exception";
-    throw; // abort process
+    throw;  // abort process
   }
 }
 

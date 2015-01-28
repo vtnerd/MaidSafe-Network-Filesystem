@@ -19,11 +19,10 @@
 
 #include "asio/use_future.hpp"
 
-#include "network_fixture.h"
-
 #include "maidsafe/common/test.h"
 #include "maidsafe/common/utils.h"
 #include "maidsafe/nfs/detail/container_key.h"
+#include "maidsafe/nfs/tests/network_fixture.h"
 
 namespace maidsafe {
 namespace nfs {
@@ -40,10 +39,10 @@ class BackendTest : public ::testing::Test, public NetworkFixture {
   }
 
   static ContainerVersion MakeRootContainerVersion() {
-    return ContainerVersion::MakeRoot(ImmutableData::Name{Identity{RandomString(64)}});
+    return MakeContainerVersionRoot(ImmutableData::Name{Identity{RandomString(64)}});
   }
   static ContainerVersion MakeChildContainerVersion(const ContainerVersion& parent) {
-    return parent.CreateChild(ImmutableData::Name{Identity{RandomString(64)}});
+    return MakeContainerVersionChild(parent, ImmutableData::Name{Identity{RandomString(64)}});
   }
 
   static ImmutableData MakeChunk() {
@@ -108,7 +107,8 @@ TEST_F(BackendTest, BEH_ExistingSDVFailure) {
   ASSERT_FALSE(sdv.valid());
   EXPECT_EQ(make_error_code(VaultErrors::data_already_exists), sdv.error());
 
-  const auto versions = network()->GetSDVVersions(container_key.GetId(), asio::use_future).get();
+  const auto versions = Network::GetSDVVersions(
+      network(), container_key.GetId(), asio::use_future).get();
   ASSERT_TRUE(versions.valid());
   ASSERT_EQ(1u, versions->size());
   EXPECT_EQ(container_version, versions->front());
@@ -138,7 +138,8 @@ TEST_F(BackendTest, BEH_UpdateExistingSDV) {
       container_key.GetId(), container_version1, container_version2, asio::use_future).get();
   EXPECT_TRUE(sdv.valid());
 
-  const auto versions = network()->GetSDVVersions(container_key.GetId(), asio::use_future).get();
+  const auto versions = Network::GetSDVVersions(
+      network(), container_key.GetId(), asio::use_future).get();
   ASSERT_TRUE(versions.valid());
   ASSERT_EQ(2u, versions->size());
   EXPECT_EQ(container_version2, (*versions)[0]);
@@ -265,7 +266,8 @@ TEST_F(BackendTest, BEH_UpdateExistingSDVSameTip) {
       DoPutSDVVersion(container_key.GetId(), container_version, container_version))
     .Times(1);
 
-  auto sdv = network()->CreateSDV(container_key.GetId(), container_version, asio::use_future).get();
+  auto sdv = Network::CreateSDV(
+      network(), container_key.GetId(), container_version, asio::use_future).get();
   EXPECT_TRUE(sdv.valid());
 
   sdv = Network::PutSDVVersion(
@@ -274,7 +276,8 @@ TEST_F(BackendTest, BEH_UpdateExistingSDVSameTip) {
   ASSERT_FALSE(sdv.valid());
   EXPECT_EQ(make_error_code(CommonErrors::invalid_parameter), sdv.error());
 
-  const auto versions = network()->GetSDVVersions(container_key.GetId(), asio::use_future).get();
+  const auto versions = Network::GetSDVVersions(
+      network(), container_key.GetId(), asio::use_future).get();
   ASSERT_TRUE(versions.valid());
   ASSERT_EQ(1u, versions->size());
   EXPECT_EQ(container_version, versions->front());
@@ -389,7 +392,7 @@ TEST_F(BackendTest, BEH_PutChunkTwice) {
   EXPECT_TRUE(put_chunk1.get().valid());
   EXPECT_TRUE(put_chunk2.get().valid());
 
-  const auto get_chunk = network()->GetChunk(chunk_data.name(), asio::use_future).get();
+  const auto get_chunk = Network::GetChunk(network(), chunk_data.name(), asio::use_future).get();
   ASSERT_TRUE(get_chunk.valid());
   EXPECT_EQ(chunk_data.name(), get_chunk->name());
   EXPECT_EQ(chunk_data.data(), get_chunk->data());
@@ -426,9 +429,10 @@ TEST_F(BackendTest, BEH_InterfaceThrow) {
       Network::PutSDVVersion(
           network(), container_key.GetId(), container_version, container_version, asio::use_future),
       std::error_code);
-  EXPECT_THROW(network()->GetSDVVersions(container_key.GetId(), asio::use_future), std::error_code);
-  EXPECT_THROW(network()->PutChunk(chunk_data, asio::use_future), std::error_code);
-  EXPECT_THROW(network()->GetChunk(chunk_data.name(), asio::use_future), std::error_code);
+  EXPECT_THROW(
+      Network::GetSDVVersions(network(), container_key.GetId(), asio::use_future), std::error_code);
+  EXPECT_THROW(Network::PutChunk(network(), chunk_data, asio::use_future), std::error_code);
+  EXPECT_THROW(Network::GetChunk(network(), chunk_data.name(), asio::use_future), std::error_code);
 }
 
 TEST_F(BackendTest, BEH_InterfaceErrors) {

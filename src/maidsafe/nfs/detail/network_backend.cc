@@ -57,6 +57,6 @@ boost::future<ImmutableData> NetworkBackend::DoGetChunk(const ImmutableData::Nam
   return backend_->Get(name);
 }
 
-}  // detail
-}  // nfs
-}  // maidsafe
+}  // namespace detail
+}  // namespace nfs
+}  // namespace maidsafe
