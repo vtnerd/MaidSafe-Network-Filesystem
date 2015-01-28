@@ -54,10 +54,10 @@ This creates a callback (variable `callback`) for an async operation that return
 Typically used as the fail function for an operation. Passes the error to the handler as an unexpected value.
 
 * **Pre-Req**
-** Must be given a `nfs::detail::Coroutine` object.
-** The frame in use by the Coroutine must have a `handler` that can accept a boost::unexpected<T>
+ * Must be given a `nfs::detail::Coroutine` object.
+ * The frame in use by the Coroutine must have a `handler` that can accept a boost::unexpected<T>
 * **Action**
-** Calls `coro.frame().handler(boost::make_unexpected(VALUE)` where `VALUE` is the parameter given to the action callback.
+ * Calls `coro.frame().handler(boost::make_unexpected(VALUE)` where `VALUE` is the parameter given to the action callback.
 
 #### API ####
 ```c++
@@ -112,9 +112,9 @@ TEST(Action, Abort) {
 Lazy callback for std::call_once.
 
 * **Pre-Req**
-** Must be given a `nfs::detail::Coroutine` object.
+ * Must be given a `nfs::detail::Coroutine` object.
 * **Action**
-** Calls the `Execute` method on the coroutine.
+ * Calls the `Execute` method on the coroutine.
 
 #### API ####
 ```c++
@@ -149,7 +149,7 @@ TEST(Action, CallOnce) {
 A few callbacks support continuation, a .Then() function accepts a second callback that is invoked after the first.
 
 * **Action**
-** Invokes first callback, then the second callback.
+ * Invokes first callback, then the second callback.
 
 #### API ####
 ```c++
@@ -201,9 +201,9 @@ Continues execution of a `nfs::detail::Coroutine` object.
 > Supports [continuation](#continuation).
 
 * **Pre-Req**
-** Must be given a `nfs::detail::Coroutine` object.
+ * Must be given a `nfs::detail::Coroutine` object.
 * **Action**
-** Calls `coro.Execute()`
+ * Calls `coro.Execute()`
 
 #### API ####
 ```c++
@@ -248,9 +248,9 @@ Callback that forwards arguments to a the assignment operator of a provided valu
 > Supports [continuation](#continuation).
 
 * **Pre-Req**
-** A reference to the value is stored, so the reference must remain valid for lifetime of callback.
+ * A reference to the value is stored, so the reference must remain valid for lifetime of callback.
 * **Action**
-** Forwards functor arguments to the provided value.
+ * Forwards functor arguments to the provided value.
 
 #### API ####
 ```c++
