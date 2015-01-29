@@ -26,6 +26,11 @@
 #include "maidsafe/nfs/detail/action.h"
 #include "maidsafe/nfs/detail/operation_handler.h"
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4510 4610)
+#endif
+
 namespace maidsafe {
 namespace nfs {
 namespace detail {
@@ -189,3 +194,7 @@ TEST(OperationHandler, BEH_ValueConversion) {
 }  // namespace detail
 }  // namespace nfs
 }  // namespace maidsafe
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif

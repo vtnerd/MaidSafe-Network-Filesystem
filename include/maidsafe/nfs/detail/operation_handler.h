@@ -22,6 +22,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "boost/config.hpp"
 #include "boost/mpl/identity.hpp"
 
 #include "maidsafe/common/config.h"
@@ -61,9 +62,8 @@ class OperationHandler {
       return Expected<void>{boost::expect};
     }
 
-    const FailureRoutine& failure_routine() const & { return failure_routine_; }
-    FailureRoutine&& failure_routine() && { return std::move(failure_routine_); }
-   
+    const FailureRoutine& failure_routine() const { return failure_routine_; }
+    FailureRoutine& failure_routine() { return failure_routine_; }
 
    private:
     FailureWrapper& operator=(const FailureWrapper&) = delete;
@@ -88,29 +88,43 @@ class OperationHandler {
       failure_wrapper_(std::move(failure_routine)) {
   }
 
+#ifdef BOOST_NO_CXX11_REF_QUALIFIERS
   template<typename NewSuccessRoutine>
-  OperationHandler<NewSuccessRoutine, FailureRoutine> OnSuccess(NewSuccessRoutine routine) const & {
-    static_assert(NotSet<SuccessRoutine>{}, "success routine already set");
-    return {std::move(routine), failure_wrapper_.failure_routine()};
-  }
-
-  template<typename NewSuccessRoutine>
-  OperationHandler<NewSuccessRoutine, FailureRoutine> OnSuccess(NewSuccessRoutine routine) && {
-    static_assert(NotSet<SuccessRoutine>{}, "success routine already set");
-    return {std::move(routine), std::move(failure_wrapper_).failure_routine()};
+  OperationHandler<NewSuccessRoutine, FailureRoutine> OnSuccess(NewSuccessRoutine&& routine) const {
+    static_assert(NotSet<SuccessRoutine>::value, "success routine already set");
+    return {std::forward<NewSuccessRoutine>(routine), failure_wrapper_.failure_routine()};
   }
 
   template<typename NewFailureRoutine>
-  OperationHandler<SuccessRoutine, NewFailureRoutine> OnFailure(NewFailureRoutine routine) const & {
-    static_assert(NotSet<FailureRoutine>{}, "failure routine already set");
-    return {success_routine_, std::move(routine)};
+  OperationHandler<SuccessRoutine, NewFailureRoutine> OnFailure(NewFailureRoutine&& routine) const {
+    static_assert(NotSet<FailureRoutine>::value, "failure routine already set");
+    return {success_routine_, std::forward<NewFailureRoutine>(routine)};
+  }
+#else // CX11_REF_QUALIFIERS
+  template<typename NewSuccessRoutine>
+  OperationHandler<NewSuccessRoutine, FailureRoutine> OnSuccess(NewSuccessRoutine&& routine) const & {
+    static_assert(NotSet<SuccessRoutine>::value, "success routine already set");
+    return {std::forward<NewSuccessRoutine>(routine), failure_wrapper_.failure_routine()};
+  }
+
+  template<typename NewSuccessRoutine>
+  OperationHandler<NewSuccessRoutine, FailureRoutine> OnSuccess(NewSuccessRoutine&& routine) && {
+    static_assert(NotSet<SuccessRoutine>::value, "success routine already set");
+    return {std::forward<NewSuccessRoutine>(routine), std::move(failure_wrapper_.failure_routine())};
   }
 
   template<typename NewFailureRoutine>
-  OperationHandler<SuccessRoutine, NewFailureRoutine> OnFailure(NewFailureRoutine routine) && {
-    static_assert(NotSet<FailureRoutine>{}, "failure routine already set");
-    return {std::move(success_routine_), std::move(routine)};
+  OperationHandler<SuccessRoutine, NewFailureRoutine> OnFailure(NewFailureRoutine&& routine) const & {
+    static_assert(NotSet<FailureRoutine>::value, "failure routine already set");
+    return {success_routine_, std::forward<NewFailureRoutine>(routine)};
   }
+
+  template<typename NewFailureRoutine>
+  OperationHandler<SuccessRoutine, NewFailureRoutine> OnFailure(NewFailureRoutine&& routine) && {
+    static_assert(NotSet<FailureRoutine>::value, "failure routine already set");
+    return {std::move(success_routine_), std::forward<NewFailureRoutine>(routine)};
+  }
+#endif
 
   void operator()() {
     Handle(Expected<void>{boost::expect});

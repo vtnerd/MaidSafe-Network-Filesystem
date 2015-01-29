@@ -21,6 +21,8 @@
 #include <type_traits>
 #include <utility>
 
+#include "boost/config.hpp"
+
 namespace maidsafe {
 namespace nfs {
 namespace detail {
@@ -47,7 +49,7 @@ class ActionContinuation {
     template<typename... Args>
     typename std::result_of<Continuation()>::type operator()(Args&&... args) {
       static_assert(
-          std::is_same<void, typename std::result_of<Derived(Args...)>::type>{},
+          std::is_same<void, typename std::result_of<Derived(Args...)>::type>::value,
           "derived returns value, and the result is unused. consider "
           "overload that sends to continuation");
       derived_(std::forward<Args>(args)...);
@@ -63,15 +65,22 @@ class ActionContinuation {
     Continuation continuation_;
   };
 
+#ifdef BOOST_NO_CXX11_REF_QUALIFIERS
   template<typename Continuation>
-  Wrapper<Continuation> Then(Continuation continuation) const & {
-    return {*self(), std::move(continuation)};
+  Wrapper<Continuation> Then(Continuation&& continuation) const {
+    return {*self(), std::forward<Continuation>(continuation)};
+  }
+#else // CX11_REF_QUALIFIERS
+  template<typename Continuation>
+  Wrapper<Continuation> Then(Continuation&& continuation) const & {
+    return {*self(), std::forward<Continuation>(continuation)};
   }
 
   template<typename Continuation>
-  Wrapper<Continuation> Then(Continuation continuation) && {
-    return {std::move(*self()), std::move(continuation)};
+  Wrapper<Continuation> Then(Continuation&& continuation) && {
+    return {std::move(*self()), std::forward<Continuation>(continuation)};
   }
+#endif
 
  private:
   Derived* self() { return static_cast<Derived*>(this); }

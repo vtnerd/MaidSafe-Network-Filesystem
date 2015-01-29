@@ -53,12 +53,13 @@ unsigned RunCoroutine(Args&&... args) {
 }  // namespace
 
 TEST(Coroutine, BEH_Basic) {
-  auto async_operation = make_unique<AsyncOperation>();
+  /// VS2013 cannot properly move here, so use shared_ptr
+  auto async_operation = std::make_shared<AsyncOperation>();
   EXPECT_CALL(*async_operation, Run()).Times(1);
   
   struct TestRoutine {
     struct Frame {
-      std::unique_ptr<AsyncOperation> async_operation;
+      std::shared_ptr<AsyncOperation> async_operation;
     };
 
     void operator()(Coroutine<TestRoutine, Frame>& coro) const {
@@ -72,12 +73,13 @@ TEST(Coroutine, BEH_Basic) {
 }
 
 TEST(Coroutine, BEH_Multiple) {
-  auto async_operation = make_unique<AsyncOperation>();
+  // VS2013 cannot properly move here, so use shared_ptr
+  auto async_operation = std::make_shared<AsyncOperation>();
   EXPECT_CALL(*async_operation, Run()).Times(2);
   
   struct TestRoutine {
     struct Frame {
-      std::unique_ptr<AsyncOperation> async_operation;
+      std::shared_ptr<AsyncOperation> async_operation;
       unsigned count;
     };
 
@@ -120,7 +122,7 @@ TEST(Coroutine, BEH_AlternateConstructor) {
         EXPECT_EQ(11, (coro.frame().count)++);
         ASIO_CORO_YIELD coro.frame().async_operation->Run();
 
-        EXPECT_EQ(12, (coro.frame().count)++);
+        EXPECT_EQ(12, coro.frame().count);
       }
     }
   };
@@ -131,13 +133,14 @@ TEST(Coroutine, BEH_AlternateConstructor) {
           Coroutine<TestRoutine, TestRoutine::Frame>{TestRoutine{}, std::move(async_operation)}));
 }
 
-TEST(Coroutine, BEH_FrameIsNotCopied) {  
-  auto async_operation = make_unique<AsyncOperation>();
+TEST(Coroutine, BEH_FrameIsNotCopied) {
+  // VS2013 cannot properly move here, so use shared_ptr
+  auto async_operation = std::make_shared<AsyncOperation>();
   EXPECT_CALL(*async_operation, Run()).Times(1);
   
   struct TestRoutine {
     struct Frame {    
-      std::unique_ptr<AsyncOperation> async_operation;
+      std::shared_ptr<AsyncOperation> async_operation;
       unsigned count;
     };
 
@@ -151,7 +154,7 @@ TEST(Coroutine, BEH_FrameIsNotCopied) {
     }
   };
 
-  auto coro = MakeCoroutine<TestRoutine>(std::move(async_operation), 0u);
+  auto coro(MakeCoroutine<TestRoutine>(std::move(async_operation), 0u));
   coro.Execute();
   EXPECT_FALSE(coro.is_complete());
 
