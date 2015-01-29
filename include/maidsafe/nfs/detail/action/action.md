@@ -170,7 +170,7 @@ struct Routine {
   };
   void operator()(Coroutine<Routine, Frame>& coro) const {
     ASIO_CORO_REENTER(coro) {
-      ++(coro.frame().value.get())
+      ++(coro.frame().value.get());
     }
   }
 };
@@ -191,7 +191,7 @@ TEST(Action, Continuation) {
 
   continued_function(150);
   EXPECT_EQ(150, value1);
-  EXPECT_EQ(2, value2);
+  EXPECT_EQ(1, value2);  // coroutine completed on first call
 }
 ```
 
