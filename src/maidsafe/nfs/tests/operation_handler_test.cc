@@ -45,7 +45,7 @@ VoidHandler<Handler> MakeVoidHandler(Handler handler) {
 }
 }
 
-TEST(OperationHandler, OnSuccess) {
+TEST(OperationHandler, BEH_OnSuccess) {
   bool success = false;
   std::error_code failure{};
 
@@ -75,7 +75,7 @@ TEST(OperationHandler, OnSuccess) {
   }
 }
 
-TEST(OperationHandler, OnFailure) {
+TEST(OperationHandler, BEH_OnFailure) {
   bool success = false;
   std::error_code failure{};
 
@@ -109,7 +109,7 @@ TEST(OperationHandler, OnFailure) {
   }
 }
 
-TEST(OperationHandler, VoidValue) {
+TEST(OperationHandler, BEH_VoidValue) {
   bool success = false;
   std::error_code failure{};
 
@@ -165,7 +165,7 @@ TEST(OperationHandler, VoidValue) {
   }
 }
 
-TEST(OperationHandler, ValueConversion) {
+TEST(OperationHandler, BEH_ValueConversion) {
   boost::optional<int> success{};
   std::error_code failure{};
 
