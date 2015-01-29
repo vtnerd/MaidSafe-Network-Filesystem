@@ -222,7 +222,7 @@ struct Routine {
   };
   void operator()(Coroutine<Routine, Frame>& coro) const {
     ASIO_CORO_REENTER(coro) {
-      ++(coro.frame().value.get())
+      ++(coro.frame().value.get());
     }
   }
 };
