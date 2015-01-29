@@ -69,7 +69,7 @@ struct ActionAbort {
 ```
 
 #### Example Usage ####
-```
+```c++
 struct Handler {
   void operator()(boost::expected<int, std::error_code> result)) {
     if (result) {
