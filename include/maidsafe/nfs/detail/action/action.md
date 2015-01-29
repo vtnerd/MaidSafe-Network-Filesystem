@@ -112,7 +112,7 @@ TEST(Action, Abort) {
 Lazy callback for std::call_once.
 
 * **Pre-Req**
- * Must be given a `nfs::detail::Coroutine` object.
+ * Call once object must be copyable, a single instance should remain after copy, and it must be convertible to `std::once_flag`. Typically `std::reference_wrapper` is used.
 * **Action**
  * Calls the `Execute` method on the coroutine.
 
