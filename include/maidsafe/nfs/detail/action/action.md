@@ -61,6 +61,15 @@ Typically used as the fail function for an operation. Passes the error to the ha
 
 #### API ####
 ```c++
+template<...>
+struct ActionAbort {
+  using ExpectedValue = std::error_code;
+  void operator()(const std::error_code);
+};
+```
+
+#### Example Usage ####
+```
 struct Handler {
   void operator()(boost::expected<int, std::error_code> result)) {
     if (result) {
@@ -73,15 +82,6 @@ struct Handler {
   std::reference_wrapper<std::error_code> error;
 };
 
-template<...>
-struct ActionAbort {
-  using ExpectedValue = std::error_code;
-  void operator()(const std::error_code);
-};
-```
-
-#### Example Usage ####
-```
 struct Routine {
   struct Frame {
     Handler handler;
