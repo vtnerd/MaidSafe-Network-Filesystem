@@ -57,7 +57,7 @@ Typically used as the fail function for an operation. Passes the error to the ha
  * Must be given a `nfs::detail::Coroutine` object.
  * The frame in use by the Coroutine must have a `handler` that can accept a boost::unexpected<T>
 * **Action**
- * Calls `coro.frame().handler(boost::make_unexpected(VALUE)` where `VALUE` is the parameter given to the action callback.
+ * Calls `coro.frame().handler(boost::make_unexpected(VALUE))` where `VALUE` is the parameter given to the action callback.
 
 #### API ####
 ```c++
