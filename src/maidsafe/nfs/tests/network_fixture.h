@@ -20,6 +20,9 @@
 
 #include <functional>
 #include <memory>
+#include <system_error>
+
+#include "boost/thread/future.hpp"
 
 #include "maidsafe/common/test.h"
 #include "maidsafe/nfs/detail/network.h"
@@ -45,6 +48,13 @@ class NetworkFixture {
   const MockBackend::Mock& GetNetworkMock() const { return mock_->mock_; }
   MockBackend::Mock& GetNetworkMock() { return mock_->mock_; }
   const std::shared_ptr<Network>& network() const { return network_; }
+
+  template<typename Result>
+  static std::shared_ptr<boost::future<Result>> MakeFutureError(std::error_code error) {
+    const auto return_val(std::make_shared<boost::future<Result>>());
+    *return_val = boost::make_exceptional_future<Result>(std::system_error(error));
+    return return_val;
+  }
 
  private:
   const std::shared_ptr<MockBackend> mock_;

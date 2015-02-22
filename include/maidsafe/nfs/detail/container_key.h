@@ -20,6 +20,7 @@
 
 #include <utility>
 
+#include "maidsafe/common/config.h"
 #include "maidsafe/common/types.h"
 #include "maidsafe/nfs/detail/container_id.h"
 
@@ -32,19 +33,35 @@ class ContainerKey {
   ContainerKey();
 
   ContainerKey(const ContainerKey&) = default;
-  ContainerKey(ContainerKey&& other) : key_(std::move(other.key_)) {}
+  ContainerKey(ContainerKey&& other)
+    : key_(std::move(other.key_)) {
+  }
 
-  ContainerKey& operator=(const ContainerKey&) = default;
-  ContainerKey& operator=(ContainerKey&& other) {
-    key_ = std::move(other.key_);
+  ContainerKey& operator=(ContainerKey other) MAIDSAFE_NOEXCEPT {
+    swap(other);
     return *this;
   }
 
+  template<typename Archive>
+  Archive& serialize(Archive& ar) {
+    return ar(key_);
+  }
+
+  void swap(ContainerKey& other) MAIDSAFE_NOEXCEPT {
+    using std::swap;
+    swap(key_, other.key_);
+  }
+
+  const Identity& key() const { return key_; }
   ContainerId GetId() const;
 
  private:
   Identity key_;
 };
+
+inline void swap(ContainerKey& lhs, ContainerKey& rhs) MAIDSAFE_NOEXCEPT {
+  lhs.swap(rhs);
+}
 
 }  // namespace detail
 }  // namespace nfs

@@ -71,7 +71,7 @@ target_include_directories(maidsafe_nfs_core PUBLIC ${CMAKE_BINARY_DIR}/Generate
 target_include_directories(maidsafe_nfs_detail PUBLIC ${PROJECT_SOURCE_DIR}/include ${MaidsafeGeneratedSourcesDir}/nfs/include PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_include_directories(maidsafe_nfs_client PUBLIC ${PROJECT_SOURCE_DIR}/include ${MaidsafeGeneratedSourcesDir}/nfs/include PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_include_directories(maidsafe_nfs_vault PUBLIC ${PROJECT_SOURCE_DIR}/include ${MaidsafeGeneratedSourcesDir}/nfs/include PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(maidsafe_nfs_core maidsafe_routing protobuf_lite)
+target_link_libraries(maidsafe_nfs_core maidsafe_encrypt maidsafe_routing protobuf_lite)
 target_link_libraries(maidsafe_nfs_detail maidsafe_common maidsafe_nfs_client maidsafe_encrypt maidsafe_routing)
 target_link_libraries(maidsafe_nfs_client maidsafe_nfs_vault maidsafe_nfs_core)
 target_link_libraries(maidsafe_nfs_vault maidsafe_nfs_client maidsafe_nfs_core)

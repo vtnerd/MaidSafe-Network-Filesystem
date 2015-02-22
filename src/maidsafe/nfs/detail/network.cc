@@ -72,7 +72,7 @@ Network::~Network() {
 }
 
 std::system_error Network::MakeNullPointerException() {
-  return std::system_error(make_error_code(CommonErrors::null_pointer));
+  return MakeError(CommonErrors::null_pointer);
 }
 
 void Network::WaitForTokens() {

@@ -24,13 +24,14 @@
 #include "maidsafe/common/config.h"
 #include "maidsafe/common/log.h"
 #include "maidsafe/common/test.h"
+#include "maidsafe/common/utils.h"
 #include "maidsafe/passport/passport.h"
 #include "maidsafe/nfs/detail/disk_backend.h"
 #include "maidsafe/nfs/detail/network_backend.h"
 #include "maidsafe/nfs/tests/network_fixture.h"
 
 namespace {
-const maidsafe::DiskUsage kDefaultMaxDiskUsage(2000);
+const maidsafe::DiskUsage kDefaultMaxDiskUsage(maidsafe::Bytes(maidsafe::MegaBytes(512)).count());
 
 const auto create_network_backend = []() {
   return std::make_shared<maidsafe::nfs::detail::NetworkBackend>(

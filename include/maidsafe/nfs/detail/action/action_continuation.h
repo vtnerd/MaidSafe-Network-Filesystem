@@ -67,18 +67,18 @@ class ActionContinuation {
 
 #ifdef BOOST_NO_CXX11_REF_QUALIFIERS
   template<typename Continuation>
-  Wrapper<Continuation> Then(Continuation&& continuation) const {
-    return {*self(), std::forward<Continuation>(continuation)};
+  Wrapper<Continuation> Then(Continuation continuation) const {
+    return {*self(), std::move(continuation)};
   }
 #else // CX11_REF_QUALIFIERS
   template<typename Continuation>
-  Wrapper<Continuation> Then(Continuation&& continuation) const & {
-    return {*self(), std::forward<Continuation>(continuation)};
+  Wrapper<Continuation> Then(Continuation continuation) const & {
+    return {*self(), std::move(continuation)};
   }
 
   template<typename Continuation>
-  Wrapper<Continuation> Then(Continuation&& continuation) && {
-    return {std::move(*self()), std::forward<Continuation>(continuation)};
+  Wrapper<Continuation> Then(Continuation continuation) && {
+    return {std::move(*self()), std::move(continuation)};
   }
 #endif
 

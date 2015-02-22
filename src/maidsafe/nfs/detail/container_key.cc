@@ -19,8 +19,8 @@
 
 #include <array>
 #include <string>
+#include <type_traits>
 
-#include "maidsafe/common/config.h"
 #include "maidsafe/common/crypto.h"
 
 namespace maidsafe {

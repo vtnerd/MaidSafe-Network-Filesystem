@@ -430,23 +430,22 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 ```C++
 class LocalBlob {
  public:
-  typedef detail::MetaData::TimePoint TimePoint;
+  using Clock = detail::MetaData::Clock;
 
   const std::string& key() const; // key associated with Blob
-  std::uint64_t size() const;
-  TimePoint creation_time() const;
-  TimePoint head_write_time() const; // write time of this revision
+  Expected<std::uint64_t> size() const;
+  Clock::time_point creation_time() const;
+  Clock::time_point last_modification_time() const;
 
   const std::string& user_metadata() const;
-  void set_user_metadata(std::string);
+  Expected<void> set_user_meta_data(std::string);
 
-  // Version at open
-  const BlobVersion& head_version() const;
+  Expected<BlobVersion> head_version() const;
 
   unspecified GetVersions(AsyncResult<std::vector<BlobVersion>>);
 
-  std::uint64_t offset() const;
-  void set_offset(std::uint64_t);
+  Expected<std::uint64_t> offset() const;
+  Expected<void> set_offset(std::uint64_t);
 
   unspecified Read(boost::asio::buffer, AsyncResult<std::uint64_t>);
   unspecified Write(boost::asio::buffer, AsyncResult<>);
@@ -458,26 +457,26 @@ class LocalBlob {
 > The network currently has no time server of its own, so the timestamps are from the clients. If a client has a misconfigured clock, the timestamps stored will also be incorrect.
 
 - **key()**
-  - Returns the key associated with the Blob
+  - Returns the key associated with the Blob. This value never changes.
 - **size()**
-  - Returns the size of the `LocalBlob` in bytes. This is *not* necessarily the size of any `Blob` stored on the network.
+  - Returns the size of the `LocalBlob` in bytes. This is *not* necessarily the size of any `Blob` stored on the network. Unavailable when a Read, Write, Truncate, or Commit asynchronous operation is pending.
 - **creation_time()**
-  - Returns the timestamp of when `key()` last went from storing nothing to storing a Blob.
-- **head_write_time()**
-  - Returns the timestamp of when the head_version() was stored.
-- **user_metadata()**
+  - Returns the timestamp of when `key()` last went from storing nothing to storing a Blob. This value never changes.
+- **last_modification_time()**
+  - Returns the timestamp of last call to Write or Truncate.
+- **user_meta_data()**
   - Returns the user metadata being stored.
-- **set_user_metadata(std::string)**
-  - Sets the user metadata. Binary data is allowed.
+- **set_user_meta_data(std::string)**
+  - Sets the user metadata. Binary data is allowed. Value must be less than 64KB (error code is returned in `Expected`).
 - **head_version()**
-  - Returns the version from when the `LocalBlob` was opened. This is **not** updated after a `Commit` succeeds.
+  - Returns the version of the last successful commit to the network. Unavailable when a Commit asynchronous operation is pending.
 - **GetVersions(AsyncResult<std::vector<BlobVersion>>)**
   - Request the version history of the Blob.
-  - AsyncResult is given the version history of `BlobVersion`s at the key. Oldest `BlobVersion` is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time. `std::vector::begin()` will be the newest `BlobVersion`, and `std::vector::end() - 1` will have the oldest BlobVersion (which is always `BlobVersion::Defunct()`).
+  - AsyncResult is given the version history of `BlobVersion`s at the key. `std::vector::begin()` will be the newest `BlobVersion`, and `std::vector::end() - 1` will have the oldest BlobVersion. If the oldest `BlobVersion` is not `BlobVersion::Defunct()`, then some of the history of the blob has been aged out.
 - **offset()**
-  - Returns the offset that will be used by the next Read, Write, or Truncate call.
+  - Returns the offset that will be used by the next Read, Write, or Truncate call. Unavailable when a Read, Write, or Truncate asynchronous operation is pending.
 - **set_offset(std::uint64_t)**
-  - Change the value returned by `offset()`.
+  - Change the value returned by `offset()`. Not possible when a Read, Write, or Truncate asynchronous operation is pending.
 - **Read(boost::asio::buffer, AsyncResult<std::uint64_t>)**
   - Read from the `LocalBlob` starting at `offset()` into the provided buffer. The buffer must remain valid until AsyncResult returns.
   - `offset()` is immediately updated to `min(file_size() - offset(), offset() + buffer::size())`

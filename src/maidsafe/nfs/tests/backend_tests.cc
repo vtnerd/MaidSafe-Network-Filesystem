@@ -48,13 +48,6 @@ class BackendTest : public ::testing::Test, public NetworkFixture {
   static ImmutableData MakeChunk() {
     return ImmutableData{NonEmptyString{RandomString(100)}};
   }
-
-  template<typename Result>
-  static std::shared_ptr<boost::future<Result>> MakeFutureError(std::error_code error) {
-    const auto return_val(std::make_shared<boost::future<Result>>());
-    *return_val = boost::make_exceptional_future<Result>(std::system_error(error));
-    return return_val;
-  }
 };
 }  // namespace
 

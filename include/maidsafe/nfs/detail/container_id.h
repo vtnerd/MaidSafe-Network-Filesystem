@@ -26,7 +26,7 @@ namespace nfs {
 namespace detail {
 
 struct ContainerIdTag;
-typedef TaggedValue<MutableData::Name, ContainerIdTag> ContainerId;
+using ContainerId = TaggedValue<MutableData::Name, ContainerIdTag>;
 
 }  // namespace detail
 }  // namespace nfs

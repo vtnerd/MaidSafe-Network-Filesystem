@@ -1,4 +1,4 @@
-/*  Copyright 2014 MaidSafe.net limited
+/*  Copyright 2013 MaidSafe.net limited
 
     This MaidSafe Software is licensed to you under (1) the MaidSafe.net Commercial License,
     version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -15,13 +15,30 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#ifndef MAIDSAFE_NFS_DETAIL_ACTION_H_
-#define MAIDSAFE_NFS_DETAIL_ACTION_H_
 
-#include "maidsafe/nfs/detail/action/action_abort.h"
-#include "maidsafe/nfs/detail/action/action_call_once.h"
-#include "maidsafe/nfs/detail/action/action_ignore.h"
-#include "maidsafe/nfs/detail/action/action_resume.h"
-#include "maidsafe/nfs/detail/action/action_store.h"
+#include "maidsafe/nfs/local_blob.h"
 
-#endif  // MAIDSAFE_NFS_DETAIL_ACTION_H_
+#include "maidsafe/common/error.h"
+
+namespace maidsafe {
+namespace nfs {
+
+LocalBlob::LocalBlob(
+    const std::shared_ptr<detail::Container>& container,
+    std::string key)
+  : working_blob_(std::make_shared<detail::LocalBlob>(container, std::move(key))),
+    meta_data_() {
+  assert(working_blob_ != nullptr);
+}
+
+LocalBlob::LocalBlob(
+    const std::shared_ptr<detail::Container>& container,
+    std::string key,
+    const detail::Blob& head)
+  : working_blob_(std::make_shared<detail::LocalBlob>(container, std::move(key), head)),
+    meta_data_(head.meta_data()) {
+  assert(working_blob_ != nullptr);
+}
+
+}  // namespace nfs
+}  // namespace maidsafe
