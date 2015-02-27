@@ -26,12 +26,6 @@ If treated as a filepath, "/users/user1" would have two different histories depe
 #### Container Keys != Filesystem Paths ####
 Containers are nested, but they cannot be used like paths. You cannot open "/container1/container2/document"; a "/" character has no special meaning in a Container key. This is intentional, [nested containers are complicated](#nested-containers-and-blob-forks), and should generally be avoided.
 
-### Storage ###
-Storage has 0 more Containers. The Storage can be public, private, or privately-shared.
-
-### StorageID ###
-A StorageID identifies a particular Storage instance on the SAFE network, and contains the necessary information to decrypt the contents.
-
 ## Examples ##
 Network operations in the Posix API are done asynchronously so that client code doesn't block while network operations are being performed. The Posix API uses the [AsyncResult](http://www.boost.org/doc/libs/1_57_0/doc/html/boost_asio/reference/async_result.html) framework from `boost::asio`. This allows clients to use callbacks, stackful co-routines, or futures as the completion signalling mechanism.
 
@@ -150,19 +144,6 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
 ## Posix Style API ##
 All public functions in this API provide the strong exception guarantee. All public const methods are thread-safe.
 
-### StorageID ###
-> maidsafe/nfs/storage_id.h
-
-- [ ] Thread-safe Public Functions
-- [x] Copyable
-- [x] Movable
-
-Represents the [`StorageID`](#storageid) abstraction listed above. Obtaining relevant `StorageID` objects are out of the scope of this document.
-
-```c++
-class StorageID { /* No Public Elements */ };
-```
-
 ### BlobVersion ###
 > maidsafe/nfs/blob_version.h
 
@@ -211,7 +192,19 @@ class ModifyBlobVersion {
   static ModifyBlobVersion Create();
   static ModifyBlobVersion Latest();
   ModifyBlobVersion(BlobVersion);
+  
+  bool Equal(const ModifyBlobVersion&) const noexcept;
+  bool Equal(const BlobVersion&) const noexcept;
 };
+
+bool operator==(const ModifyBlobVersion&, const ModifyBlobVersion&) noexcept;
+bool operator!=(const ModifyBlobVersion&, const ModifyBlobVersion&) noexcept;
+
+bool operator==(const ModifyBlobVersion&, const BlobVersion&) noexcept;
+bool operator!=(const ModifyBlobVersion&, const BlobVersion&) noexcept;
+
+bool operator!=(const BlobVersion&, const ModifyBlobVersion&) noexcept;
+bool operator==(const BlobVersion&, const ModifyBlobVersion&) noexcept;
 ```
 - **Create()**
   - Returns an object that indicates the Posix API should only succeed if the specified key is unused.
@@ -219,6 +212,11 @@ class ModifyBlobVersion {
   - Returns an object that indicates the Posix API should overwrite any existing Blob at the specified key.
 - **ModifyBlobVersion(BlobVersion)**
   - Creates an object that indicates the Posix API should only overwrite the Blob at the specified key if it matches the BlobVersion.
+- **Equal(const ModifyBlobVersion&)**
+  - Return true if *this ModifyBlobVersion is equivalent to the one given in the parameter.
+- **Equal(const BlobVersion&)**
+  - Return true if *this ModifyBlobVersion was constructed with an equivalent BlobVersion given in the parameter.
+- The non-member operator overloads call the corresponding Equal functions.
 
 ### RetrieveBlobVersion ###
 > maidsafe/nfs/retrieve_blob_version.h
@@ -233,12 +231,29 @@ Operations in [`Container`](#container-1) that retrieve a Blob stored at a key r
 class RetrieveBlobVersion {
   static RetrieveBlobVersion Latest();
   RetrieveBlobVersion(BlobVersion);
+  
+  bool Equal(const RetrieveBlobVersion&) const noexcept;
+  bool Equal(const BlobVersion&) const noexcept;
 };
+
+bool operator==(const RetrieveBlobVersion&, const RetrieveBlobVersion&) noexcept;
+bool operator!=(const RetrieveBlobVersion&, const RetrieveBlobVersion&) noexcept;
+
+bool operator==(const RetrieveBlobVersion&, const BlobVersion&) noexcept;
+bool operator!=(const RetrieveBlobVersion&, const BlobVersion&) noexcept;
+
+bool operator!=(const BlobVersion&, const RetrieveBlobVersion&) noexcept;
+bool operator==(const BlobVersion&, const RetrieveBlobVersion&) noexcept;
 ```
 - **Latest()**
   - Returns an object that indicates the Posix API should retrieve the latest Blob stored at the specified key.
 - **RetrieveBlobVersion(BlobVersion)**
   - Creates an object that indicates the Posix API needs to retrieve a specific Blob version stored at the specified key.
+- **Equal(const RetrieveBlobVersion&)**
+  - Return true if *this RetrieveBlobVersion is equivalent to the one given in the parameter.
+- **Equal(const BlobVersion&)**
+  - Return true if *this RetrieveBlobVersion was constructed with an equivalent BlobVersion given in the parameter.
+- The non-member operator overloads call the corresponding Equal functions.
 
 ### ModifyContainerVersion ###
 > maidsafe/nfs/modfy_container_version.h
@@ -290,17 +305,17 @@ class RetrieveContainerVersion {
 - [ ] Copyable
 - [x] Movable
 
-Currently `maidsafe::nfs::Future` is a `boost::future` object, but this may be changed to a non-allocating design. It is recommended that you use the typedef (`maidsafe::nfs::Future`) in case the implementation changes.
+Currently `maidsafe::nfs::Future` is a `std::future` object, but this may be changed to a non-allocating design. It is recommended that you use the typedef (`maidsafe::nfs::Future`) in case the implementation changes.
 
 In the Posix API, the `Future` will only throw exceptions on non-network related errors (std::bad_alloc, std::bad_promise, etc.). Values and network related errors are returned in a `boost::expected` object.
 
 ```c++
 template<typename T>
-using Future = boost::future<T>;
+using Future = std::future<T>;
 ```
 
-### maidsafe::nfs::Storage ###
-> maidsafe/nfs/storage.h
+### maidsafe::nfs::PosixContainer ###
+> maidsafe/nfs/posix_container.h
 
 - [x] Thread-safe Public Functions
 - [x] Copyable
@@ -308,7 +323,7 @@ using Future = boost::future<T>;
 
 > This object has a single shared_ptr, and is shallow-copied. This makes it extremely quick to copy.
 
-Represents the [`Storage`](#storage) abstraction listed above. Constructing a `Storage` object requires a `StorageID` object.
+An interface for the [`Container`](#container) abstraction listed above. The process for opening a container is still a work-in-progress, as it involves the launcher application being concurrently developed.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback in the form `void(boost::expected<T, std::error_code>)`; return type is void
@@ -316,63 +331,31 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 - A maidsafe::nfs::use_future; return type is `maidsafe::nfs::Future<boost::expected<T, std::error_code>>`.
 
 ```c++
-class Storage {
+class PosixContainer {
   unspecified GetVersions(AsyncResult<std::vector<ContainerVersion>>);
 
+  // Child Container Operations
   unspecified GetContainers(
-      RetrieveContainerVersion, AsyncResult<std::vector<std::string>>);
-
+      RetrieveContainerVersion, AsyncResult<std::vector<ContainerInfo>>);
+  
+  unspecified OpenContainer(ContainerInfo, AsyncResult<Container>);    
   unspecified OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>);
-  unspecified DeleteContainer(std::string, RetrieveContainerVersion, AsyncResult<>);
-};
-```
-- **GetVersions(AsyncResult<std::vector<ContainerVersion>>)**
-  - Request the version history of Storage.
-  - AsyncResult is given the version history of Storage. A new version is created each time a Container is created or deleted. Oldest `ContainerVersion` is always `ContainerVersion::Defunct()`, and is used subsequently when the key had no associated Container for some period of time. `std::vector::begin()` will be the newest `ContainerVersion`, and `std::vector::end() - 1` will have the oldest `ContainerVersion` (which is always `ContainerVersion::Defunct()`).
-- **GetContainers(RetrieveContainerVersion, AsyncResult<std::vector<std::string>>)**
-  - Request the list of nested Containers.
-  - AsyncResult is given the list of nested containers.
-- **OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>)**
-  - Make a request to open a container at the specified key.
-  - AsyncResult is given the nested `Container` with the specified name.
-- **DeleteContainer(std::string, RetrieveContainerVersion, AsyncResult<>)**
-  - Make a request to delete a container at the specified key.
+  
+  unspecified DeleteContainer(
+      std::string, RetrieveContainerVersion, AsyncResult<ContainerVersion>);
 
-### maidsafe::nfs::Container ###
-> maidsafe/nfs/container.h
 
-- [x] Thread-safe Public Functions
-- [x] Copyable
-- [x] Movable
-
-> This object has a single shared_ptr, and is shallow-copied. This makes it extremely quick to copy.
-
-Represents the [`Container`](#container) abstraction listed above. Constructing a `Container` object cannot be done directly; `Container` objects can only be retrieved from `Storage::OpenContainer`.
-
-Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
-- A callback in the form `void(boost::expected<T, std::error_code>)`; return type is void
-- A boost::asio::yield_context object; return type is `boost::expected<T, std::error_code>`.
-- A maidsafe::nfs::use_future; return type is `maidsafe::nfs::Future<boost::expected<T, std::error_code>>`.
-
-```c++
-class Container {
-  unspecified GetVersions(AsyncResult<std::vector<ContainerVersion>>);
-
-  unspecified GetContainers(
-      RetrieveContainerVersion, AsyncResult<std::vector<std::string>>);
-
-  unspecified GetBlobs(
-      RetreieveContainerVersion,
-      AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>);
-
-  unspecified OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>);
+  // Blob Operations
+  unspecified GetBlobs(RetrieveContainerVersion, AsyncResult<std::vector<Blob>>);
+  
+  LocalBlob CreateLocalBlob() const;
+  LocalBlob OpenBlob(const Blob& blob);
   unspecified OpenBlob(std::string, ModifyBlobVersion, AsyncResult<LocalBlob>);
 
-  unspecified DeleteContainer(std::string, RetrieveContainerVersion, AsyncResult<>);
-  unspecified DeleteBlob(std:string, ModifyBlobVersion, AsyncResult<>);
-
-  unspecified Copy(
-      const LocalBlob& from, std::string to, ModifyVersion, AsyncResult<LocalBlob>);
+  unspecified Write(
+      const LocalBlob& from, std::string to, ModifyBlobVersion, AsyncResult<Blob>);
+      
+  unspecified DeleteBlob(std:string, ModifyBlobVersion, AsyncResult<ContainerVersion>);
 };
 ```
 > A key can only store a Blob or a nested Container at a given point in time.
