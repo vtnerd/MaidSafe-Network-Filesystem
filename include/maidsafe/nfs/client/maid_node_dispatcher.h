@@ -76,9 +76,9 @@ class MaidNodeDispatcher {
                                         const StructuredDataVersions::VersionName& branch_tip);
 
   void SendCreateAccountRequest(routing::TaskId task_id,
-                                const nfs_vault::AccountCreation& account_creation);
+                                const nfs_vault::MaidAccountCreation& account_creation);
 
-  void SendRemoveAccountRequest(const nfs_vault::AccountRemoval& account_removal);
+  void SendRemoveAccountRequest(const nfs_vault::MaidAccountRemoval& account_removal);
 
  private:
   MaidNodeDispatcher();
@@ -100,22 +100,6 @@ class MaidNodeDispatcher {
 };
 
 // ==================== Implementation =============================================================
-template <typename DataName>
-void MaidNodeDispatcher::SendGetRequest(routing::TaskId task_id, const DataName& data_name) {
-  typedef nfs::GetRequestFromMaidNodeToDataManager NfsMessage;
-  CheckSourcePersonaType<NfsMessage>();
-  typedef routing::Message<NfsMessage::Sender, NfsMessage::Receiver> RoutingMessage;
-  static const routing::Cacheable kCacheable(is_cacheable<typename DataName::data_type>::value ?
-      routing::Cacheable::kGet : routing::Cacheable::kNone);
-  LOG(kVerbose) << "MaidNodeDispatcher::SendGetRequest for task_id " << task_id
-                << ", data name: " << HexSubstr(data_name->string());
-  nfs::MessageId message_id(task_id);
-  NfsMessage::Contents content(data_name);
-  NfsMessage nfs_message(message_id, content);
-  NfsMessage::Receiver receiver(routing::GroupId(NodeId(data_name->string())));
-  RoutingMessage routing_message(nfs_message.Serialise(), kThisNodeAsSender_, receiver, kCacheable);
-  RoutingSend(routing_message);
-}
 
 template <typename Data>
 void MaidNodeDispatcher::SendPutRequest(routing::TaskId task_id, const Data& data) {

@@ -50,7 +50,7 @@ class DataGetter {
   typedef boost::future<std::vector<StructuredDataVersions::VersionName>> VersionNamesFuture;
 
   // all_pmids_from_file should only be non-empty if TESTING is defined
-  DataGetter(AsioService& asio_service, routing::Routing& routing);
+  DataGetter(BoostAsioService& asio_service, routing::Routing& routing);
 
   // This call only cancels the rpc timers. As routing object is not owned by data getter,
   // it doesn't stop routing.
@@ -102,7 +102,7 @@ template <typename DataName>
 boost::future<typename DataName::data_type> DataGetter::Get(
     const DataName& data_name,
     const std::chrono::steady_clock::duration& timeout) {
-  LOG(kVerbose) << "MaidNodeNfs Get " << HexSubstr(data_name.value);
+  LOG(kVerbose) << "MaidClient Get " << HexSubstr(data_name.value);
   auto promise(std::make_shared<boost::promise<typename DataName::data_type>>());
   get_handler_.Get(data_name, promise, timeout);
   return promise->get_future();

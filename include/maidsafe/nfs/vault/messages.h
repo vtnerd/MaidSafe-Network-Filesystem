@@ -28,15 +28,27 @@
 #include "maidsafe/common/types.h"
 #include "maidsafe/common/data_types/data_type_values.h"
 #include "maidsafe/common/data_types/structured_data_versions.h"
+#include "maidsafe/common/bounded_string.h"
 
-#include "maidsafe/nfs/vault/account_creation.h"
-#include "maidsafe/nfs/vault/account_removal.h"
+#include "maidsafe/passport/types.h"
+
+#include "maidsafe/nfs/vault/maid_account_creation.h"
+#include "maidsafe/nfs/vault/maid_account_removal.h"
+#include "maidsafe/nfs/vault/mpid_account_creation.h"
+#include "maidsafe/nfs/vault/mpid_account_removal.h"
 #include "maidsafe/nfs/vault/pmid_registration.h"
 
 
 namespace maidsafe {
 
 namespace nfs_vault {
+
+const unsigned int kMaxHeaderSize = 128;
+const unsigned int kMaxBodySize = 1024 * 1024;
+const unsigned int kIdSize = 64;
+using  MessageIdType = detail::BoundedString<kIdSize, kIdSize>;
+using  MessageHeaderType = detail::BoundedString<0, kMaxHeaderSize>;
+using  MessageBodyType = detail::BoundedString<0, kMaxBodySize>;
 
 // ========================== Empty ================================================================
 
@@ -373,6 +385,67 @@ struct PmidHealth {
 
 bool operator==(const PmidHealth& lhs, const PmidHealth& rhs);
 void swap(PmidHealth& lhs, PmidHealth& rhs) MAIDSAFE_NOEXCEPT;
+
+// ================================= MpidMessageBase =============================================
+
+struct MpidMessageBase {
+  MpidMessageBase();
+  MpidMessageBase(const passport::PublicMpid::Name& sender_in,
+                  const passport::PublicMpid::Name& receiver_in, int32_t id_in,
+                  int32_t parent_id_in, const MessageHeaderType& signed_header_in);
+  explicit MpidMessageBase(const std::string& serialised_copy);
+  MpidMessageBase(const MpidMessageBase& other);
+  MpidMessageBase(MpidMessageBase&& other);
+  MpidMessageBase& operator=(MpidMessageBase other);
+
+  std::string Serialise() const;
+
+  passport::PublicMpid::Name sender, receiver;
+  int32_t id, parent_id;
+  MessageHeaderType signed_header;
+};
+
+bool operator==(const MpidMessageBase& lhs, const MpidMessageBase& rhs);
+void swap(MpidMessageBase& lhs, MpidMessageBase& rhs) MAIDSAFE_NOEXCEPT;
+
+// ================================= MpidMessageAlert =============================================
+
+struct MpidMessageAlert {
+  MpidMessageAlert();
+  MpidMessageAlert(const MpidMessageBase& base_in,
+                   const MessageIdType& message_id_in);
+  explicit MpidMessageAlert(const std::string& serialised_copy);
+  MpidMessageAlert(const MpidMessageAlert& other);
+  MpidMessageAlert(MpidMessageAlert&& other);
+  MpidMessageAlert& operator=(MpidMessageAlert other);
+
+  std::string Serialise() const;
+
+  MpidMessageBase base;
+  MessageIdType message_id;
+};
+
+bool operator==(const MpidMessageAlert& lhs, const MpidMessageAlert& rhs);
+void swap(MpidMessageAlert& lhs, MpidMessageAlert& rhs) MAIDSAFE_NOEXCEPT;
+
+// ================================= MpidMessage ==================================================
+
+struct MpidMessage {
+  MpidMessage();
+  MpidMessage(const MpidMessageBase& base_in, const MessageBodyType& signed_body_in);
+  explicit MpidMessage(const std::string& serialised_copy);
+  MpidMessage(const MpidMessage& other);
+  MpidMessage(MpidMessage&& other);
+  MpidMessage& operator=(MpidMessage other);
+
+  std::string Serialise() const;
+
+  MpidMessageBase base;
+  MessageBodyType signed_body;
+};
+
+bool operator==(const MpidMessage& lhs, const MpidMessage& rhs);
+void swap(MpidMessage& lhs, MpidMessage& rhs) MAIDSAFE_NOEXCEPT;
 
 }  // namespace nfs_vault
 

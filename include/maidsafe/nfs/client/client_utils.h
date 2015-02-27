@@ -48,6 +48,11 @@ struct HandleGetResult {
 void HandlePutResponseResult(const ReturnCode& result,
                              std::shared_ptr<boost::promise<void>> promise);
 
+void HandleSendMessageResponseResult(const ReturnCode& result,
+                                     std::shared_ptr<boost::promise<void>> promise);
+void HandleGetMessageResponseResult(const MpidMessageOrReturnCode& result,
+        std::shared_ptr<boost::promise<nfs_vault::MpidMessage>> promise);
+
 void HandleGetVersionsOrBranchResult(
     const StructuredDataNameAndContentOrReturnCode& result,
     std::shared_ptr<boost::promise<std::vector<StructuredDataVersions::VersionName>>> promise);
@@ -84,7 +89,7 @@ void HandleGetResult<Data>::operator()(const DataNameAndContentOrReturnCode& res
     } else if (result.return_code) {
       LOG(kWarning) << "HandleGetResult don't have a result but having a return code "
                     << result.return_code->value.what();
-      boost::throw_exception(result.return_code->value);
+      BOOST_THROW_EXCEPTION(result.return_code->value);
     } else {
       LOG(kError) << "HandleGetResult result uninitialised";
       BOOST_THROW_EXCEPTION(MakeError(CommonErrors::uninitialised));
