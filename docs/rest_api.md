@@ -10,12 +10,6 @@ Data on the SAFE network is stored in Blobs. A Blob can contain text or binary d
 ### Container ###
 A Container stores Blobs at keys that have no restrictions (any sequence of bytes are valid). Each key is versioned, so past Blobs can be retrieved (which gives the appearance of mutability since a new `Blob`s can be stored at an existing key).
 
-### Storage ###
-Storage has 0 more Containers. The Storage can be public, private, or privately-shared.
-
-### StorageID ###
-A StorageID identifies a particular Storage instance on the SAFE network, and contains the necessary information to decrypt the contents.
-
 ## Behavior Overview ##
 Every REST API function call that requires a network operation returns a [`Future<T>`](#futuret) object. This prevents the interface from blocking, and provides an interface for signalling completion. Every `Future<T>` object in the REST API returns an [expected](#expected) object, which either holds the result of the operation or a network related error. An expected object allows for exception-style programming, return-code style programming, or monadic style programming. When an expected object contains a successful operation, it will have the result of the operation and version information. When an expected object contains a failed operation, it will contain an error code and a retry mechanism that returns a `Future<T>` with the same type as the original `Future<T>`.
 
@@ -160,35 +154,26 @@ This examples uses the `->` operator on the `boost::expected` object instead of 
 ## REST Style API ##
 All public functions listed in this API provide the strong exception guarantee. All public const methods are thread-safe.
 
-### StorageID ###
-> maidsafe/nfs/storage_id.h
-
-- [ ] Thread-safe Public Functions
-- [x] Copyable
-- [x] Movable
-
-Represents the [`StorageID`](#storageid) abstraction listed above. Obtaining relevant `StorageID` objects are out of the scope of this document.
-
-```c++
-class StorageID { /* No Public Elements */ };
-```
-
-### BlobVersion ###
+### maidsafe::nfs::BlobVersion ###
 > maidsafe/nfs/blob_version.h
 
 - [ ] Thread-safe Public Functions
 - [x] Copyable
 - [x] Movable
 
-Blobs stored at the same key are differentiated/identified by a `BlobVersion` object. The `BlobVersion` allows REST API users to retrieve older revisions of Blobs, or place constraints on operations that change the blob associated with a key.
+Blobs stored at the same key are differentiated/identified by a `BlobVersion` object. The `BlobVersion` allows Posix API users to retrieve older revisions of Blobs, or place constraints on operations that change the blob associated with a key.
 
 ```c++
 class BlobVersion {
-  static BlobVersion Defunct();
+  bool Equal(const BlobVersion&) const noexcept;
 };
+
+bool operator==(const BlobVersion&, const BlobVersion&) noexcept;
+bool operator!=(const BlobVersion&, const BlobVersion&) noexcept;
 ```
-- **Defunct()**
-  - Returns a `BlobVersion` that is used to indicate a deleted Blob. This is never returned by a [`BlobOperation`](#bloboperation), and is only used when retrieving the history of the Blobs stored at a key.
+- **Equal(const BlobVersion&)**
+  - Return true if *this BlobVersion is equivalent to the BlobVersion given in the parameter.
+- The non-member operator overloads call the Equal function.
 
 ### ContainerVersion ###
 > maidsafe/nfs/container_version.h
@@ -197,54 +182,88 @@ class BlobVersion {
 - [x] Copyable
 - [x] Movable
 
-Containers are also versioned, but none of the REST API functions accept a ContainerVersion. This class is mentioned/returned by `Container` operations for users that wish to use the [Posix API](posix_api.md) in some situations.
+Each time a Blob is stored, or a container pointer is modified, a new version of the parent Container is created. The ContainerVersion object allows users of the Posix API to reference specific versions of the Container.
 
 ```c++
-class ContainerVersion { /* No Public Elements */ };
+class ContainerVersion {};
 ```
 
-### ModifyBlobVersion ###
+### maidsafe::nfs::ModifyBlobVersion ###
 > maidsafe/nfs/modfy_blob_version.h
 
 - [ ] Thread-safe Public Functions
 - [x] Copyable
 - [x] Movable
 
-Operations in [`Container`](#container-1) that change the Blob stored at a key require a ModifyBlobVersion object.
+Operations on [`PosixContainer`](#maidsafenfsposixcontainer) that change the Blob stored at a key require a ModifyBlobVersion object.
 
 ```c++
 class ModifyBlobVersion {
   static ModifyBlobVersion Create();
   static ModifyBlobVersion Latest();
   ModifyBlobVersion(BlobVersion);
+  
+  bool Equal(const ModifyBlobVersion&) const noexcept;
+  bool Equal(const BlobVersion&) const noexcept;
 };
+
+bool operator==(const ModifyBlobVersion&, const ModifyBlobVersion&) noexcept;
+bool operator!=(const ModifyBlobVersion&, const ModifyBlobVersion&) noexcept;
+
+bool operator==(const ModifyBlobVersion&, const BlobVersion&) noexcept;
+bool operator!=(const ModifyBlobVersion&, const BlobVersion&) noexcept;
+
+bool operator!=(const BlobVersion&, const ModifyBlobVersion&) noexcept;
+bool operator==(const BlobVersion&, const ModifyBlobVersion&) noexcept;
 ```
 - **Create()**
-  - Returns an object that indicates the REST API should only succeed if the specified key is unused.
+  - Returns an object that indicates the Posix API should only succeed if the specified key is unused.
 - **Latest()**
-  - Returns an object that indicates the REST API should overwrite any existing Blob at the specified key.
+  - Returns an object that indicates the Posix API should overwrite any existing Blob at the specified key.
 - **ModifyBlobVersion(BlobVersion)**
-  - Creates an object that indicates the REST API should only overwrite the Blob at the specified key if it matches the BlobVersion.
+  - Creates an object that indicates the Posix API should only overwrite the Blob at the specified key if it matches the BlobVersion.
+- **Equal(const ModifyBlobVersion&)**
+  - Return true if *this ModifyBlobVersion is equivalent to the one given in the parameter.
+- **Equal(const BlobVersion&)**
+  - Return true if *this ModifyBlobVersion was constructed with an equivalent BlobVersion given in the parameter.
+- The non-member operator overloads call the corresponding Equal functions.
 
-### RetrieveBlobVersion ###
+### maidsafe::nfs::RetrieveBlobVersion ###
 > maidsafe/nfs/retrieve_blob_version.h
 
 - [ ] Thread-safe Public Functions
 - [x] Copyable
 - [x] Movable
 
-Operations in [`Container`](#container-1) that retrieve a Blob stored at a key require a RetrieveBlobVersion object.
+Operations on [`PosixContainer`](#maidsafenfsposixcontainer) that retrieve a Blob stored at a key require a RetrieveBlobVersion object.
 
 ```c++
 class RetrieveBlobVersion {
   static RetrieveBlobVersion Latest();
   RetrieveBlobVersion(BlobVersion);
+  
+  bool Equal(const RetrieveBlobVersion&) const noexcept;
+  bool Equal(const BlobVersion&) const noexcept;
 };
+
+bool operator==(const RetrieveBlobVersion&, const RetrieveBlobVersion&) noexcept;
+bool operator!=(const RetrieveBlobVersion&, const RetrieveBlobVersion&) noexcept;
+
+bool operator==(const RetrieveBlobVersion&, const BlobVersion&) noexcept;
+bool operator!=(const RetrieveBlobVersion&, const BlobVersion&) noexcept;
+
+bool operator!=(const BlobVersion&, const RetrieveBlobVersion&) noexcept;
+bool operator==(const BlobVersion&, const RetrieveBlobVersion&) noexcept;
 ```
 - **Latest()**
-  - Returns an object that indicates the REST API should retrieve the latest Blob stored at the specified key.
+  - Returns an object that indicates the Posix API should retrieve the latest Blob stored at the specified key.
 - **RetrieveBlobVersion(BlobVersion)**
-  - Creates an object that indicates the REST API needs to retrieve a specific Blob version stored at the specified key.
+  - Creates an object that indicates the Posix API needs to retrieve a specific Blob version stored at the specified key.
+- **Equal(const RetrieveBlobVersion&)**
+  - Return true if *this RetrieveBlobVersion is equivalent to the one given in the parameter.
+- **Equal(const BlobVersion&)**
+  - Return true if *this RetrieveBlobVersion was constructed with an equivalent BlobVersion given in the parameter.
+- The non-member operator overloads call the corresponding Equal functions.
 
 ### ContainerOperation<T> ###
 > maidsafe/nfs/container_operation.h
@@ -379,36 +398,6 @@ boost::expected<ContainerOperation<T>, std::error_code> monadic(
     ExpectedContainerOperation<T>&& expected);
 ```
 
-### Storage ###
-> maidsafe/nfs/storage.h
-
-- [x] Thread-safe Public Functions
-- [x] Copyable
-- [x] Movable
-
-> This object has a single `shared_ptr`, and is shallow-copied. This makes it extremely quick to copy.
-
-Represents the [`Storage`](#storage) abstraction listed above. Constructing a `Storage` object requires a `StorageID` object.
-
-```c++
-class Storage {
-  explicit Storage(StorageID);
-
-  Future<ExpectedContainerOperation<std::vector<std::string>>> GetContainers();
-
-  Future<ExpectedContainerOperation<Container>> OpenContainer(std::string);
-  Future<ExpectedContainerOperation<>>          DeleteContainer(std::string);
-};
-```
-- **Storage(const StorageID)**
-  - Creates a Storage object. The `StorageID` provides the keys necessary for decrypting the data.
-- **GetContainers()**
-  - Retrieves the names of containers currently in Storage.
-- **OpenContainer(std::string)**
-  - Retrieves a `Container` with the specified name. The Container is created as necessary.
-- **DeleteContainer(std::string)**
-  - Deletes a container with the specified name.
-
 ### Container ###
 > maidsafe/nfs/container.h
 
@@ -422,24 +411,26 @@ Represents the [`Container`](#container) abstraction listed above. Constructing 
 
 ```c++
 class Container {
-  Future<ExpectedContainerOperation<std::vector<std::pair<std::string, BlobVersion>>>> GetBlobs();
+  Future<ExpectedContainerOperation<std::vector<Blob>>> GetBlobs();
 
-  Future<ExpectedContainerOperation<std::vector<BlobVersion>>> GetBlobVersions(std::string key);
-
-  Future<ExpectedBlobOperation<>>            PutMetadata(
+  Future<ExpectedBlobOperation<Blob>>        PutMetadata(
       std::string key, std::string, ModifyBlobVersion);
   Future<ExpectedBlobOperation<std::string>> GetMetadata(std::string key, RetrieveBlobVersion);
 
-  Future<ExpectedBlobOperation<>>            Put(std::string key, std::string, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<Blob>>        Put(std::string key, std::string, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<std::string>> Get(Blob);
   Future<ExpectedBlobOperation<std::string>> Get(std::string key, RetrieveBlobVersion);
   Future<ExpectedBlobOperation<>>            Delete(std::string key, RetrieveBlobVersion);
 
-  Future<ExpectedBlobOperation<>>            ModifyRange(
-      std::string key, std::string, std::uint64_t offset, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<Blob>>        ModifyRange(
+      std::string key, ModifyBlobVersion, std::string, std::uint64_t offset);
   Future<ExpectedBlobOperation<std::string>> GetRange(
-      std::string key, std::size_t length, std::uint64_t offset, RetrieveBlobVersion);
+      Blob, std::size_t length, std::uint64_t offset);
+  Future<ExpectedBlobOperation<std::string>> GetRange(
+      std::string key, RetrieveBlobVersion, std::size_t length, std::uint64_t offset);
 
-  Future<ExpectedBlobOperation<>> Copy(
+  Future<ExpectedBlobOperation<Blob>> Copy(Blob from, std::string to, ModifyBlobVersion);
+  Future<ExpectedBlobOperation<Blob>> Copy(
       std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
 };
 ```
