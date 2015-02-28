@@ -185,7 +185,7 @@ class ContainerVersion {};
 - [x] Copyable
 - [x] Movable
 
-Operations in [`Container`](#container-1) that change the Blob stored at a key require a ModifyBlobVersion object.
+Operations on [`PosixContainer`](#posixcontainer) that change the Blob stored at a key require a ModifyBlobVersion object.
 
 ```c++
 class ModifyBlobVersion {
@@ -225,7 +225,7 @@ bool operator==(const BlobVersion&, const ModifyBlobVersion&) noexcept;
 - [x] Copyable
 - [x] Movable
 
-Operations in [`Container`](#container-1) that retrieve a Blob stored at a key require a RetrieveBlobVersion object.
+Operations on [`PosixContainer`](#posixcontainer) that retrieve a Blob stored at a key require a RetrieveBlobVersion object.
 
 ```c++
 class RetrieveBlobVersion {
@@ -262,7 +262,7 @@ bool operator==(const BlobVersion&, const RetrieveBlobVersion&) noexcept;
 - [x] Copyable
 - [x] Movable
 
-Operations in [`Container`](#container-1) or [`Storage`](#storage-1) that change the Container stored at a key require a ModifyContainerVersion object.
+Operations on [`PosixContainer`](#posixcontainer) that change the Container stored at a key require a ModifyContainerVersion object.
 
 ```c++
 class ModifyContainerVersion {
@@ -302,7 +302,7 @@ bool operator==(const ContainerVersion&, const ModifyContainerVersion&) noexcept
 - [x] Copyable
 - [x] Movable
 
-Operations in [`Container`](#container-1) or [`Storage`](#storage-1) that retrieve a Container stored at a key require a RetrieveContainerVersion object.
+Operations on [`PosixContainer`](#posixcontainer) that retrieve a Container stored at a key require a RetrieveContainerVersion object.
 
 ```c++
 class RetrieveContainerVersion {
@@ -331,6 +331,36 @@ bool operator==(const ContainerVersion&, const RetrieveContainerVersion&) noexce
 - **Equal(const ContainerVersion&)**
   - Return true if *this RetrieveContainerVersion was constructed with an equivalent BlobVersion given in the parameter.
 - The non-member operator overloads call the corresponding Equal functions.
+
+### Blob ###
+> maidsafe/nfs/blob.h
+
+Represents a single stored Blob on the network. Can be given to any valid [`PosixContainer`](#posixcontainer) so that the contents can be read - this object stores pointers to the data on the network for quicker access.
+
+> The network currently has no time server of its own, so the timestamps are from the clients. If a client has a misconfigured clock, the timestamps stored will also be incorrect.
+
+```c++
+class Blob {
+    const BlobVersion& version() const noexcept;
+    const std::string& key() const noexcept;
+    Clock::time_point creation_time() const noexcept;
+    Clock::time_point modification_time() const noexcept;
+    std::uint64_t size() const noexcept;
+    const std::string& user_meta_data() const noexcept;
+};
+```
+- **version()**
+  - Returns the version that uniquely references this `Blob`.
+- **key()**
+  - Returns the key associated with this `Blob`.
+- **creation_time()**
+  - Returns the timestamp of when `key()` last went from storing nothing to storing a `Blob`.
+- **modification_time()**
+  - Returns the timestamp of when this `Blob` instance was stored.
+- **size()**
+  - Returns the size of this `Blob` in bytes.
+- **user_meta_data()**
+  - Returns the user metadata being stored for this `Blob`.
 
 ### maidsafe::nfs::Future<T> ###
 > maidsafe/nfs/future.h
@@ -371,10 +401,10 @@ class PosixContainer {
   // Child Container Operations
   unspecified GetContainers(
       RetrieveContainerVersion, AsyncResult<std::vector<ContainerInfo>>);
-  
+
   unspecified OpenContainer(ContainerInfo, AsyncResult<Container>);    
   unspecified OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>);
-  
+
   unspecified DeleteContainer(
       std::string, RetrieveContainerVersion, AsyncResult<ContainerVersion>);
 
@@ -394,28 +424,46 @@ class PosixContainer {
 ```
 > A key can only store a Blob or a nested Container at a given point in time.
 
+> The network only stores the last 100 versions of a Container. This theoretically makes it possible for a the history of the Blob to be completely "erased" if other entries in the container are rapidly changing. Storing the original `Blob` object until a Write has completed is recommended (or for as long as possible) - a `Blob` object stores the network addresses of the data and can always be opened later. `BlobVersion` takes up less memory (64-bytes - a SHA512 hash), and can fetch a blob at anytime (provided the history hasn't aged out).
+
 - **GetVersions(AsyncResult<std::vector<ContainerVersion>>)**
-  - Request the version history of Container.
-  - AsyncResult is given the version history of Container. A new version is created each time a Container is created or deleted. Oldest `ContainerVersion` is always `ContainerVersion::Defunct()`, and is used subsequently when the key had no associated Container for some period of time. `std::vector::begin()` will be the newest `ContainerVersion`, and `std::vector::end() - 1` will have the oldest `ContainerVersion` (which is always `ContainerVersion::Defunct()`).
-- **GetContainers(RetrieveContainerVersion, AsyncResult<std::vector<std::string>>)**
-  - Request the list of nested Containers.
-  - AsyncResult is given the list of nested containers.
-- **GetBlobs(RetreieveContainerVersion, AsyncResult<std::vector<std::pair<std::string, BlobVersion>>>)**
-  - Request the list of Blobs.
-  - AsyncResult Retrieves the names of Blobs in the Container. The BlobVersion is provided for each Blob.
-- **OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>)**
+  - Request the version history of this Container.
+  - The network stores only the last 100 versions.
+  - AsyncResult is given the version history of this Container, where front() is the newest version, and back() is the oldest known version. A Container will always have at least one version.
+- **GetContainers(RetrieveContainerVersion, AsyncResult<std::vector<ContainerInfo>>)**
+  - Request the list of nested (child) Containers.
+  - AsyncResult is given handles that represent the child containers. The ordering in the vector is unspecified.
+- **OpenContainer(std::string, ModifyContainerVersion, AsyncResult<PosixContainer>)**
   - Make a request to open a container at the specified key.
-  - AsyncResult is given the nested `Container` with the specified name.
-- **OpenBlob(std::string, ModifyBlobVersion, AsyncResult<LocalBlob>)**
-  - Make a request to open a Blob at the specified key.
-  - AsyncResult is given a `LocalBlob` that represents the Blob at the specified key.
-- **DeleteContainer(std::string, RetrieveContainerVersion, AsyncResult<>)**
+  - AsyncResult is given the nested Container with the specified name.
+  - Faster than the overload that takes a `std::string, ContainerVersion` because the network addresses are stored in the ContainerInfo object.
+- **OpenContainer(std::string, ModifyContainerVersion, AsyncResult<PosixContainer>)**
+  - Make a request to open a container at the specified key.
+  - AsyncResult is given the nested Container with the specified name.
+  - Slower than the overload that takes a ContainerInfo object, since that object has to be found first.
+- **DeleteContainer(std::string, RetrieveContainerVersion, AsyncResult<ContainerVersion>)**
   - Make a request to delete the Container at the specified key.
-- **DeleteBlob(std:string, ModifyBlobVersion, AsyncResult<>)**
+  - Fails if a BLob is stored at the key.
+  - AsyncResult is given the new version stored with an empty key.
+- **GetBlobs(RetreieveContainerVersion, AsyncResult<std::vector<Blob>>)**
+  - Request the list of Blobs.
+  - AsyncResult is given handles to the Blob objects that can be used to read the contents. The ordering in the vector is unspecified.
+- **CreateLocalBlob()**
+  - A LocalBlob is returned with `size() == 0` and `user_meta_data().empty()`.
+- **OpenBlob(const Blob&)**
+  - Immediately returns a LocalBlob whose initial contents are identical to Blob.
+- **OpenBlob(std::string, RetrieveBlobVersion, AsyncResult<LocalBlob>)**
+  - Make a request to open a Blob at the specified key.
+  - AsyncResult is given a `LocalBlob` that has the data and user meta data at the specified key.
+  - Slower than the overload that takes a Blob object, since that object has to be found first.
+- **Write(LocalBlob& from, std::string to, ModifyVersion, AsyncResult<Blob>)**
+  - Make a request to write the data and user meta data of the `LocalBlob` to the specified key.
+  - Do not invoke if Read, Write, or Truncate calls have not completed on the `LocalBlob`.
+  - AsyncResult is given a handle to the `Blob` that was stored on the network.
+- **DeleteBlob(std:string, ModifyBlobVersion, AsyncResult<ContainerVersion>)**
   - Make a request to delete the Blob at the specified key.
-- **Copy(const LocalBlob& from, std::string to, ModifyVersion, AsyncResult<LocalBlob>)**
-  - Make a request to copy the contents of the `LocalBlob` to the specified key.
-  - AsyncResult is given the new `LocalBlob` associated with the destination of the copy.
+  - Fails if a Container is stored at the key.
+  - AsyncResult is given the new version stored with an empty key.
 
 ### maidsafe::nfs::LocalBlob ###
 > maidsafe/nfs/local_blob.h
@@ -446,48 +494,19 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 
 ```C++
 class LocalBlob {
- public:
-  typedef detail::MetaData::TimePoint TimePoint;
-
-  const std::string& key() const; // key associated with Blob
+  const std::string& user_metadata() const noexcept;
+  Expected<void> set_user_metadata(std::string);
+  
   std::uint64_t size() const;
-  TimePoint creation_time() const;
-  TimePoint head_write_time() const; // write time of this revision
-
-  const std::string& user_metadata() const;
-  void set_user_metadata(std::string);
-
-  // Version at open
-  const BlobVersion& head_version() const;
-
-  unspecified GetVersions(AsyncResult<std::vector<BlobVersion>>);
-
   std::uint64_t offset() const;
   void set_offset(std::uint64_t);
 
   unspecified Read(boost::asio::buffer, AsyncResult<std::uint64_t>);
   unspecified Write(boost::asio::buffer, AsyncResult<>);
-  void Truncate(std::uint64_t);
-
-  unspecified commit(AsyncResult<BlobVersion>);
+  void Truncate(std::uint64_t, AsyncResult<>);
 };
 ```
-> The network currently has no time server of its own, so the timestamps are from the clients. If a client has a misconfigured clock, the timestamps stored will also be incorrect.
 
-- **key()**
-  - Returns the key associated with the Blob
-- **size()**
-  - Returns the size of the `LocalBlob` in bytes. This is *not* necessarily the size of any `Blob` stored on the network.
-- **creation_time()**
-  - Returns the timestamp of when `key()` last went from storing nothing to storing a Blob.
-- **head_write_time()**
-  - Returns the timestamp of when the head_version() was stored.
-- **user_metadata()**
-  - Returns the user metadata being stored.
-- **set_user_metadata(std::string)**
-  - Sets the user metadata. Binary data is allowed.
-- **head_version()**
-  - Returns the version from when the `LocalBlob` was opened. This is **not** updated after a `Commit` succeeds.
 - **GetVersions(AsyncResult<std::vector<BlobVersion>>)**
   - Request the version history of the Blob.
   - AsyncResult is given the version history of `BlobVersion`s at the key. Oldest `BlobVersion` is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time. `std::vector::begin()` will be the newest `BlobVersion`, and `std::vector::end() - 1` will have the oldest BlobVersion (which is always `BlobVersion::Defunct()`).
