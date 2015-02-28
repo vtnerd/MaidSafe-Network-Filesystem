@@ -496,7 +496,7 @@ class LocalBlob {
 ```
 - **user_meta_data()**
   - Return the current user meta data associated with the LocalBlob.
-- ** set_user_meta_data(std::string)**
+- **set_user_meta_data(std::string)**
   - Update the `user_meta_data()`. Size must be less than 64KB (CommonErrors::cannot_exceed_limit is returned in expected if this is not held).
 - **offset()**
   - Returns the offset that will be used by the next Read, Write, or Truncate call.
