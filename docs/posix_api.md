@@ -471,7 +471,7 @@ class PosixContainer {
 - [ ] Copyable
 - [x] Movable
 
-Upon initial creation, `LocalBlob` inherits the data and user meta data fro the Blob that was used to open it. If LocalBlob was created without a Blob object (`PosixContainer::CreateLocalBlob()`), then the data and user meta data are completely empty. The `offset()` is always initially set to zero.
+Upon initial creation, `LocalBlob` inherits the data and user meta data from the Blob that was used to open it. If LocalBlob was created without a Blob object (`PosixContainer::CreateLocalBlob()`), then the data and user meta data are completely empty. The `offset()` is always initially set to zero.
 
 Only a single `Read`, `Write`, or `Truncate` operation can take place at a given time. The `AsyncResult<T>` must be signalled before _any_ of these three functions can be invoked. A LocalBlob is stored by calling `PosixContainer::Write`, which can be invoked on any `PosixContainer` object, even if the LocalBlob was not opened on that PosixContainer.
 
@@ -495,7 +495,7 @@ class LocalBlob {
 };
 ```
 - **user_meta_data()**
-  - ere
+  - Return the current user meta data associated with the LocalBlob.
 - ** set_user_meta_data(std::string)**
   - Update the `user_meta_data()`. Size must be less than 64KB (CommonErrors::cannot_exceed_limit is returned in expected if this is not held).
 - **offset()**
