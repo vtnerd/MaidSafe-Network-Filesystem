@@ -144,7 +144,7 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
 ## Posix Style API ##
 All public functions in this API provide the strong exception guarantee. All public const methods are thread-safe.
 
-### BlobVersion ###
+### maidsafe::nfs::BlobVersion ###
 > maidsafe/nfs/blob_version.h
 
 - [ ] Thread-safe Public Functions
@@ -178,14 +178,14 @@ Each time a Blob is stored, or a container pointer is modified, a new version of
 class ContainerVersion {};
 ```
 
-### ModifyBlobVersion ###
+### maidsafe::nfs::ModifyBlobVersion ###
 > maidsafe/nfs/modfy_blob_version.h
 
 - [ ] Thread-safe Public Functions
 - [x] Copyable
 - [x] Movable
 
-Operations on [`PosixContainer`](#posixcontainer) that change the Blob stored at a key require a ModifyBlobVersion object.
+Operations on [`PosixContainer`](#maidsafenfsposixcontainer) that change the Blob stored at a key require a ModifyBlobVersion object.
 
 ```c++
 class ModifyBlobVersion {
@@ -218,14 +218,14 @@ bool operator==(const BlobVersion&, const ModifyBlobVersion&) noexcept;
   - Return true if *this ModifyBlobVersion was constructed with an equivalent BlobVersion given in the parameter.
 - The non-member operator overloads call the corresponding Equal functions.
 
-### RetrieveBlobVersion ###
+### maidsafe::nfs::RetrieveBlobVersion ###
 > maidsafe/nfs/retrieve_blob_version.h
 
 - [ ] Thread-safe Public Functions
 - [x] Copyable
 - [x] Movable
 
-Operations on [`PosixContainer`](#posixcontainer) that retrieve a Blob stored at a key require a RetrieveBlobVersion object.
+Operations on [`PosixContainer`](#maidsafenfsposixcontainer) that retrieve a Blob stored at a key require a RetrieveBlobVersion object.
 
 ```c++
 class RetrieveBlobVersion {
@@ -255,14 +255,14 @@ bool operator==(const BlobVersion&, const RetrieveBlobVersion&) noexcept;
   - Return true if *this RetrieveBlobVersion was constructed with an equivalent BlobVersion given in the parameter.
 - The non-member operator overloads call the corresponding Equal functions.
 
-### ModifyContainerVersion ###
+### maidsafe::nfs::ModifyContainerVersion ###
 > maidsafe/nfs/modfy_container_version.h
 
 - [ ] Thread-safe Public Functions
 - [x] Copyable
 - [x] Movable
 
-Operations on [`PosixContainer`](#posixcontainer) that change the Container stored at a key require a ModifyContainerVersion object.
+Operations on [`PosixContainer`](#maidsafenfsposixcontainer) that change the Container stored at a key require a ModifyContainerVersion object.
 
 ```c++
 class ModifyContainerVersion {
@@ -295,14 +295,14 @@ bool operator==(const ContainerVersion&, const ModifyContainerVersion&) noexcept
   - Return true if *this ModifyContainerVersion was constructed with an equivalent ContainerVersion given in the parameter.
 - The non-member operator overloads call the corresponding Equal functions.
 
-### RetrieveContainerVersion ###
+### maidsafe::nfs::RetrieveContainerVersion ###
 > maidsafe/nfs/retrieve_container_version.h
 
 - [ ] Thread-safe Public Functions
 - [x] Copyable
 - [x] Movable
 
-Operations on [`PosixContainer`](#posixcontainer) that retrieve a Container stored at a key require a RetrieveContainerVersion object.
+Operations on [`PosixContainer`](#maidsafenfsposixcontainer) that retrieve a Container stored at a key require a RetrieveContainerVersion object.
 
 ```c++
 class RetrieveContainerVersion {
@@ -332,10 +332,10 @@ bool operator==(const ContainerVersion&, const RetrieveContainerVersion&) noexce
   - Return true if *this RetrieveContainerVersion was constructed with an equivalent BlobVersion given in the parameter.
 - The non-member operator overloads call the corresponding Equal functions.
 
-### Blob ###
+### maidsafe::nfs::Blob ###
 > maidsafe/nfs/blob.h
 
-Represents a single stored Blob on the network. Can be given to any valid [`PosixContainer`](#posixcontainer) so that the contents can be read - this object stores pointers to the data on the network for quicker access.
+Represents a single stored Blob on the network. Can be given to any valid [`PosixContainer`](#maidsafenfsposixcontainer) so that the contents can be read - this object stores pointers to the data on the network for quicker access.
 
 > The network currently has no time server of its own, so the timestamps are from the clients. If a client has a misconfigured clock, the timestamps stored will also be incorrect.
 
