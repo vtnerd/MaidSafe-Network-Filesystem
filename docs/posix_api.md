@@ -471,20 +471,9 @@ class PosixContainer {
 - [ ] Copyable
 - [x] Movable
 
-Upon initial creation, `LocalBlob` represents a `Blob` stored at a key/version in the associated `Container` object. Write calls are reflected immediately in that object, but the `LocalBlob` becomes unversioned because it does not represent a `Blob` on the network. The current `LocalBlob` can be saved to the network with a call to a `LocalBlob::Commit`, and success of the async operation indicates that the `LocalBlob` now represents the new version returned.
+Upon initial creation, `LocalBlob` inherits the data and user meta data fro the Blob that was used to open it. If LocalBlob was created without a Blob object (`PosixContainer::CreateLocalBlob()`), then the data and user meta data are completely empty. The `offset()` is always initially set to zero.
 
-Function |  State After Throw   | State After Return                                 |State after Successful Async Operation
----------|----------------------|----------------------------------------------------|-------------------------------
-Read     | Valid and Unchanged. | Unchanged.                                         | Unchanged (buffer has requested contents from LocalBlob).
-Write    | Valid and Unchanged. | Unversioned. Buffer can be read from LocalBlob.    | Buffer has been copied, but not visible to remote `Blob`s.
-Truncate | Valid and Unchanged. | Unversioned. Truncation can be read from LocalBlob.| N/A
-Commit   | Valid and Unchanged. | Unchanged.                                         | Local changes are visible to remote `Blob`s. Version provided to AsyncResult is `ModifyBlobVersion::Latest()`.
-
-Since write operations are reflected immediately in the `LocalBlob` object, users do not have to wait for the previous operation to complete to make additional read or write calls. The `AsyncResult` object provided to `LocalBlob::Write` calls is notified when the data has been safely copied. Writes stored on the network are hidden from other clients until the async operation for `LocalBlob::Commit` succeeds.
-
-If a `LocalBlob` is unversioned, the async operation for `LocalBlob::Commit` will wait for all uncompleted `LocalBlob::Write` or `LocalBlob::Truncate` calls to complete, and then try to store the new Blob version. If `LocalBlob::Commit` signals failure to the `AsyncResult<>`, all subsequent calls to `LocalBlob::Commit` will continue to fail, however subsequent `LocalBlob::Write` or `LocalBlob::Truncate` operations can succeed. Changes to the `LocalBlob` object can always be be stored with `Container::Copy`, which will wait for any remaining write calls to complete, and then commit a new version.
-
-If multiple `LocalBlob` objects are opened within the same process, they are treated no differently than `LocalBlob` objects opened across different processes or even systems. Simultaneous reads can occur, and simultaneous writes will result in only one of the `LocalBlob` objects successfully writing to the network (the first to successfully call `LocalBlob::Commit`). All other `LocalBlob` objects become permanently unversioned.
+Only a single `Read`, `Write`, or `Truncate` operation can take place at a given time. The `AsyncResult<T>` must be signalled before _any_ of these three functions can be invoked. A LocalBlob is stored by calling `PosixContainer::Write`, which can be invoked on any `PosixContainer` object, even if the LocalBlob was not opened on that PosixContainer.
 
 Parameters labeled as `AsyncResult<T>` affect the return type of the function, and valid values are:
 - A callback in the form `void(boost::expected<T, std::error_code>)`; return type is void
@@ -493,41 +482,38 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 
 ```C++
 class LocalBlob {
-  const std::string& user_metadata() const noexcept;
-  Expected<void> set_user_metadata(std::string);
+  const std::string& user_meta_data() const noexcept;
+  Expected<void> set_user_meta_data(std::string);
   
   std::uint64_t size() const;
   std::uint64_t offset() const;
   void set_offset(std::uint64_t);
 
-  unspecified Read(boost::asio::buffer, AsyncResult<std::uint64_t>);
-  unspecified Write(boost::asio::buffer, AsyncResult<>);
+  unspecified Read(asio::buffer, AsyncResult<std::uint64_t>);
+  unspecified Write(asio::buffer, AsyncResult<>);
   void Truncate(std::uint64_t, AsyncResult<>);
 };
 ```
-
-- **GetVersions(AsyncResult<std::vector<BlobVersion>>)**
-  - Request the version history of the Blob.
-  - AsyncResult is given the version history of `BlobVersion`s at the key. Oldest `BlobVersion` is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time. `std::vector::begin()` will be the newest `BlobVersion`, and `std::vector::end() - 1` will have the oldest BlobVersion (which is always `BlobVersion::Defunct()`).
+- **user_meta_data()**
+  - ere
+- ** set_user_meta_data(std::string)**
+  - Update the `user_meta_data()`. Size must be less than 64KB (CommonErrors::cannot_exceed_limit is returned in expected if this is not held).
 - **offset()**
   - Returns the offset that will be used by the next Read, Write, or Truncate call.
+  - Cannot be invoked if a `Read`, `Write`, or `Truncate` call has not-yet completed.
 - **set_offset(std::uint64_t)**
   - Change the value returned by `offset()`.
-- **Read(boost::asio::buffer, AsyncResult<std::uint64_t>)**
+  - Cannot be invoked if a `Read`, `Write`, or `Truncate` call has not-yet completed.
+- **Read(asio::buffer, AsyncResult<std::uint64_t>)**
   - Read from the `LocalBlob` starting at `offset()` into the provided buffer. The buffer must remain valid until AsyncResult returns.
-  - `offset()` is immediately updated to `min(file_size() - offset(), offset() + buffer::size())`
+  - `offset()` is immediately updated to `min(size() - offset(), offset() + buffer::size())`
   - AsyncResult is given the number of bytes actually read.
-  - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
+  - Cannot be invoked if a `Read`, `Write`, or `Truncate` call has not-yet completed.
 - **Write(boost::asio::buffer, AsyncResult<>)**
   - Write to the `LocalBlob` starting at `offset()` from the provided buffer. The buffer must remain valid until AsyncResult returns.
   - `offset()` is immediately updated to `offset() + buffer::size()`
-  - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
-- **Truncate(std::uint64_t, AsyncResult<>)**
-  - Change the size of the `LocalBlob` to offset() + size bytes.
-  - `offset()` is immediately updated to `offset() + size`
-  - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
-- **Commit(AsyncResult<BlobVersion>)**
-  - Make a request to store the contents of the `LocalBlob` at `key()`
-  - Storing a  `LocalBlob` at `key()` will fail if another `LocalBlob` modified `key()` since `head_version()`.
-  - AsyncResult is given the `BlobVersion` of the new Blob stored on the network.
-  - Can be invoked before other calls to `Read`, `Write`, `Truncate`, or `Commit` complete.
+  - Cannot be invoked if a `Read`, `Write`, or `Truncate` call has not-yet completed.
+- **Truncate(std::uint64_t size, AsyncResult<>)**
+  - Change the size of the `LocalBlob` to `size` bytes.
+  - `offset()` is immediately updated to `size`
+  - Cannot be invoked if a `Read`, `Write`, or `Truncate` call has not-yet completed.
