@@ -335,11 +335,11 @@ bool operator==(const ContainerVersion&, const RetrieveContainerVersion&) noexce
 ### maidsafe::nfs::ContainerInfo ###
 > maidsafe/nfs/container_info.h
 
-- [ ] Thread-safe Public Functions
+- [x] Thread-safe Public Functions
 - [x] Copyable
 - [x] Movable
 
-References a Container stored on the network. Allows for quicker opening of child containers, than using `std::string, ContainerVersion` because the network locations are already known.
+References a Container stored on the network. Allows for quicker opening of child containers, than using `std::string, ContainerVersion` because the network locations are already known. Object is immutable.
 
 ```c++
 class ContainerInfo {
@@ -352,11 +352,11 @@ class ContainerInfo {
 ### maidsafe::nfs::Blob ###
 > maidsafe/nfs/blob.h
 
-- [ ] Thread-safe Public Functions
+- [x] Thread-safe Public Functions
 - [x] Copyable
 - [x] Movable
 
-Represents a single stored Blob on the network. Can be given to any valid [`PosixContainer`](#maidsafenfsposixcontainer) so that the contents can be read - this object stores pointers to the data on the network for quicker access.
+Represents a single stored Blob on the network. Can be given to any valid [`PosixContainer`](#maidsafenfsposixcontainer) so that the contents can be read - this object stores pointers to the data on the network for quicker access. Object is immutable.
 
 > The network currently has no time server of its own, so the timestamps are from the clients. If a client has a misconfigured clock, the timestamps stored will also be incorrect.
 
