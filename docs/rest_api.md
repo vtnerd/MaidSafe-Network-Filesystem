@@ -186,7 +186,7 @@ Each time a Blob is stored, or a container pointer is modified, a new version of
 
 ```c++
 class ContainerVersion {};
-```
+``` 
 
 ### maidsafe::nfs::ModifyBlobVersion ###
 > maidsafe/nfs/modfy_blob_version.h
@@ -264,6 +264,43 @@ bool operator==(const BlobVersion&, const RetrieveBlobVersion&) noexcept;
 - **Equal(const BlobVersion&)**
   - Return true if *this RetrieveBlobVersion was constructed with an equivalent BlobVersion given in the parameter.
 - The non-member operator overloads call the corresponding Equal functions.
+
+### maidsafe::nfs::Blob ###
+> maidsafe/nfs/blob.h
+
+- [x] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
+Represents a single stored Blob on the network. Can be given to any valid [`PosixContainer`](#maidsafenfsposixcontainer) so that the contents can be read - this object stores pointers to the data on the network for quicker access. Object is immutable.
+
+> The network currently has no time server of its own, so the timestamps are from the clients. If a client has a misconfigured clock, the timestamps stored will also be incorrect.
+
+```c++
+class Blob {
+    const BlobVersion& version() const noexcept;
+    const std::string& key() const noexcept;
+    Clock::time_point creation_time() const noexcept;
+    Clock::time_point modification_time() const noexcept;
+    std::uint64_t size() const noexcept;
+    const std::string& user_meta_data() const noexcept;
+    Expected<std::string> data() const;
+};
+```
+- **version()**
+  - Returns the version that uniquely references this `Blob`.
+- **key()**
+  - Returns the key associated with this `Blob`.
+- **creation_time()**
+  - Returns the timestamp of when `key()` last went from storing nothing to storing a `Blob`.
+- **modification_time()**
+  - Returns the timestamp of when this `Blob` instance was stored.
+- **size()**
+  - Returns the size of this `Blob` in bytes.
+- **user_meta_data()**
+  - Returns the user metadata being stored for this `Blob`.
+- **data()**
+  - Returns the contents of the `Blob`, if `size()` is less than 3KB. If this is not true, `CommonErrors::cannot_exceed_limit` is returned, and the `RestContainer::Get` function will have to be used instead.
 
 ### ContainerOperation<T> ###
 > maidsafe/nfs/container_operation.h
@@ -398,8 +435,8 @@ boost::expected<ContainerOperation<T>, std::error_code> monadic(
     ExpectedContainerOperation<T>&& expected);
 ```
 
-### Container ###
-> maidsafe/nfs/container.h
+### maidsafe::nfs::RestContainer ###
+> maidsafe/nfs/rest_container.h
 
 - [x] Thread-safe Public Functions
 - [x] Copyable
@@ -407,15 +444,15 @@ boost::expected<ContainerOperation<T>, std::error_code> monadic(
 
 > This object has a single `shared_ptr`, and is shallow-copied. This makes it extremely quick to copy.
 
-Represents the [`Container`](#container) abstraction listed above. Constructing a `Container` object cannot be done directly; `Container` objects can only be retrieved from `Storage::OpenContainer`.
+Represents the [`Container`](#container) abstraction listed above.
 
 ```c++
-class Container {
+class RestContainer {
   Future<ExpectedContainerOperation<std::vector<Blob>>> GetBlobs();
 
-  Future<ExpectedBlobOperation<Blob>>        PutMetadata(
+  Future<ExpectedBlobOperation<Blob>>        PutMetaData(
       std::string key, std::string, ModifyBlobVersion);
-  Future<ExpectedBlobOperation<std::string>> GetMetadata(std::string key, RetrieveBlobVersion);
+  Future<ExpectedBlobOperation<std::string>> GetMetaData(std::string key, RetrieveBlobVersion);
 
   Future<ExpectedBlobOperation<Blob>>        Put(std::string key, std::string, ModifyBlobVersion);
   Future<ExpectedBlobOperation<std::string>> Get(Blob);
@@ -435,22 +472,37 @@ class Container {
 };
 ```
 - **GetBlobs()**
-  - Retrieves the names of Blobs in the Container. The `BlobVersion` is provided for each Blob.
-- **GetBlobVersions()**
-  - Retrieves the history of `BlobVersion`s at the key. Oldest BlobVersion is always `BlobVersion::Defunct()`, and is used subsequently when the key had no associated Blob for some period of time. `std::vector::begin()` will be the newest `BlobVersion`, and `std::vector::end() - 1` will have the oldest `BlobVersion` (which is always `BlobVersion::Defunct()`).
-- **PutMetadata(std::string key, std::string, ModifyBlobVersion)**
-  - Stores the contents at the key as user metadata. Same effect as storing a blob (new BlobVersion). Maximum size is 64KB.
-- **GetMetadata(std::string key, RetrieveBlobVersion)**
-  - Retrieves the user controlled metadata for a Blob.
+  - Retrieves the `Blob`s currently in the Container.
+- **PutMetaData(std::string key, std::string, ModifyBlobVersion)**
+  - Stores the contents at the key as user meta data. 
+  - Maximum size is 64KB. 
+  - The new `Blob` is returned on completion.
+- **GetMetaData(std::string key, RetrieveBlobVersion)**
+  - Retrieves the user meta data for a Blob.
 - **Put(std::string key, std::string, ModifyBlobVersion)**
-  - Stores the Blob contents at the key.
+  - Stores the Blob contents at the key. 
+  - The new `Blob` is returned on completion.
+- **Get(Blob)**
+  - Retrieves the `Blob` contents. 
+  - Faster than the `std::string, Version` overload because the network pointers are contained within the `Blob` object.
 - **Get(std::string key, RetrieveBlobVersion)**
-  - Retrieves the Blob contents at the key.
+  - Retrieves the Blob contents at the key. 
+  - Slower than the `Blob` overload because the `Blob` object has to be retrieved first.
 - **Delete(std::string key, RetrieveBlobVersion)**
   - Removes the key from the Container.
 - **ModifyRange(std::string key, std::string, std::uint64_t offset, ModifyBlobVersion)**
-  - Stores a new Blob by re-using a portion of an existing Blob. The size of the Blob is automatically extended if offset exceeds the size of the original Blob.
+  - Stores a new Blob by re-using a portion of an existing Blob. The size of the Blob is automatically extended if offset exceeds the size of the original Blob. The new `Blob` is returned on completion.
+- **GetRange(Blob, std::size_t length, std::uint64_t offset)**
+  - Retrieves a portion of the Blob contents at the key.
+  - Returned std::string is automatically truncated if length + offset exceeds Blob size. 
+  - Faster than the `std::string, Version` overload because the network pointers are contained within the Blob object.
 - **GetRange(std::string key, std::size_t length, std::uint64_t offset, RetrieveBlobVersion)**
-  - Retrieves a portion of the Blob contents at the key. Returned std::string is automatically truncated if length + offset exceeds Blob size.
+  - Retrieves a portion of the Blob contents at the key. 
+  - Returned std::string is automatically truncated if length + offset exceeds Blob size.
+  - Slower than the `Blob` overload because the `Blob` object has to be retrieved first.
+- **Copy(Blob from, std::string to, ModifyBlobVersion)**
+  - Copies user metadata + data from a Blob at one key to a Blob at another key.
+  - Faster than the `std::string, Version` overload because the network pointers are contained within the Blob object.
 - **Copy(std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion)**
   - Copies user metadata + data from a Blob at one key to a Blob at another key.
+  - Slower than the `Blob` overload because the `Blob` object has to be retrieved first.
