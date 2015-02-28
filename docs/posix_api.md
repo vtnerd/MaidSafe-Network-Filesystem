@@ -332,8 +332,29 @@ bool operator==(const ContainerVersion&, const RetrieveContainerVersion&) noexce
   - Return true if *this RetrieveContainerVersion was constructed with an equivalent BlobVersion given in the parameter.
 - The non-member operator overloads call the corresponding Equal functions.
 
+### maidsafe::nfs::ContainerInfo ###
+> maidsafe/nfs/container_info.h
+
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
+
+References a Container stored on the network. Allows for quicker opening of child containers, than using `std::string, ContainerVersion` because the network locations are already known.
+
+```c++
+class ContainerInfo {
+    const std::string& key() const noexcept;
+};
+```
+- **key()**
+  - Returns the key associated with this `ContainerInfo`.
+
 ### maidsafe::nfs::Blob ###
 > maidsafe/nfs/blob.h
+
+- [ ] Thread-safe Public Functions
+- [x] Copyable
+- [x] Movable
 
 Represents a single stored Blob on the network. Can be given to any valid [`PosixContainer`](#maidsafenfsposixcontainer) so that the contents can be read - this object stores pointers to the data on the network for quicker access.
 
