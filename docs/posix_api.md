@@ -155,11 +155,15 @@ Blobs stored at the same key are differentiated/identified by a `BlobVersion` ob
 
 ```c++
 class BlobVersion {
-  static BlobVersion Defunct();
+  bool Equal(const BlobVersion&) const noexcept;
 };
+
+bool operator==(const BlobVersion&, const BlobVersion&) noexcept;
+bool operator!=(const BlobVersion&, const BlobVersion&) noexcept;
 ```
-- **Defunct()**
-  - Returns a `BlobVersion` that is used to indicate a deleted Blob. This is only used when retrieving the history of the Blobs.
+- **Equal(const BlobVersion&)**
+  - Return true if *this BlobVersion is equivalent to the BlobVersion given in the parameter.
+- The non-member operator overloads call the Equal function.
 
 ### ContainerVersion ###
 > maidsafe/nfs/container_version.h
@@ -171,12 +175,8 @@ class BlobVersion {
 Each time a Blob is stored, or a container pointer is modified, a new version of the parent Container is created. The ContainerVersion object allows users of the Posix API to reference specific versions of the Container.
 
 ```c++
-class ContainerVersion {
-  static ContainerVersion Defunct();
-};
+class ContainerVersion {};
 ```
-- **Defunct()**
-  - Returns a `ContainerVersion` that is used to indicate a deleted Container. This is only used when retrieving the history of Containers.
 
 ### ModifyBlobVersion ###
 > maidsafe/nfs/modfy_blob_version.h
@@ -269,14 +269,31 @@ class ModifyContainerVersion {
   static ModifyContainerVersion Create();
   static ModifyContainerVersion Latest();
   ModifyContainerVersion(ContainerVersion);
+  
+  bool Equal(const ModifyContainerVersion&) const noexcept;
+  bool Equal(const ConttainerVersion&) const noexcept;
 };
+
+bool operator==(const ModifyContainerVersion&, const ModifyContainerVersion&) noexcept;
+bool operator!=(const ModifyContainerVersion&, const ModifyContainerVersion&) noexcept;
+
+bool operator==(const ModifyContainerVersion&, const ContainerVersion&) noexcept;
+bool operator!=(const ModifyContainerVersion&, const ContainerVersion&) noexcept;
+
+bool operator!=(const ContainerVersion&, const ModifyContainerVersion&) noexcept;
+bool operator==(const ContainerVersion&, const ModifyContainerVersion&) noexcept;
 ```
 - **Create()**
   - Returns an object that indicates the Posix API should only succeed if the specified key is unused.
 - **Latest()**
   - Returns an object that indicates the Posix API should overwrite any existing Container at the specified key.
-- **ModifyBlobVersion(BlobVersion)**
+- **ModifyContainerVersion(ContainerVersion)**
   - Creates an object that indicates the Posix API should only overwrite the Container at the specified key if it matches the ContainerVersion.
+- **Equal(const ModifyContainerVersion&)**
+  - Return true if *this ModifyContainerVersion is equivalent to the one given in the parameter.
+- **Equal(const ContainerVersion&)**
+  - Return true if *this ModifyContainerVersion was constructed with an equivalent ContainerVersion given in the parameter.
+- The non-member operator overloads call the corresponding Equal functions.
 
 ### RetrieveContainerVersion ###
 > maidsafe/nfs/retrieve_container_version.h
@@ -291,12 +308,29 @@ Operations in [`Container`](#container-1) or [`Storage`](#storage-1) that retrie
 class RetrieveContainerVersion {
   static RetrieveContainerVersion Latest();
   RetrieveContainerVersion(ContainerVersion);
+
+  bool Equal(const RetrieveBlobVersion&) const noexcept;
+  bool Equal(const BlobVersion&) const noexcept;
 };
+
+bool operator==(const RetrieveContainerVersion&, const RetrieveContainerVersion&) noexcept;
+bool operator!=(const RetrieveContainerVersion&, const RetrieveContainerVersion&) noexcept;
+
+bool operator==(const RetrieveContainerVersion&, const ContainerVersion&) noexcept;
+bool operator!=(const RetrieveContainerVersion&, const ContainerVersion&) noexcept;
+
+bool operator!=(const ContainerVersion&, const RetrieveContainerVersion&) noexcept;
+bool operator==(const ContainerVersion&, const RetrieveContainerVersion&) noexcept;
 ```
 - **Latest()**
   - Returns an object that indicates the Posix API should retrieve the latest Container stored at the specified key.
-- **RetrieveBlobVersion(BlobVersion)**
+- **RetrieveContainerVersion(BlobContainer)**
   - Creates an object that indicates the Posix API needs to retrieve a specific Container version stored at the specified key.
+- **Equal(const RetrieveContainerVersion&)**
+  - Return true if *this RetrieveContainerVersion is equivalent to the one given in the parameter.
+- **Equal(const ContainerVersion&)**
+  - Return true if *this RetrieveContainerVersion was constructed with an equivalent BlobVersion given in the parameter.
+- The non-member operator overloads call the corresponding Equal functions.
 
 ### maidsafe::nfs::Future<T> ###
 > maidsafe/nfs/future.h
