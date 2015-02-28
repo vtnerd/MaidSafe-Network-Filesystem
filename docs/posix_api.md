@@ -368,6 +368,7 @@ class Blob {
     Clock::time_point modification_time() const noexcept;
     std::uint64_t size() const noexcept;
     const std::string& user_meta_data() const noexcept;
+    Expected<std::string> data() const;
 };
 ```
 - **version()**
@@ -382,6 +383,8 @@ class Blob {
   - Returns the size of this `Blob` in bytes.
 - **user_meta_data()**
   - Returns the user metadata being stored for this `Blob`.
+- **data()**
+  - Returns the contents of the `Blob`, if `size()` is less than 3KB. If this is not true, `CommonErrors::cannot_exceed_limit` is returned instead, and the `PosixContainer::OpenBlob` function will have to be used instead.
 
 ### maidsafe::nfs::Future<T> ###
 > maidsafe/nfs/future.h
