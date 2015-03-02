@@ -440,8 +440,8 @@ class PosixContainer {
   LocalBlob OpenBlob(const Blob& blob);
   unspecified OpenBlob(std::string, ModifyBlobVersion, AsyncResult<LocalBlob>);
 
-  unspecified Write(
-      const LocalBlob& from, std::string to, ModifyBlobVersion, AsyncResult<Blob>);
+  unspecified Copy(const Blob& from, std::string to, ModifyBlobVersion, AsyncResult<Blob>);
+  unspecified Write(LocalBlob& from, std::string to, ModifyBlobVersion, AsyncResult<Blob>);
       
   unspecified DeleteBlob(std:string, ModifyBlobVersion, AsyncResult<ContainerVersion>);
 };
@@ -478,7 +478,11 @@ class PosixContainer {
   - Make a request to open a Blob at the specified key.
   - AsyncResult is given a `LocalBlob` that has the data and user meta data at the specified key.
   - Slower than the overload that takes a Blob object, since that object has to be found first.
-- **Write(LocalBlob& from, std::string to, ModifyVersion, AsyncResult<Blob>)**
+- **Copy(const Blob& from, std::string to, ModifyBlobVersion, AsyncResult<Blob>**
+  - Make a reques to copy the data and user meta data of `Blob` to the specified key.
+  - The data chunks for the Blob are never re-uploaded, only the Container has to be updated.
+  - AsyncResult is given a handle to the `Blob` that was stored on the network.
+- **Write(LocalBlob& from, std::string to, ModifyBlobVersion, AsyncResult<Blob>)**
   - Make a request to write the data and user meta data of the `LocalBlob` to the specified key.
   - Do not invoke if Read, Write, or Truncate calls have not completed on the `LocalBlob`.
   - AsyncResult is given a handle to the `Blob` that was stored on the network.
