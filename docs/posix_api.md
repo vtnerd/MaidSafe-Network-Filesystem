@@ -426,7 +426,7 @@ class PosixContainer {
   unspecified GetContainers(
       RetrieveContainerVersion, AsyncResult<std::vector<ContainerInfo>>);
 
-  unspecified OpenContainer(ContainerInfo, AsyncResult<Container>);    
+  PosixContainer OpenContainer(ContainerInfo);
   unspecified OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>);
 
   unspecified DeleteContainer(
