@@ -456,9 +456,8 @@ class PosixContainer {
 - **GetContainers(RetrieveContainerVersion, AsyncResult<std::vector<ContainerInfo>>)**
   - Request the list of nested (child) Containers.
   - AsyncResult is given handles that represent the child containers. The ordering in the vector is unspecified.
-- **OpenContainer(ContainerInfo, AsyncResult<PosixContainer>)**
-  - Make a request to open a container refereneced by the ContainerInfo handle.
-  - AsyncResult is given the nested Container referenced by the ContainerInfo.
+- **OpenContainer(ContainerInfo)**
+  - Open a container refereneced by the ContainerInfo handle.
   - Faster than the overload that takes a `std::string, ContainerVersion` because the network addresses are stored in the ContainerInfo object.
 - **OpenContainer(std::string, ModifyContainerVersion, AsyncResult<PosixContainer>)**
   - Make a request to open a container at the specified key.
