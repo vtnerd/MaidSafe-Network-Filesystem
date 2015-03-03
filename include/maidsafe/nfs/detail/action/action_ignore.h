@@ -15,34 +15,38 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#include "maidsafe/nfs/detail/container_key.h"
+#ifndef MAIDSAFE_NFS_DETAIL_ACTION_ACTION_IGNORE_H_
+#define MAIDSAFE_NFS_DETAIL_ACTION_ACTION_IGNORE_H_
 
-#include "maidsafe/common/crypto.h"
-#include "maidsafe/common/serialisation/serialisation.h"
+#include "maidsafe/nfs/detail/action/action_continuation.h"
 
 namespace maidsafe {
 namespace nfs {
 namespace detail {
+namespace action {
 
-/* Keep constructor, destructor, and load methods in cc file. These
-   instantiate a templated singleton object for flyweight, and the easiest
-   way to keep these in maidsafe DSOs is to keep them in maidsafe TU. Otherwise,
-   multiple flyweight registries will exist.*/
+template<typename Value>
+class ActionIgnore : public ActionContinuation<ActionIgnore<Value>> {
+ public:
+  using ExpectedValue = Value;
 
-ContainerKey::ContainerKey() : value_() {}
-ContainerKey::ContainerKey(std::string key) : value_(std::move(key)) {}
-ContainerKey::~ContainerKey() {}
+  ActionIgnore() {}
+  ActionIgnore(const ActionIgnore&) = default;
 
-template<typename Archive>
-Archive& ContainerKey::load(Archive& archive) {
-  std::string value;
-  archive(value);
-  value_ = std::move(value);
-  return archive;
-}
+  template<typename... Args>
+  void operator()(Args&&...) const {}
 
-template BinaryInputArchive& ContainerKey::load<BinaryInputArchive>(BinaryInputArchive&);
+ private:
+  ActionIgnore& operator=(const ActionIgnore&) = delete;
+  ActionIgnore& operator=(ActionIgnore&&) = delete;
+};
 
-}  // namespace detail
-}  // namespace nfs
-}  // namespace maidsafe
+template<typename Value>
+inline ActionIgnore<Value> Ignore() { return {}; }
+
+}  // action
+}  // detail
+}  // nfs
+}  // maidsafe
+
+#endif  // MAIDSAFE_NFS_DETAIL_ACTION_ACTION_IGNORE_H_

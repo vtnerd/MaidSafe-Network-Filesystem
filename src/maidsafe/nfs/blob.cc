@@ -15,34 +15,20 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#include "maidsafe/nfs/detail/container_key.h"
+#include "maidsafe/nfs/blob.h"
 
-#include "maidsafe/common/crypto.h"
-#include "maidsafe/common/serialisation/serialisation.h"
+#include "maidsafe/common/error.h"
 
 namespace maidsafe {
 namespace nfs {
-namespace detail {
+Expected<std::string>  Blob::data() const {
+  if (detail_blob_.data_map().chunks.empty()) {
+    return std::string(
+        detail_blob_.data_map().content.begin(),
+        detail_blob_.data_map().content.end());
+  }
 
-/* Keep constructor, destructor, and load methods in cc file. These
-   instantiate a templated singleton object for flyweight, and the easiest
-   way to keep these in maidsafe DSOs is to keep them in maidsafe TU. Otherwise,
-   multiple flyweight registries will exist.*/
-
-ContainerKey::ContainerKey() : value_() {}
-ContainerKey::ContainerKey(std::string key) : value_(std::move(key)) {}
-ContainerKey::~ContainerKey() {}
-
-template<typename Archive>
-Archive& ContainerKey::load(Archive& archive) {
-  std::string value;
-  archive(value);
-  value_ = std::move(value);
-  return archive;
+  return boost::make_unexpected(make_error_code(CommonErrors::cannot_exceed_limit));
 }
-
-template BinaryInputArchive& ContainerKey::load<BinaryInputArchive>(BinaryInputArchive&);
-
-}  // namespace detail
 }  // namespace nfs
 }  // namespace maidsafe

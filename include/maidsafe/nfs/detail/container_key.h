@@ -18,51 +18,92 @@
 #ifndef MAIDSAFE_NFS_DETAIL_CONTAINER_KEY_H_
 #define MAIDSAFE_NFS_DETAIL_CONTAINER_KEY_H_
 
+#include <cstdint>
+#include <memory>
+#include <string>
 #include <utility>
 
+#include "boost/flyweight.hpp"
+#include "cereal/types/string.hpp"
+
 #include "maidsafe/common/config.h"
-#include "maidsafe/common/types.h"
-#include "maidsafe/nfs/detail/container_id.h"
+#include "maidsafe/common/hash/algorithms/siphash.h"
+#include "maidsafe/common/hash/hash_numeric.h"
+#include "maidsafe/common/hash/hash_string.h"
+#include "maidsafe/common/hash/wrappers/seeded_hash.h"
+#include "maidsafe/common/serialisation/types/boost_flyweight.h"
+
+namespace cereal { class access; }
 
 namespace maidsafe {
 namespace nfs {
 namespace detail {
-
+// Type used to represent the KEY in a Container (see ContainerInstance)
 class ContainerKey {
  public:
+  friend class cereal::access;
+
   ContainerKey();
+  ContainerKey(std::string value);
 
   ContainerKey(const ContainerKey&) = default;
-  ContainerKey(ContainerKey&& other)
-    : key_(std::move(other.key_)) {
+  ContainerKey(ContainerKey&& other) MAIDSAFE_NOEXCEPT
+    : value_(std::move(other.value_)) {
   }
 
-  ContainerKey& operator=(ContainerKey other) MAIDSAFE_NOEXCEPT {
-    swap(other);
+  ~ContainerKey();
+
+  ContainerKey& operator=(const ContainerKey&) = default;
+  ContainerKey& operator=(ContainerKey&& other) MAIDSAFE_NOEXCEPT {
+    value_ = std::move(other.value_);
     return *this;
   }
 
-  template<typename Archive>
-  Archive& serialize(Archive& ar) {
-    return ar(key_);
+  template<typename HashAlgorithm>
+  void HashAppend(HashAlgorithm& hash) const {
+    // Each flyweight pointer is already unique;
+    // this type is only used in unordered_map key.
+    hash(std::uintptr_t(std::addressof(value())));
+  }
+
+  bool Equal(const ContainerKey& other) const MAIDSAFE_NOEXCEPT {
+    return value_ == other.value_;
   }
 
   void swap(ContainerKey& other) MAIDSAFE_NOEXCEPT {
     using std::swap;
-    swap(key_, other.key_);
+    swap(value_, other.value_);
   }
 
-  const Identity& key() const { return key_; }
-  ContainerId GetId() const;
+  const std::string& value() const MAIDSAFE_NOEXCEPT { return value_; }
 
  private:
-  Identity key_;
+  template<typename Archive>
+  Archive& load(Archive& archive);
+
+  // Skip flyweight serialisation entirely, and save 4 bytes of space per key. A
+  // container key can never appear twice in a single ContainerInstance.
+  template<typename Archive>
+  Archive& save(Archive& archive) const {
+    return archive(value());
+  }
+
+ private:
+  boost::flyweight<
+    std::string, boost::flyweights::hashed_factory<SeededHash<SipHash, std::string>>> value_;
 };
 
 inline void swap(ContainerKey& lhs, ContainerKey& rhs) MAIDSAFE_NOEXCEPT {
   lhs.swap(rhs);
 }
 
+inline bool operator==(const ContainerKey& lhs, const ContainerKey& rhs) MAIDSAFE_NOEXCEPT {
+  return lhs.Equal(rhs);
+}
+
+inline bool operator!=(const ContainerKey& lhs, const ContainerKey& rhs) MAIDSAFE_NOEXCEPT {
+  return !lhs.Equal(rhs);
+}
 }  // namespace detail
 }  // namespace nfs
 }  // namespace maidsafe

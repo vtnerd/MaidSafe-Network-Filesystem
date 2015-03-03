@@ -15,33 +15,50 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#include "maidsafe/nfs/detail/container_key.h"
+#include "maidsafe/nfs/detail/container_info.h"
+
+#include <array>
+#include <string>
+#include <type_traits>
 
 #include "maidsafe/common/crypto.h"
 #include "maidsafe/common/serialisation/serialisation.h"
+#include "maidsafe/common/serialisation/types/boost_flyweight.h"
 
 namespace maidsafe {
 namespace nfs {
 namespace detail {
+namespace {
+std::string MakeContainerKey() {
+  std::array<byte, 64> new_id{{}};
 
-/* Keep constructor, destructor, and load methods in cc file. These
+  auto& random = maidsafe::crypto::random_number_generator();
+  random.GenerateBlock(&new_id[0], new_id.size());
+
+  return std::string(new_id.begin(), new_id.end());
+}
+}  // namespace
+
+
+/* Keep constructor, destructor, and serialize method in cc file. These
    instantiate a templated singleton object for flyweight, and the easiest
    way to keep these in maidsafe DSOs is to keep them in maidsafe TU. Otherwise,
    multiple flyweight registries will exist.*/
 
-ContainerKey::ContainerKey() : value_() {}
-ContainerKey::ContainerKey(std::string key) : value_(std::move(key)) {}
-ContainerKey::~ContainerKey() {}
+ContainerInfo::ContainerInfo() : key_(Identity(MakeContainerKey())) {}
+ContainerInfo::~ContainerInfo() {}
 
 template<typename Archive>
-Archive& ContainerKey::load(Archive& archive) {
-  std::string value;
-  archive(value);
-  value_ = std::move(value);
-  return archive;
+Archive& ContainerInfo::serialize(Archive& archive) {
+  return archive(key_);
 }
 
-template BinaryInputArchive& ContainerKey::load<BinaryInputArchive>(BinaryInputArchive&);
+template BinaryInputArchive& ContainerInfo::serialize<BinaryInputArchive>(BinaryInputArchive&);
+template BinaryOutputArchive& ContainerInfo::serialize<BinaryOutputArchive>(BinaryOutputArchive&);
+
+ContainerId ContainerInfo::GetId() const {
+  return ContainerId{MutableData::Name{crypto::Hash<crypto::SHA512>(key())}};
+}
 
 }  // namespace detail
 }  // namespace nfs

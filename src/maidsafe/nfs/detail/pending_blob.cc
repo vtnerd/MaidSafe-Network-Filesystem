@@ -15,33 +15,35 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#include "maidsafe/nfs/detail/container_key.h"
+#include "maidsafe/nfs/detail/pending_blob.h"
 
-#include "maidsafe/common/crypto.h"
-#include "maidsafe/common/serialisation/serialisation.h"
+#include <utility>
 
 namespace maidsafe {
 namespace nfs {
 namespace detail {
 
-/* Keep constructor, destructor, and load methods in cc file. These
-   instantiate a templated singleton object for flyweight, and the easiest
-   way to keep these in maidsafe DSOs is to keep them in maidsafe TU. Otherwise,
-   multiple flyweight registries will exist.*/
-
-ContainerKey::ContainerKey() : value_() {}
-ContainerKey::ContainerKey(std::string key) : value_(std::move(key)) {}
-ContainerKey::~ContainerKey() {}
-
-template<typename Archive>
-Archive& ContainerKey::load(Archive& archive) {
-  std::string value;
-  archive(value);
-  value_ = std::move(value);
-  return archive;
+PendingBlob::PendingBlob(
+    UserMetaData user_meta_data,
+    encrypt::DataMap data_map,
+    std::shared_ptr<NetworkData::Buffer> buffer)
+  : user_meta_data_(std::move(user_meta_data)),
+    data_map_(std::move(data_map)),
+    buffer_(std::move(buffer)) {
 }
 
-template BinaryInputArchive& ContainerKey::load<BinaryInputArchive>(BinaryInputArchive&);
+PendingBlob::PendingBlob(PendingBlob&& other)
+  : user_meta_data_(std::move(other.user_meta_data_)),
+    data_map_(std::move(other.data_map_)),
+    buffer_(std::move(other.buffer_)) {
+}
+
+void PendingBlob::swap(PendingBlob& other) MAIDSAFE_NOEXCEPT {
+  using std::swap;
+  swap(user_meta_data_, other.user_meta_data_);
+  swap(data_map_, other.data_map_);
+  swap(buffer_, other.buffer_);
+}
 
 }  // namespace detail
 }  // namespace nfs

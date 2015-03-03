@@ -15,34 +15,18 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#include "maidsafe/nfs/detail/container_key.h"
+#ifndef MAIDSAFE_NFS_RETRIEVE_CONTAINER_VERSION_H_
+#define MAIDSAFE_NFS_RETRIEVE_CONTAINER_VERSION_H_
 
-#include "maidsafe/common/crypto.h"
-#include "maidsafe/common/serialisation/serialisation.h"
+#include "maidsafe/nfs/container_version.h"
+#include "maidsafe/nfs/retrieve_version.h"
 
 namespace maidsafe {
 namespace nfs {
-namespace detail {
 
-/* Keep constructor, destructor, and load methods in cc file. These
-   instantiate a templated singleton object for flyweight, and the easiest
-   way to keep these in maidsafe DSOs is to keep them in maidsafe TU. Otherwise,
-   multiple flyweight registries will exist.*/
+using RetrieveContainerVersion = RetrieveVersion<ContainerVersion>;
 
-ContainerKey::ContainerKey() : value_() {}
-ContainerKey::ContainerKey(std::string key) : value_(std::move(key)) {}
-ContainerKey::~ContainerKey() {}
+}  // nfs
+}  // maidsafe
 
-template<typename Archive>
-Archive& ContainerKey::load(Archive& archive) {
-  std::string value;
-  archive(value);
-  value_ = std::move(value);
-  return archive;
-}
-
-template BinaryInputArchive& ContainerKey::load<BinaryInputArchive>(BinaryInputArchive&);
-
-}  // namespace detail
-}  // namespace nfs
-}  // namespace maidsafe
+#endif // MAIDSAFE_NFS_RETRIEVE_CONTAINER_VERSION_H_

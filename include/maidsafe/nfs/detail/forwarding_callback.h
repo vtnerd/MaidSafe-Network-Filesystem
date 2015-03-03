@@ -15,34 +15,42 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#include "maidsafe/nfs/detail/container_key.h"
+#ifndef MAIDSAFE_NFS_DETAIL_FORWARDING_CALLBACK_H_
+#define MAIDSAFE_NFS_DETAIL_FORWARDING_CALLBACK_H_
 
-#include "maidsafe/common/crypto.h"
-#include "maidsafe/common/serialisation/serialisation.h"
+#include <type_traits>
+#include <utility>
 
 namespace maidsafe {
 namespace nfs {
 namespace detail {
 
-/* Keep constructor, destructor, and load methods in cc file. These
-   instantiate a templated singleton object for flyweight, and the easiest
-   way to keep these in maidsafe DSOs is to keep them in maidsafe TU. Otherwise,
-   multiple flyweight registries will exist.*/
+/* The result of asio::handler_type cannot be passed directly to another
+   function leveraging asio::async_result. Otherwise, asio::async_result will
+   try to get the future from a promise multiple times, etc. */
+template<typename Callback>
+class ForwardingCallback {
+ public:
+  explicit ForwardingCallback(Callback callback)
+    : callback_(std::move(callback)) {
+  }
 
-ContainerKey::ContainerKey() : value_() {}
-ContainerKey::ContainerKey(std::string key) : value_(std::move(key)) {}
-ContainerKey::~ContainerKey() {}
+  template<typename... Args>
+  typename std::result_of<Callback(Args...)>::type operator()(Args&&... args) {
+    return callback_(std::forward<Args>(args)...);
+  }
 
-template<typename Archive>
-Archive& ContainerKey::load(Archive& archive) {
-  std::string value;
-  archive(value);
-  value_ = std::move(value);
-  return archive;
+ private:
+  Callback callback_;
+};
+
+template<typename Callback>
+inline ForwardingCallback<Callback> MakeForwardingCallback(Callback callback) {
+  return ForwardingCallback<Callback>{std::move(callback)};
 }
-
-template BinaryInputArchive& ContainerKey::load<BinaryInputArchive>(BinaryInputArchive&);
 
 }  // namespace detail
 }  // namespace nfs
 }  // namespace maidsafe
+
+#endif  // MAIDSAFE_NFS_DETAIL_FORWARDING_CALLBACK_H_

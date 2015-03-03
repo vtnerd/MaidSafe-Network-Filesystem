@@ -19,50 +19,50 @@
 
 #include "maidsafe/common/serialisation/serialisation.h"
 #include "maidsafe/common/test.h"
-#include "maidsafe/nfs/detail/container_key.h"
+#include "maidsafe/nfs/detail/container_info.h"
 
-TEST(ContainerKey, BEH_SameId) {
-  maidsafe::nfs::detail::ContainerKey key{};
+TEST(ContainerInfo, BEH_SameId) {
+  maidsafe::nfs::detail::ContainerInfo key{};
 
   EXPECT_EQ(key.GetId(), key.GetId());
 }
 
-TEST(ContainerKey, BEH_DifferentId) {
-  maidsafe::nfs::detail::ContainerKey key1{};
-  maidsafe::nfs::detail::ContainerKey key2{};
+TEST(ContainerInfo, BEH_DifferentId) {
+  maidsafe::nfs::detail::ContainerInfo key1{};
+  maidsafe::nfs::detail::ContainerInfo key2{};
 
   EXPECT_NE(key1.GetId(), key2.GetId());
 }
 
-TEST(ContainerKey, BEH_Serialize) {
+TEST(ContainerInfo, BEH_Serialize) {
   maidsafe::SerialisedData data;
   maidsafe::Identity inner_key{};
   maidsafe::nfs::detail::ContainerId id{};
   {
-    maidsafe::nfs::detail::ContainerKey key{};
+    maidsafe::nfs::detail::ContainerInfo key{};
     id = key.GetId();
     inner_key = key.key();
     data = maidsafe::Serialise(key);
   }
 
-  maidsafe::nfs::detail::ContainerKey revived_key{};
+  maidsafe::nfs::detail::ContainerInfo revived_key{};
   maidsafe::Parse(data, revived_key);
 
   EXPECT_EQ(inner_key, revived_key.key());
   EXPECT_EQ(id, revived_key.GetId());
 }
 
-TEST(ContainerKey, BEH_CopyConstructor) {
-  maidsafe::nfs::detail::ContainerKey key1{};
-  maidsafe::nfs::detail::ContainerKey key2{key1};
+TEST(ContainerInfo, BEH_CopyConstructor) {
+  maidsafe::nfs::detail::ContainerInfo key1{};
+  maidsafe::nfs::detail::ContainerInfo key2{key1};
 
   EXPECT_EQ(key1.key(), key2.key());
   EXPECT_EQ(key1.GetId(), key2.GetId());
 }
 
-TEST(ContainerKey, BEH_Assignment) {
-  maidsafe::nfs::detail::ContainerKey key1{};
-  maidsafe::nfs::detail::ContainerKey key2{};
+TEST(ContainerInfo, BEH_Assignment) {
+  maidsafe::nfs::detail::ContainerInfo key1{};
+  maidsafe::nfs::detail::ContainerInfo key2{};
 
   EXPECT_NE(key1.key(), key2.key());
   EXPECT_NE(key1.GetId(), key2.GetId());
@@ -73,14 +73,14 @@ TEST(ContainerKey, BEH_Assignment) {
   EXPECT_EQ(key1.GetId(), key2.GetId());
 }
 
-TEST(ContainerKey, BEH_Swap) {
-  maidsafe::nfs::detail::ContainerKey key1{};
-  maidsafe::nfs::detail::ContainerKey key2{};
+TEST(ContainerInfo, BEH_Swap) {
+  maidsafe::nfs::detail::ContainerInfo key1{};
+  maidsafe::nfs::detail::ContainerInfo key2{};
   const auto inner_key1 = key1.key();
   const auto inner_key2 = key2.key();
   const auto container_id1 = key1.GetId();
   const auto container_id2 = key2.GetId();
-  
+
   {
     using std::swap;
     swap(key1, key2);

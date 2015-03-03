@@ -21,7 +21,7 @@
 
 #include "maidsafe/common/test.h"
 #include "maidsafe/common/utils.h"
-#include "maidsafe/nfs/detail/container_key.h"
+#include "maidsafe/nfs/detail/container_info.h"
 #include "maidsafe/nfs/tests/network_fixture.h"
 
 namespace maidsafe {
@@ -52,7 +52,7 @@ class BackendTest : public ::testing::Test, public NetworkFixture {
 }  // namespace
 
 TEST_F(BackendTest, BEH_CreateSDV) {
-  const ContainerKey container_key{};
+  const ContainerInfo container_key{};
   const ContainerVersion container_version{MakeRootContainerVersion()};
 
   EXPECT_CALL(
@@ -80,7 +80,7 @@ TEST_F(BackendTest, BEH_CreateSDV) {
 }
 
 TEST_F(BackendTest, BEH_ExistingSDVFailure) {
-  const ContainerKey container_key{};
+  const ContainerInfo container_key{};
   const ContainerVersion container_version{MakeRootContainerVersion()};
 
   EXPECT_CALL(
@@ -108,7 +108,7 @@ TEST_F(BackendTest, BEH_ExistingSDVFailure) {
 }
 
 TEST_F(BackendTest, BEH_UpdateExistingSDV) {
-  const ContainerKey container_key{};
+  const ContainerInfo container_key{};
   const ContainerVersion container_version1{MakeRootContainerVersion()};
   const ContainerVersion container_version2{MakeChildContainerVersion(container_version1)};
 
@@ -140,7 +140,7 @@ TEST_F(BackendTest, BEH_UpdateExistingSDV) {
 }
 
 TEST_F(BackendTest, BEH_PutNonExistingSDVFailure) {
-  const ContainerKey container_key{};
+  const ContainerInfo container_key{};
   const ContainerVersion container_version1{MakeRootContainerVersion()};
   const ContainerVersion container_version2{MakeChildContainerVersion(container_version1)};
 
@@ -163,7 +163,7 @@ TEST_F(BackendTest, BEH_PutNonExistingSDVFailure) {
 }
 
 TEST_F(BackendTest, BEH_UpdateExistingSDVBranchFailure) {
-  const ContainerKey container_key{};
+  const ContainerInfo container_key{};
   const ContainerVersion container_version1{MakeRootContainerVersion()};
   const ContainerVersion container_version2{MakeChildContainerVersion(container_version1)};
   const ContainerVersion container_version3{MakeChildContainerVersion(container_version2)};
@@ -209,7 +209,7 @@ TEST_F(BackendTest, BEH_UpdateExistingSDVBranchFailure) {
 
 // See MAID-658 for DISABLED_
 TEST_F(BackendTest, DISABLED_BEH_UpdateExistingSDVBadRootFailure) {
-  const ContainerKey container_key{};
+  const ContainerInfo container_key{};
   const ContainerVersion container_version1{MakeRootContainerVersion()};
   const ContainerVersion container_version2{MakeChildContainerVersion(container_version1)};
   const ContainerVersion container_version3{MakeChildContainerVersion(container_version2)};
@@ -244,7 +244,7 @@ TEST_F(BackendTest, DISABLED_BEH_UpdateExistingSDVBadRootFailure) {
 }
 
 TEST_F(BackendTest, BEH_UpdateExistingSDVSameTip) {
-  const ContainerKey container_key{};
+  const ContainerInfo container_key{};
   const ContainerVersion container_version{MakeRootContainerVersion()};
 
   EXPECT_CALL(
@@ -277,8 +277,8 @@ TEST_F(BackendTest, BEH_UpdateExistingSDVSameTip) {
 }
 
 TEST_F(BackendTest, BEH_TwoSDVs) {
-  const ContainerKey container_key1{};
-  const ContainerKey container_key2{};
+  const ContainerInfo container_key1{};
+  const ContainerInfo container_key2{};
   const ContainerVersion container_version1{MakeRootContainerVersion()};
   const ContainerVersion container_version2{MakeChildContainerVersion(container_version1)};
 
@@ -396,7 +396,7 @@ TEST_F(BackendTest, BEH_InterfaceThrow) {
   using ::testing::Throw;
 
   // Make sure every interface function correctly returns errors
-  const ContainerKey container_key{};
+  const ContainerInfo container_key{};
   const ContainerVersion container_version{MakeRootContainerVersion()};
   const ImmutableData chunk_data{MakeChunk()};
 
@@ -433,7 +433,7 @@ TEST_F(BackendTest, BEH_InterfaceErrors) {
   using ::testing::Return;
 
   // Make sure every interface function correctly returns errors
-  const ContainerKey container_key{};
+  const ContainerInfo container_key{};
   const ContainerVersion container_version{MakeRootContainerVersion()};
   const ImmutableData chunk_data{MakeChunk()};
 
