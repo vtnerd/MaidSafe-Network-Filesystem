@@ -364,11 +364,13 @@ Represents a single stored Blob on the network. Can be given to any valid [`Posi
 class Blob {
     const BlobVersion& version() const noexcept;
     const std::string& key() const noexcept;
-    Clock::time_point creation_time() const noexcept;
-    Clock::time_point modification_time() const noexcept;
     std::uint64_t size() const noexcept;
-    const std::string& user_meta_data() const noexcept;
+    
+    Clock::time_point creation_time() const;
+    Clock::time_point modification_time() const;
+    
     Expected<std::string> data() const;
+    const std::string& user_meta_data() const noexcept;
 };
 ```
 - **version()**
