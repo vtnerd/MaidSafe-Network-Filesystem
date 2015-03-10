@@ -40,7 +40,7 @@ class UserMetaData {
   UserMetaData();
 
   UserMetaData(const UserMetaData&) = default;
-  UserMetaData(UserMetaData&& other)
+  UserMetaData(UserMetaData&& other) MAIDSAFE_NOEXCEPT
     : value_(std::move(other.value_)) {
   }
 

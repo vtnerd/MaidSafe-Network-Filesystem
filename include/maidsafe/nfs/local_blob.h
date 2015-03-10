@@ -36,7 +36,6 @@
 #include "maidsafe/nfs/detail/action/action_resume.h"
 #include "maidsafe/nfs/detail/action/action_store.h"
 #include "maidsafe/nfs/detail/async_result.h"
-#include "maidsafe/nfs/detail/async_value.h"
 #include "maidsafe/nfs/detail/container.h"
 #include "maidsafe/nfs/detail/container_instance.h"
 #include "maidsafe/nfs/detail/coroutine.h"
@@ -57,13 +56,13 @@ class LocalBlob {
   explicit LocalBlob(std::weak_ptr<detail::Network> network);
   LocalBlob(const std::weak_ptr<detail::Network>& network, const detail::Blob& head);
 
-  LocalBlob(LocalBlob&& other)
+  LocalBlob(LocalBlob&& other) MAIDSAFE_NOEXCEPT
     : data_(std::move(other.data_)),
       offset_(std::move(other.offset_)),
       user_meta_data_(std::move(other.user_meta_data_)) {
   }
 
-  LocalBlob& operator=(LocalBlob&& other) {
+  LocalBlob& operator=(LocalBlob&& other) MAIDSAFE_NOEXCEPT {
     data_ = std::move(other.data_);
     offset_ = std::move(other.offset_);
     user_meta_data_ = std::move(other.user_meta_data_);
