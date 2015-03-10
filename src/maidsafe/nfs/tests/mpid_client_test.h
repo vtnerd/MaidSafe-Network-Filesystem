@@ -15,49 +15,51 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#include "maidsafe/nfs/detail/container_info.h"
 
-#include <array>
+#ifndef MAIDSAFE_NFS_TESTS_MPID_CLIENT_TEST_H_
+#define MAIDSAFE_NFS_TESTS_MPID_CLIENT_TEST_H_
+
 #include <string>
+#include <utility>
+#include <vector>
 
-#include "maidsafe/common/crypto.h"
+#include "boost/filesystem/path.hpp"
+
+#include "maidsafe/common/test.h"
+#include "maidsafe/passport/passport.h"
+#include "maidsafe/routing/parameters.h"
+
+#include "maidsafe/nfs/client/mpid_client.h"
 
 namespace maidsafe {
+
 namespace nfs {
-namespace detail {
-namespace {
-std::string MakeContainerKey() {
-  std::array<byte, 64> new_id{{}};
 
-  auto& random = maidsafe::crypto::random_number_generator();
-  random.GenerateBlock(&new_id[0], new_id.size());
+namespace test {
 
-  return std::string(new_id.begin(), new_id.end());
-}
+class MpidClientTest : public testing::Test {
+ public:
+  MpidClientTest() {}
 
-void VerifyKey(const std::shared_ptr<Identity>& key) {
-
-}
-}  // namespace
-
-ContainerInfo::ContainerInfo() : key_(std::make_shared<Identity>(MakeContainerKey())) {}
-
-NfsInputArchive& ContainerInfo::load(NfsInputArchive& archive) {
-  {
-    Identity key{};
-    archive(key);
-    key_ = Network::CacheInsert(archive.network(), std::move(key));
+  ~MpidClientTest() {
+    for (auto& client : clients_)
+      client->Stop();
   }
-  if (key_ == nullptr) {
-    BOOST_THROW_EXCEPTION(MakeError(CommonErrors::null_pointer));
+
+ protected:
+  void AddClient() {
+    auto mpid_and_signer(passport::CreateMpidAndSigner());
+    clients_.emplace_back(nfs_client::MpidClient::MakeShared(mpid_and_signer));
   }
-  return archive;
-}
 
-ContainerId ContainerInfo::GetId() const {
-  return ContainerId{MutableData::Name{crypto::Hash<crypto::SHA512>(key())}};
-}
+  std::vector<nfs_vault::MpidMessage> messages_;
+  std::vector<std::shared_ptr<nfs_client::MpidClient>> clients_;
+};
 
-}  // namespace detail
+}  // namespace test
+
 }  // namespace nfs
+
 }  // namespace maidsafe
+
+#endif  // MAIDSAFE_NFS_TESTS_MPID_CLIENT_TEST_H_

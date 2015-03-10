@@ -332,6 +332,7 @@ bool operator==(const DataNameAndSizeAndSpaceAndReturnCode& lhs,
 // ================================= MpidMessageOrReturnCode =======================================
 
 struct MpidMessageOrReturnCode {
+  MpidMessageOrReturnCode();
   MpidMessageOrReturnCode(
       const boost::expected<nfs_vault::MpidMessage, maidsafe_error>& expected);
   explicit MpidMessageOrReturnCode(const std::string& serialised_copy);
@@ -341,7 +342,7 @@ struct MpidMessageOrReturnCode {
 
   std::string Serialise() const;
   boost::optional<nfs_vault::MpidMessage> mpid_message;
-  boost::optional<ReturnCode> return_code;
+  ReturnCode return_code;
 };
 
 bool operator==(const MpidMessageOrReturnCode& lhs, const MpidMessageOrReturnCode& rhs);

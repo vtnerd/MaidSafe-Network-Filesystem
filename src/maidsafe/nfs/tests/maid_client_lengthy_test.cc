@@ -15,49 +15,23 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#include "maidsafe/nfs/detail/container_info.h"
 
-#include <array>
-#include <string>
-
-#include "maidsafe/common/crypto.h"
+#include "maidsafe/nfs/tests/maid_client_test.h"
 
 namespace maidsafe {
+
 namespace nfs {
-namespace detail {
-namespace {
-std::string MakeContainerKey() {
-  std::array<byte, 64> new_id{{}};
 
-  auto& random = maidsafe::crypto::random_number_generator();
-  random.GenerateBlock(&new_id[0], new_id.size());
+namespace test {
 
-  return std::string(new_id.begin(), new_id.end());
+TEST_F(MaidClientTest, FUNC_PopulateLengthyTree) {
+  VersionTreeTest(100, 1, 1500, 256);
+  VersionTreeTest(15000, 1, 14580, 128);
+  VersionTreeTest(100, 1, 20000, 128);
 }
 
-void VerifyKey(const std::shared_ptr<Identity>& key) {
+}  // namespace test
 
-}
-}  // namespace
-
-ContainerInfo::ContainerInfo() : key_(std::make_shared<Identity>(MakeContainerKey())) {}
-
-NfsInputArchive& ContainerInfo::load(NfsInputArchive& archive) {
-  {
-    Identity key{};
-    archive(key);
-    key_ = Network::CacheInsert(archive.network(), std::move(key));
-  }
-  if (key_ == nullptr) {
-    BOOST_THROW_EXCEPTION(MakeError(CommonErrors::null_pointer));
-  }
-  return archive;
-}
-
-ContainerId ContainerInfo::GetId() const {
-  return ContainerId{MutableData::Name{crypto::Hash<crypto::SHA512>(key())}};
-}
-
-}  // namespace detail
 }  // namespace nfs
+
 }  // namespace maidsafe

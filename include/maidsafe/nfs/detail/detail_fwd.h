@@ -23,6 +23,7 @@ namespace nfs {
 namespace detail {
 
 class Blob;
+class BlobContents;
 class Container;
 class ContainerInstance;
 class ContainerInfo;
@@ -31,11 +32,12 @@ class DiskBackend;
 class MetaData;
 class Network;
 class NetworkBackend;
+class NfsInputArchive;
 class PendingBlob;
 class UserMetaData;
 
-}  // detail
-}  // nfs
-}  // maidsafe
+}  // namespace detail
+}  // namespace nfs
+}  // namespace maidsafe
 
 #endif  // MAIDSAFE_NFS_DETAIL_DETAIL_FWD_H_

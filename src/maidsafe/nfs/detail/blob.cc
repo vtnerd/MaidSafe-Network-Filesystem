@@ -17,84 +17,43 @@
     use of the MaidSafe Software.                                                                 */
 #include "maidsafe/nfs/detail/blob.h"
 
-#include "maidsafe/common/hash/algorithms/sha.h"
-#include "maidsafe/common/serialisation/serialisation.h"
-#include "maidsafe/common/serialisation/types/boost_flyweight.h"
-#include "maidsafe/nfs/detail/pending_blob.h"
+#include "maidsafe/nfs/detail/nfs_binary_archive.h"
 
 namespace maidsafe {
 namespace nfs {
 namespace detail {
-
-/* Keep constructor, destructor, and serialize method in cc file. These
-   instantiate a templated singleton object for flyweight, and the easiest
-   way to keep these in maidsafe DSOs is to keep them in maidsafe TU. Otherwise,
-   multiple flyweight registries will exist.*/
-
-Blob::Blob() : contents_() {}
-Blob::Blob(const PendingBlob& pending_blob) : contents_(pending_blob) {}
-Blob::Blob(const PendingBlob& pending_blob, Clock::time_point creation_time)
-  : contents_(pending_blob, creation_time) {
-}
-
-Blob::~Blob() {}
-
-template<typename Archive>
-Archive& Blob::serialize(Archive& archive) {
-  return archive(contents_);
-}
-
-template BinaryInputArchive& Blob::serialize<BinaryInputArchive>(BinaryInputArchive&);
-template BinaryOutputArchive& Blob::serialize<BinaryOutputArchive>(BinaryOutputArchive&);
-
-Blob::Contents::Contents()
-  : version_(),
-    meta_data_(),
-    buffer_(),
-    buffer_mutex_() {
-  Refresh();
-}
-
-Blob::Contents::Contents(const PendingBlob& pending_blob)
-  : version_(),
-    meta_data_(pending_blob.user_meta_data()),
-    data_map_(pending_blob.data_map()),
-    buffer_(),
-    buffer_mutex_() {
-  Refresh();
-  buffer_ = pending_blob.buffer();
-}
-
-Blob::Contents::Contents(const PendingBlob& pending_blob, Clock::time_point creation_time)
-  : version_(),
-    meta_data_(pending_blob.user_meta_data(), creation_time),
-    data_map_(pending_blob.data_map()),
-    buffer_(),
-    buffer_mutex_() {
-  Refresh();
-  buffer_ = pending_blob.buffer();
-}
-
-void Blob::Contents::Refresh() {
-  const std::lock_guard<std::mutex> lock{buffer_mutex_};
-  buffer_.reset();
-  maidsafe::SHA512 hash{};
-  hash(meta_data_, data_map_);
-  version_ = BlobVersion{hash.Finalize()};
-}
-
-std::shared_ptr<NetworkData::Buffer> Blob::Contents::GetBuffer(
-    const std::weak_ptr<Network>& network) const {
-  const std::lock_guard<std::mutex> lock{buffer_mutex_};
-  std::shared_ptr<NetworkData::Buffer> buffer{buffer_.lock()};
-  if (buffer == nullptr) {
-    buffer = NetworkData::MakeBuffer(network);
-    buffer_ = buffer;
+namespace {
+void VerifyContents(const std::shared_ptr<const BlobContents&> contents) {
+  if (contents == nullptr) {
+    BOOST_THROW_EXCEPTION(MakeError(CommonErrors::null_pointer));
   }
-
-  return buffer;
+}
+}  // namespace
+  
+Blob::Blob() : contents_(std::make_shared<BlobContents>()) {}
+Blob::Blob(const std::shared_ptr<Network>& network, const PendingBlob& pending_blob)
+  : contents_(Network::CacheInsert(network, BlobContents{pending_blob})) {
+  VerifyContents(contents_);
 }
 
+Blob::Blob(
+    const std::shared_ptr<Nework>& network,
+    const PendingBlob& pending_blob,
+    Clock::time_point creation_time)
+  : contents_(Network::CacheInsert(network, BlobContents{pending_blob, creation_time})) {
+  VerifyContents(contents_);
+}
+
+NfsInputArchive& Blob::load(NfsInputArchive& archive) {
+  assert(contents_);
+  {
+    BlobContents contents{};
+    archive(contents);
+    contents_ = Network::CacheInsert(archive.network(), std::move(contents));
+  }
+  VerifyContents(contents_);
+  return archive;
+}
 }  // namespace detail
 }  // namespace nfs
 }  // namespace maidsafe

@@ -21,8 +21,10 @@
 #include <condition_variable>
 #include <mutex>
 #include <utility>
+#include <string>
 #include <system_error>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 #ifdef _MSC_VER
@@ -34,13 +36,18 @@
 #pragma warning(pop)
 #endif
 
+#include "boost/fusion/include/at_key.hpp"
+#include "boost/fusion/include/set.hpp"
 #include "boost/throw_exception.hpp"
 
 #include "maidsafe/common/config.h"
 #include "maidsafe/common/data_types/immutable_data.h"
+#include "maidsafe/common/types.h"
 #include "maidsafe/nfs/container_version.h"
 #include "maidsafe/nfs/detail/async_result.h"
 #include "maidsafe/nfs/detail/container_id.h"
+#include "maidsafe/nfs/detail/detail_fwd.h"
+#include "maidsafe/nfs/detail/object_cache.h"
 #include "maidsafe/nfs/expected.h"
 
 namespace maidsafe {
@@ -240,6 +247,36 @@ class Network {
     return result.get();
   }
 
+  template<typename ObjectType>
+  static std::shared_ptr<const ObjectType> CacheInsert(
+      const std::shared_ptr<Network>& network, ObjectType&& object) {
+    if (network == nullptr) {
+      BOOST_THROW_EXCEPTION(MakeNullPointerException());
+    }
+
+    using RealType = typename std::decay<ObjectType>::type;
+
+    const std::weak_ptr<Network> weak_network(network);
+
+    boost::fusion::at_key<RealType>(network->object_caches_).Insert(
+        std::forward<ObjectType>(object),
+        [weak_network](const RealType* dead_object) {
+          if (dead_object != nullptr) {
+            const std::unique_ptr<RealType> safe_free(dead_object);
+
+            const auto strong_network = weak_network.lock();
+            if (strong_network != nullptr) {
+              strong_network->CacheErase(*safe_free);
+            }
+          }
+        });
+  }
+
+  template<typename ObjectType>
+  void CacheErase(const ObjectType& dead_object) {
+    boost::fusion::at_key<ObjectType>(object_caches_).Erase(dead_object);
+  }
+
  private:
   static std::system_error MakeNullPointerException();
 
@@ -298,6 +335,9 @@ class Network {
   std::condition_variable waiting_notification_;
   std::mutex waiting_mutex_;
   std::atomic<bool> continue_waiting_;
+
+  boost::fusion::set<
+    ObjectCache<BlobContents>, ObjectCache<std::string>, ObjectCache<Identity>> object_caches_;
 };
 
 }  // namespace detail

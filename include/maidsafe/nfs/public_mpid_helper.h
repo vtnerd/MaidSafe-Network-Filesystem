@@ -1,4 +1,4 @@
-/*  Copyright 2014 MaidSafe.net limited
+/*  Copyright 2013 MaidSafe.net limited
 
     This MaidSafe Software is licensed to you under (1) the MaidSafe.net Commercial License,
     version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -15,49 +15,47 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#include "maidsafe/nfs/detail/container_info.h"
 
-#include <array>
-#include <string>
+#ifndef MAIDSAFE_NFS_PUBLIC_MPID_HELPER_H_
+#define MAIDSAFE_NFS_PUBLIC_MPID_HELPER_H_
 
-#include "maidsafe/common/crypto.h"
+#include <functional>
+#include <memory>
+#include <vector>
+
+#include "boost/thread/future.hpp"
+
+#include "maidsafe/passport/types.h"
+#include "maidsafe/routing/api_config.h"
 
 namespace maidsafe {
+
 namespace nfs {
+
 namespace detail {
-namespace {
-std::string MakeContainerKey() {
-  std::array<byte, 64> new_id{{}};
 
-  auto& random = maidsafe::crypto::random_number_generator();
-  random.GenerateBlock(&new_id[0], new_id.size());
+class PublicMpidHelper {
+ public :
+  PublicMpidHelper();
+  ~PublicMpidHelper();
+  void AddEntry(boost::future<passport::PublicMpid>&& future,
+                routing::GivePublicKeyFunctor give_key_functors);
 
-  return std::string(new_id.begin(), new_id.end());
-}
+ private:
+  void Poll();
+  void Run();
 
-void VerifyKey(const std::shared_ptr<Identity>& key) {
-
-}
-}  // namespace
-
-ContainerInfo::ContainerInfo() : key_(std::make_shared<Identity>(MakeContainerKey())) {}
-
-NfsInputArchive& ContainerInfo::load(NfsInputArchive& archive) {
-  {
-    Identity key{};
-    archive(key);
-    key_ = Network::CacheInsert(archive.network(), std::move(key));
-  }
-  if (key_ == nullptr) {
-    BOOST_THROW_EXCEPTION(MakeError(CommonErrors::null_pointer));
-  }
-  return archive;
-}
-
-ContainerId ContainerInfo::GetId() const {
-  return ContainerId{MutableData::Name{crypto::Hash<crypto::SHA512>(key())}};
-}
+  std::mutex mutex_;
+  bool running_;
+  std::vector<routing::GivePublicKeyFunctor> new_functors_;
+  std::vector<boost::future<passport::PublicMpid>> new_futures_;
+  std::future<void> worker_future_;
+};
 
 }  // namespace detail
+
 }  // namespace nfs
+
 }  // namespace maidsafe
+
+#endif  // MAIDSAFE_NFS_PUBLIC_MPID_HELPER_H_

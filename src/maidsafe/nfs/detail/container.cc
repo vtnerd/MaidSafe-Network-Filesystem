@@ -249,7 +249,9 @@ Expected<ImmutableData> Container::EncryptVersion(const encrypt::DataMap& data_m
 }
 
 Expected<ContainerInstance> Container::DecryptAndCacheInstance(
-    ContainerVersion version, const ImmutableData& encrypted_version) {
+    std::shared_ptr<Network> network,
+    ContainerVersion version,
+    const ImmutableData& encrypted_version) {
   std::vector<byte> serialised_instance{};
 
   try {
@@ -265,7 +267,7 @@ Expected<ContainerInstance> Container::DecryptAndCacheInstance(
     return boost::make_unexpected(e.code());
   }
 
-  return ContainerInstance::Parse(serialised_instance).bind(
+  return ContainerInstance::Parse(std::move(network), serialised_instance).bind(
       [this, &version] (ContainerInstance loaded_instance) {
 
         const std::lock_guard<std::mutex> lock{data_mutex_};

@@ -64,16 +64,27 @@ ContainerInstance::ContainerInstance(std::initializer_list<Entry>&& entries) : C
   meta_data_.UpdateModificationTime();
 }
 
-Expected<ContainerInstance> ContainerInstance::Parse(const std::vector<byte>& serialised) {
+Expected<ContainerInstance> ContainerInstance::Parse(
+    std::shared_ptr<Network> network, const std::vector<byte>& serialised) {
   try {
-    return ::maidsafe::Parse<ContainerInstance>(serialised);
+    ContainerInstance instance{};
+    {
+      NfsInputArchive input_archive{std::move(network), InputVectorStream{serialised}};
+      input_archive(instance);
+    }
+    return instance;
   } catch (const cereal::Exception&) {
     return boost::make_unexpected(make_error_code(CommonErrors::parsing_error));
   }
 }
 
 std::vector<byte> ContainerInstance::Serialise() const {
-  return ::maidsafe::Serialise(*this);
+  std::vector<byte> serialised{};
+  {
+    NfsOutputArchive output_archive{OutputVectorStream{serialised}};
+    output_archive(*this);
+  }
+  return serialised;
 }
 
 template<typename Archive>

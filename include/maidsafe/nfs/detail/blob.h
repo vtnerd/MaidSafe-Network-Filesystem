@@ -22,15 +22,11 @@
 #include <memory>
 #include <mutex>
 
-#include "boost/flyweight.hpp"
-
 #include "maidsafe/common/config.h"
-#include "maidsafe/common/hash/algorithms/siphash.h"
-#include "maidsafe/common/hash/wrappers/seeded_hash.h"
 #include "maidsafe/encrypt/data_map.h"
 #include "maidsafe/nfs/blob_version.h"
+#include "maidsafe/nfs/detail/blob_contents.h"
 #include "maidsafe/nfs/detail/detail_fwd.h"
-#include "maidsafe/nfs/detail/meta_data.h"
 #include "maidsafe/nfs/detail/network_data.h"
 
 namespace cereal { class access; }
@@ -43,15 +39,16 @@ class Blob {
   friend class cereal::access;
 
   Blob();
-  Blob(const detail::PendingBlob& pending_blob);
-  Blob(const detail::PendingBlob& pending_blob, Clock::time_point creation_time);
+  Blob(const std::shared_ptr<Network>& network, const detail::PendingBlob& pending_blob);
+  Blob(
+      const std::shared_ptr<Network>& network,
+      const detail::PendingBlob& pending_blob,
+      Clock::time_point creation_time);
 
   Blob(const Blob&) = default;
   Blob(Blob&& other) MAIDSAFE_NOEXCEPT
     : contents_(std::move(other.contents_)) {
   }
-
-  ~Blob();
 
   Blob& operator=(const Blob&) = default;
   Blob& operator=(Blob&& other) MAIDSAFE_NOEXCEPT {
@@ -59,95 +56,36 @@ class Blob {
     return *this;
   }
 
-  const MetaData& meta_data() const MAIDSAFE_NOEXCEPT { return contents_.get().meta_data(); }
-  const encrypt::DataMap& data_map() const MAIDSAFE_NOEXCEPT { return contents_.get().data_map(); }
-  const BlobVersion& version() const MAIDSAFE_NOEXCEPT { return contents_.get().version(); }
+  const MetaData& meta_data() const MAIDSAFE_NOEXCEPT { return contents().meta_data(); }
+  const encrypt::DataMap& data_map() const MAIDSAFE_NOEXCEPT { return contents().data_map(); }
+  const BlobVersion& version() const MAIDSAFE_NOEXCEPT { return contents().version(); }
 
   std::shared_ptr<NetworkData::Buffer> GetBuffer(const std::weak_ptr<Network>& network) const {
-    return contents_.get().GetBuffer(network);
+    return contents().GetBuffer(network);
   }
-
-  /* The flyweight was done on an inner class so that the templated
-     static factory methods of flyweight would be guaranteed to be in the TU
-     for maidsafe binaries, and never in the client TU. */
-  struct Contents {
-   public:
-    Contents();
-    Contents(const PendingBlob& pending_blob);
-    Contents(const PendingBlob& pending_blob, Clock::time_point creation_time);
-
-    Contents(Contents&& other)
-      : version_(std::move(other.version_)),
-        meta_data_(std::move(other.meta_data_)),
-        data_map_(std::move(other.data_map_)),
-        buffer_(std::move(other.buffer_)),
-        buffer_mutex_() {
-    }
-
-    // Re-calculates version, clears buffer
-    void Refresh();
-
-    template<typename Archive>
-    Archive& load(Archive& ar, const std::uint32_t /*version*/) {
-      ar(meta_data_, data_map_);
-      Refresh();
-      return ar;
-    }
-
-    template<typename Archive>
-    Archive& save(Archive& archive, const std::uint32_t /*version*/) const {
-      return archive(meta_data_, data_map_);
-    }
-
-    template<typename HashAlgorithm>
-    void HashAppend(HashAlgorithm& hash) const {
-      return hash(version());
-    }
-
-    bool Equal(const Contents& other) const {
-      return version() == other.version();
-    }
-
-    const BlobVersion& version() const MAIDSAFE_NOEXCEPT { return version_; }
-    const MetaData& meta_data() const MAIDSAFE_NOEXCEPT { return meta_data_; }
-    const encrypt::DataMap& data_map() const MAIDSAFE_NOEXCEPT { return data_map_; }
-
-    std::shared_ptr<NetworkData::Buffer> GetBuffer(const std::weak_ptr<Network>& network) const;
-
-   private:
-    Contents(const Contents&) = delete;
-
-    Contents& operator=(const Contents&) = delete;
-    Contents& operator=(Contents&&) = delete;
-
-   private:
-    BlobVersion version_;  // unique SHA-512 id
-    MetaData meta_data_;
-    encrypt::DataMap data_map_;
-    mutable std::weak_ptr<NetworkData::Buffer> buffer_;
-    mutable std::mutex buffer_mutex_;
-  };
 
   bool Equal(const Blob& other) const {
-    return contents_ == other.contents_;
+    return contents_ == other.contents_ || contents() == other.contents();
   }
 
  private:
+  const BlobContents& contents() const MAIDSAFE_NOEXCEPT {
+    assert(contents_ != nullptr);
+    return *contents_;
+  }
+
+  NfsInputArchive& load(NfsInputArchive& archive);
+
   template<typename Archive>
-  Archive& serialize(Archive& archive);
+  Archive& save(Archive& archive) const {
+    // Blob contents contain timestamps, so its extremely unlikely that a single
+    // ContainerInstance will contain duplicates. Save the 4 bytes.
+    return archive(contents());
+  }
 
  private:
-  boost::flyweight<
-    Contents, boost::flyweights::hashed_factory<SeededHash<SipHash, Contents>>> contents_;
+  std::shared_ptr<const BlobContents> contents_;
 };
-
-inline bool operator==(const Blob::Contents& lhs, const Blob::Contents& rhs) {
-  return lhs.Equal(rhs);
-}
-
-inline bool operator!=(const Blob::Contents& lhs, const Blob::Contents& rhs) {
-  return !lhs.Equal(rhs);
-}
 
 inline bool operator==(const Blob& lhs, const Blob& rhs) {
    return lhs.Equal(rhs);

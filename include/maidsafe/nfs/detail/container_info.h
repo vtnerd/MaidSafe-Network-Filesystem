@@ -18,19 +18,17 @@
 #ifndef MAIDSAFE_NFS_DETAIL_CONTAINER_INFO_H_
 #define MAIDSAFE_NFS_DETAIL_CONTAINER_INFO_H_
 
+#include <memory>
 #include <utility>
 
-#include "boost/flyweight.hpp"
-
 #include "maidsafe/common/config.h"
-#include "maidsafe/common/hash/algorithms/siphash.h"
-#include "maidsafe/common/hash/wrappers/seeded_hash.h"
 #include "maidsafe/common/types.h"
 #include "maidsafe/nfs/detail/container_id.h"
 
 namespace cereal { class access; }
 
 namespace maidsafe {
+  
 namespace nfs {
 namespace detail {
 class ContainerInfo {
@@ -44,8 +42,6 @@ class ContainerInfo {
     : key_(std::move(other.key_)) {
   }
 
-  ~ContainerInfo();
-
   ContainerInfo& operator=(const ContainerInfo&) = default;
   ContainerInfo& operator=(ContainerInfo&& other) MAIDSAFE_NOEXCEPT {
     key_ = std::move(other.key_);
@@ -57,16 +53,25 @@ class ContainerInfo {
     swap(key_, other.key_);
   }
 
-  const Identity& key() const MAIDSAFE_NOEXCEPT { return key_.get(); }
   ContainerId GetId() const;
+  const Identity& key() const MAIDSAFE_NOEXCEPT {
+    assert(key_ != nullptr);
+    return *key_;
+  }
 
  private:
+  NfsInputArchive& load(NfsInputArchive& archive);
+
   template<typename Archive>
-  Archive& serialize(Archive& ar);
+  Archive& save(Archive& archive) const {
+    // Serialise shared_ptr. This will allow for multiple keys to be associated
+    // with a single pointer in the future. This costs 4 bytes, but nested
+    // containers are expected to be rare.
+    return archive(key_);
+  }
 
  private:
-  boost::flyweight<
-    Identity, boost::flyweights::hashed_factory<SeededHash<SipHash, Identity>>> key_;
+  std::shared_ptr<const Identity> key_;
 };
 
 inline void swap(ContainerInfo& lhs, ContainerInfo& rhs) MAIDSAFE_NOEXCEPT {

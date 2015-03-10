@@ -270,7 +270,7 @@ class Container {
       ASIO_CORO_REENTER(coro) {
         ASIO_CORO_YIELD
           Network::GetChunk(
-              coro.frame().container->network_.lock(),
+              coro.frame().container->network().lock(),
               coro.frame().get_version.id,
               operation
                 .OnSuccess(
@@ -281,6 +281,7 @@ class Container {
         assert(coro.frame().encrypted_version);
         coro.frame().handler(
             coro.frame().container->DecryptAndCacheInstance(
+                coro.frame().container().network().lock(),
                 std::move(coro.frame().get_version),
                 std::move(*(coro.frame().encrypted_version))));
       }
@@ -517,7 +518,9 @@ class Container {
 
   Expected<ImmutableData> EncryptVersion(const encrypt::DataMap& data_map) const;
   Expected<ContainerInstance> DecryptAndCacheInstance(
-      ContainerVersion version, const ImmutableData& encrypted_version);
+      std::shared_ptr<Network> network,
+      ContainerVersion version,
+      const ImmutableData& encrypted_version);
 
   maidsafe::unordered_map<ContainerVersion, const ContainerInstance>::iterator PruneCache(
       maidsafe::unordered_map<ContainerVersion, const ContainerInstance>::iterator prune_entry,

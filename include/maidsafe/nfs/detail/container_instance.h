@@ -67,7 +67,8 @@ class ContainerInstance {
     swap(entries_, other.entries_);
   }
 
-  static Expected<ContainerInstance> Parse(const std::vector<byte>& serialised);
+  static Expected<ContainerInstance> Parse(
+      std::shared_ptr<Network> network, const std::vector<byte>& serialised);
   std::vector<byte> Serialise() const;
 
   const Entries& entries() const { return entries_; }

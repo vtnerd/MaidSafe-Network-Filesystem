@@ -150,7 +150,7 @@ class LocalBlob {
     
     auto coro = detail::MakeCoroutine<CommitRoutine<Handler>>(
         std::move(container),
-        detail::ContainerKey{std::move(key)},
+        detail::ContainerKey{container->network().lock(), std::move(key)},
         std::move(replace),
         std::move(original_data),
         std::move(pending_blob),
@@ -197,6 +197,7 @@ class LocalBlob {
               std::bind(
                   UpdateBlob{},
                   std::placeholders::_1,
+                  coro.frame().container.network().lock(),
                   std::cref(coro.frame().key),
                   std::cref(coro.frame().replace),
                   std::cref(coro.frame().pending_blob),
@@ -219,6 +220,7 @@ class LocalBlob {
   struct UpdateBlob {
     Expected<void> operator()(
         detail::ContainerInstance& instance,
+        const std::shared_ptr<detail::Network>& network,
         const detail::ContainerKey& key,
         const ModifyBlobVersion& replace,
         const detail::PendingBlob& pending,

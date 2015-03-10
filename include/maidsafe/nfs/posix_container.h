@@ -55,6 +55,7 @@ class PosixContainer {
  public:
   explicit PosixContainer(std::shared_ptr<detail::Container> container);
 
+  // do not allow moves, it can leave a null shared_ptr
   PosixContainer(const PosixContainer&) = default;
   PosixContainer& operator=(const PosixContainer&) = default;
 
@@ -84,9 +85,10 @@ class PosixContainer {
 
   template<typename Token>
   detail::AsyncResultReturn<Token, PosixContainer> OpenContainer(
-      std::string key, ModifyContainerVersion version, Token token) const {
+      const std::string& key, ModifyContainerVersion version, Token token) const {
     namespace arg = std::placeholders;
     using Handler = detail::AsyncHandler<Token, PosixContainer>;
+    assert(container_ != nullptr);
 
     Handler handler(std::move(token));
     asio::async_result<Handler> result(handler);
@@ -94,7 +96,7 @@ class PosixContainer {
     if (version == ModifyContainerVersion::Create()) {
       auto coro = detail::MakeCoroutine<CreateContainerRoutine<Handler>>(
           container_,
-          detail::ContainerKey{std::move(key)},
+          detail::ContainerKey{container_->network().lock(), key},
           std::make_shared<detail::Container>(container_->network(), container_->container_info()),
           std::move(handler));
       coro.Execute();
@@ -142,15 +144,16 @@ class PosixContainer {
 
   template<typename Token>
   detail::AsyncResultReturn<Token, LocalBlob> OpenBlob(
-      std::string key, RetrieveBlobVersion version, Token token) const {
+      const std::string& key, RetrieveBlobVersion version, Token token) const {
     using Handler = detail::AsyncHandler<Token, LocalBlob>;
+    assert(container_ != nullptr);
 
     Handler handler(std::move(token));
     asio::async_result<Handler> result(handler);
 
     auto coro = detail::MakeCoroutine<OpenBlobRoutine<Handler>>(
         container_,
-        detail::ContainerKey{std::move(key)},
+        detail::ContainerKey{container_->network().lock(), key},
         std::move(version),
         std::vector<ContainerVersion>{},
         detail::ContainerInstance{},

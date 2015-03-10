@@ -52,12 +52,23 @@ ms_glob_dir(NfsVault ${NfsSourcesDir}/vault "Nfs Vault")
 ms_glob_dir(NfsTests ${NfsSourcesDir}/tests Tests)
 set(NfsNetworkTestsMain ${NfsSourcesDir}/tests/network_tests_main.cc)
 set(NfsNetworkTestsAllFiles ${NfsSourcesDir}/tests/data_getter_test.cc
+<<<<<<< HEAD
                             ${NfsSourcesDir}/tests/maid_node_nfs_test.h
                             ${NfsSourcesDir}/tests/maid_node_nfs_test.cc
                             ${NfsNetworkTestsMain})
 set(NfsWeeklyNetworkTestsAllFiles ${NfsSourcesDir}/tests/maid_node_nfs_test.h
                                   ${NfsSourcesDir}/tests/maid_node_nfs_lengthy_test.cc
                                   ${NfsNetworkTestsMain})
+=======
+                            ${NfsSourcesDir}/tests/maid_client_test.h
+                            ${NfsSourcesDir}/tests/maid_client_test.cc
+                            ${NfsSourcesDir}/tests/mpid_client_test.h
+                            ${NfsSourcesDir}/tests/mpid_client_test.cc
+                            ${NfsTestsMain})
+set(NfsWeeklyNetworkTestsAllFiles ${NfsSourcesDir}/tests/maid_client_test.h
+                                  ${NfsSourcesDir}/tests/maid_client_lengthy_test.cc
+                                  ${NfsTestsMain})
+>>>>>>> origin/next
 list(REMOVE_ITEM NfsTestsAllFiles ${NfsNetworkTestsAllFiles} ${NfsWeeklyNetworkTestsAllFiles})
 
 #==================================================================================================#
@@ -115,7 +126,7 @@ if(INCLUDE_TESTS)
   ms_add_network_gtests(network_test_nfs)
   if(WEEKLY)
     ms_add_network_gtests(weekly_network_test_nfs)
-    set_property(TEST MaidNodeNfsTest.FUNC_PopulateLengthyTree PROPERTY TIMEOUT 5000)
+    set_property(TEST MaidClientTest.FUNC_PopulateLengthyTree PROPERTY TIMEOUT 5000)
   endif()
   ms_test_summary_output()
 endif()
