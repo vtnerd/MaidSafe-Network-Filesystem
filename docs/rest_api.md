@@ -174,8 +174,6 @@ class Blob {
     const std::string& user_meta_data() const noexcept;
 };
 ```
-- **version()**
-  - Returns the version that uniquely references this `Blob`.
 - **key()**
   - Returns the key associated with this `Blob`.
 - **creation_time()**
@@ -204,9 +202,9 @@ class OperationError {
   std::error_code code() const;
 };
 ```
-- **Retry**
+- **Retry -> RetryResult**
   - Return a Future to another attempt at the failed operation. Be careful of infinite loops - some operations could fail indefinitely. If the retry returns an error code `std::errc::not_supported`, then a retry is not possible.
-- **code()**
+- **code() -> std::error_code**
   - Return error code for the failed operation.
 
 ### Future<T> ###
