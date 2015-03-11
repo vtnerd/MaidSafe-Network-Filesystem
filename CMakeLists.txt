@@ -52,23 +52,14 @@ ms_glob_dir(NfsVault ${NfsSourcesDir}/vault "Nfs Vault")
 ms_glob_dir(NfsTests ${NfsSourcesDir}/tests Tests)
 set(NfsNetworkTestsMain ${NfsSourcesDir}/tests/network_tests_main.cc)
 set(NfsNetworkTestsAllFiles ${NfsSourcesDir}/tests/data_getter_test.cc
-<<<<<<< HEAD
-                            ${NfsSourcesDir}/tests/maid_node_nfs_test.h
-                            ${NfsSourcesDir}/tests/maid_node_nfs_test.cc
-                            ${NfsNetworkTestsMain})
-set(NfsWeeklyNetworkTestsAllFiles ${NfsSourcesDir}/tests/maid_node_nfs_test.h
-                                  ${NfsSourcesDir}/tests/maid_node_nfs_lengthy_test.cc
-                                  ${NfsNetworkTestsMain})
-=======
                             ${NfsSourcesDir}/tests/maid_client_test.h
                             ${NfsSourcesDir}/tests/maid_client_test.cc
                             ${NfsSourcesDir}/tests/mpid_client_test.h
                             ${NfsSourcesDir}/tests/mpid_client_test.cc
-                            ${NfsTestsMain})
+                            ${NfsNetworkTestsMain})
 set(NfsWeeklyNetworkTestsAllFiles ${NfsSourcesDir}/tests/maid_client_test.h
                                   ${NfsSourcesDir}/tests/maid_client_lengthy_test.cc
-                                  ${NfsTestsMain})
->>>>>>> origin/next
+                                  ${NfsNetworkTestsMain})
 list(REMOVE_ITEM NfsTestsAllFiles ${NfsNetworkTestsAllFiles} ${NfsWeeklyNetworkTestsAllFiles})
 
 #==================================================================================================#

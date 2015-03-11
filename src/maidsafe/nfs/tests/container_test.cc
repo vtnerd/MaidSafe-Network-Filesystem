@@ -115,7 +115,9 @@ class DetailContainerTest : public ::testing::Test, public NetworkFixture {
 
     EXPECT_EQ(contents.size(), data_map->size());
     return detail::Blob{
-      detail::PendingBlob{std::move(user_meta_data),  std::move(*data_map), std::move(buffer)}};
+      network(),
+      detail::PendingBlob{std::move(user_meta_data),  std::move(*data_map), std::move(buffer)}
+    };
   }
 
   detail::Blob MakeBlob(const std::string& contents) const {
@@ -140,7 +142,7 @@ TEST_F(DetailContainerTest, BEH_NullContainer) {
           nullptr, boost::phoenix::val(Expected<void>{boost::expect}), asio::use_future),
       std::system_error);
   EXPECT_THROW(
-      Container::GetBlob(nullptr, std::string(), BlobVersion{}, asio::use_future),
+      Container::GetBlob(nullptr, ContainerKey{}, BlobVersion{}, asio::use_future),
       std::system_error);
 }
 
@@ -204,7 +206,9 @@ TEST_F(DetailContainerTest, BEH_OneBlobInContainer) {
     Container::PutInstance(
         container(),
         boost::none,
-        ContainerInstance{ContainerInstance::Entry{std::string("key1"), MakeBlob(blob_contents)}},
+        ContainerInstance{
+          ContainerInstance::Entry{ContainerKey{network(), "key1"}, MakeBlob(blob_contents)}
+        },
         asio::use_future).get().value();
 
   const auto instance = Container::GetInstance(container(), update, asio::use_future).get().value();
@@ -245,7 +249,9 @@ TEST_F(DetailContainerTest, BEH_OneContainerInContainer) {
     Container::PutInstance(
         container(),
         boost::none,
-        ContainerInstance{ContainerInstance::Entry{std::string("key1"), inner_container}},
+        ContainerInstance{
+          ContainerInstance::Entry{ContainerKey{network(), "key1"}, inner_container}
+        },
         asio::use_future).get().value();
 
   const auto instance = Container::GetInstance(container(), update, asio::use_future).get().value();
@@ -293,14 +299,15 @@ TEST_F(DetailContainerTest, BEH_VerifyStorage) {
         temp_container,
         boost::none,
         ContainerInstance{
-          ContainerInstance::Entry{std::string("key1"), inner_container},
-            ContainerInstance::Entry{std::string("key2"), MakeBlob(blob_contents)}
+          ContainerInstance::Entry{ContainerKey{network(), "key1"}, inner_container},
+          ContainerInstance::Entry{ContainerKey{network(), "key2"}, MakeBlob(blob_contents)}
         },
         asio::use_future)
       .get().value();
   }
 
-  const auto instance = Container::GetInstance(container(), version, asio::use_future).get().value();
+  const auto instance =
+    Container::GetInstance(container(), version, asio::use_future).get().value();
 
   const auto containers = adapt::filter(instance.entries(), IsContainerInfo{});
   EXPECT_TRUE(range::equal(std::vector<std::string>({"key1"}), adapt::keys(containers)));
@@ -414,7 +421,9 @@ TEST_F(DetailContainerTest, BEH_GetBlob) {
     previous_version = Container::PutInstance(
         container(),
         previous_version,
-        ContainerInstance{ContainerInstance::Entry{std::string("the_blob"), std::move(blob)}},
+        ContainerInstance{
+          ContainerInstance::Entry{ContainerKey{network(), "the_blob"}, std::move(blob)}
+        },
         asio::use_future)
       .get().value();
   }
@@ -424,14 +433,15 @@ TEST_F(DetailContainerTest, BEH_GetBlob) {
         data.first,
         ReadBlobContents{network()}(
             Container::GetBlob(
-                container(), std::string("the_blob"), data.second, asio::use_future).get().value())
+                container(), ContainerKey{network(), "the_blob"}, data.second, asio::use_future)
+            .get().value())
         .c_str());
   }
 
   for (const auto& data : test_data) {
     const auto get_result =
       Container::GetBlob(
-          container(), std::string("wrong_blob"), data.second, asio::use_future).get();
+          container(), ContainerKey{network(), "wrong_blob"}, data.second, asio::use_future).get();
     ASSERT_FALSE(get_result.valid());
     EXPECT_EQ(CommonErrors::no_such_element, get_result.error());
   }
@@ -444,7 +454,8 @@ TEST_F(DetailContainerTest, BEH_GetBlob) {
         data.first,
         ReadBlobContents{network()}(
             Container::GetBlob(
-                empty_cache, std::string("the_blob"), data.second, asio::use_future).get().value())
+                empty_cache, ContainerKey{network(), "the_blob"}, data.second, asio::use_future)
+            .get().value())
         .c_str());
   }
 
@@ -454,7 +465,7 @@ TEST_F(DetailContainerTest, BEH_GetBlob) {
           network(), container()->parent_info(), container()->container_info());
     const auto get_result =
       Container::GetBlob(
-          empty_cache, std::string("wrong_blob"), data.second, asio::use_future).get();
+          empty_cache, ContainerKey{network(), "wrong_blob"}, data.second, asio::use_future).get();
     ASSERT_FALSE(get_result.valid());
     EXPECT_EQ(CommonErrors::no_such_element, get_result.error());
   }
@@ -541,14 +552,17 @@ TEST_F(DetailContainerTest, FUNC_LargeBlob) {
     Container::PutInstance(
         container(),
         boost::none,
-        ContainerInstance{ContainerInstance::Entry{std::string("blob"), MakeBlob(blob_contents)}},
+        ContainerInstance{
+          ContainerInstance::Entry{ContainerKey{network(), "blob"}, MakeBlob(blob_contents)}
+        },
         asio::use_future).get().value();
 
   const auto instance =
     Container::GetInstance(container(), std::move(put), asio::use_future).get().value();
   EXPECT_EQ(
       blob_contents,
-      ReadBlobContents{network()}(instance.GetBlob(std::string("blob")).value()));
+      ReadBlobContents{network()}(
+          instance.GetBlob(detail::ContainerKey{network(), "blob"}).value()));
 }
 
 }  // namespace test

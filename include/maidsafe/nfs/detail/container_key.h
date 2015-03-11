@@ -33,7 +33,8 @@ namespace cereal { class access; }
 namespace maidsafe {
 namespace nfs {
 namespace detail {
-// Type used to represent the KEY in a Container (see ContainerInstance)
+/* Type used to represent the KEY in a Container (see ContainerInstance).
+   All equivalent keys are merged to a single std::string object. */
 class ContainerKey {
  public:
   friend class cereal::access;
@@ -54,13 +55,17 @@ class ContainerKey {
     return *this;
   }
 
+  void swap(ContainerKey& other) MAIDSAFE_NOEXCEPT {
+    using std::swap;
+    swap(value_, other.value_);
+  }
+
   bool Equal(const ContainerKey& other) const MAIDSAFE_NOEXCEPT {
     return value_ == other.value_ || value() == other.value();
   }
 
-  void swap(ContainerKey& other) MAIDSAFE_NOEXCEPT {
-    using std::swap;
-    swap(value_, other.value_);
+  bool Equal(const std::string& other) const MAIDSAFE_NOEXCEPT {
+    return value() == other;
   }
 
   const std::string& value() const MAIDSAFE_NOEXCEPT {
@@ -69,11 +74,11 @@ class ContainerKey {
   }
 
   template<typename Archive>
-  void save(Archive& archive) const {
+  Archive& save(Archive& archive) const {
     // Skip shared_ptr serialisation entirely, and save 4 bytes of space per
     // key. A container key can never appear twice in a single
     // ContainerInstance.
-    archive(value());
+    return archive(value());
   }
 
  private:
@@ -93,6 +98,22 @@ inline bool operator==(const ContainerKey& lhs, const ContainerKey& rhs) MAIDSAF
 
 inline bool operator!=(const ContainerKey& lhs, const ContainerKey& rhs) MAIDSAFE_NOEXCEPT {
   return !lhs.Equal(rhs);
+}
+
+inline bool operator==(const ContainerKey& lhs, const std::string& rhs) MAIDSAFE_NOEXCEPT {
+  return lhs.Equal(rhs);
+}
+
+inline bool operator==(const std::string& lhs, const ContainerKey& rhs) MAIDSAFE_NOEXCEPT {
+  return rhs.Equal(lhs);
+}
+
+inline bool operator!=(const ContainerKey& lhs, const std::string& rhs) MAIDSAFE_NOEXCEPT {
+  return !lhs.Equal(rhs);
+}
+
+inline bool operator!=(const std::string& lhs, const ContainerKey& rhs) MAIDSAFE_NOEXCEPT {
+  return !rhs.Equal(lhs);
 }
 }  // namespace detail
 }  // namespace nfs

@@ -248,22 +248,21 @@ class Network {
   }
 
   template<typename ObjectType>
-  static std::shared_ptr<const ObjectType> CacheInsert(
+  static std::shared_ptr<const typename std::decay<ObjectType>::type> CacheInsert(
       const std::shared_ptr<Network>& network, ObjectType&& object) {
+    using RealType = typename std::decay<ObjectType>::type;
+
     if (network == nullptr) {
       BOOST_THROW_EXCEPTION(MakeNullPointerException());
     }
 
-    using RealType = typename std::decay<ObjectType>::type;
-
     const std::weak_ptr<Network> weak_network(network);
-
-    boost::fusion::at_key<RealType>(network->object_caches_).Insert(
+    return boost::fusion::at_key<ObjectCache<RealType>>(network->object_caches_).Insert(
         std::forward<ObjectType>(object),
         [weak_network](const RealType* dead_object) {
-          if (dead_object != nullptr) {
-            const std::unique_ptr<RealType> safe_free(dead_object);
 
+          if (dead_object != nullptr) {
+            const std::unique_ptr<const RealType> safe_free{dead_object};
             const auto strong_network = weak_network.lock();
             if (strong_network != nullptr) {
               strong_network->CacheErase(*safe_free);
@@ -274,7 +273,7 @@ class Network {
 
   template<typename ObjectType>
   void CacheErase(const ObjectType& dead_object) {
-    boost::fusion::at_key<ObjectType>(object_caches_).Erase(dead_object);
+    boost::fusion::at_key<ObjectCache<ObjectType>>(object_caches_).Erase(dead_object);
   }
 
  private:

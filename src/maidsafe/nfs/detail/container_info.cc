@@ -21,6 +21,9 @@
 #include <string>
 
 #include "maidsafe/common/crypto.h"
+#include "maidsafe/common/error.h"
+#include "maidsafe/nfs/detail/network.h"
+#include "maidsafe/nfs/detail/nfs_binary_archive.h"
 
 namespace maidsafe {
 namespace nfs {
@@ -35,8 +38,10 @@ std::string MakeContainerKey() {
   return std::string(new_id.begin(), new_id.end());
 }
 
-void VerifyKey(const std::shared_ptr<Identity>& key) {
-
+void VerifyKey(const std::shared_ptr<const Identity>& key) {
+  if (key == nullptr) {
+    BOOST_THROW_EXCEPTION(MakeError(CommonErrors::null_pointer));
+  }
 }
 }  // namespace
 
@@ -44,13 +49,12 @@ ContainerInfo::ContainerInfo() : key_(std::make_shared<Identity>(MakeContainerKe
 
 NfsInputArchive& ContainerInfo::load(NfsInputArchive& archive) {
   {
-    Identity key{};
+    std::shared_ptr<Identity> key{};
     archive(key);
-    key_ = Network::CacheInsert(archive.network(), std::move(key));
+    VerifyKey(key);
+    key_ = Network::CacheInsert(archive.network(), std::move(*key));
   }
-  if (key_ == nullptr) {
-    BOOST_THROW_EXCEPTION(MakeError(CommonErrors::null_pointer));
-  }
+  VerifyKey(key_);
   return archive;
 }
 

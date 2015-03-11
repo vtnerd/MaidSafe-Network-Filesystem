@@ -21,9 +21,12 @@
 #include <memory>
 #include <utility>
 
+#include "cereal/types/memory.hpp"
+
 #include "maidsafe/common/config.h"
 #include "maidsafe/common/types.h"
 #include "maidsafe/nfs/detail/container_id.h"
+#include "maidsafe/nfs/detail/detail_fwd.h"
 
 namespace cereal { class access; }
 

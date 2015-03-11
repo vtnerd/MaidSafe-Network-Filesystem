@@ -93,10 +93,12 @@ class PosixContainer {
     Handler handler(std::move(token));
     asio::async_result<Handler> result(handler);
 
+    detail::ContainerKey container_key{container_->network().lock(), key};
+
     if (version == ModifyContainerVersion::Create()) {
       auto coro = detail::MakeCoroutine<CreateContainerRoutine<Handler>>(
           container_,
-          detail::ContainerKey{container_->network().lock(), key},
+          std::move(container_key),
           std::make_shared<detail::Container>(container_->network(), container_->container_info()),
           std::move(handler));
       coro.Execute();
@@ -105,7 +107,7 @@ class PosixContainer {
           version == ModifyContainerVersion::Latest() ?
             RetrieveContainerVersion::Latest() :
             RetrieveContainerVersion{static_cast<ContainerVersion>(std::move(version))},
-          std::bind(GetContainer{}, container_, arg::_1, std::move(key)),
+          std::bind(GetContainer{}, container_, arg::_1, std::move(container_key)),
           std::move(handler));
     }
 
@@ -114,15 +116,21 @@ class PosixContainer {
 
   template<typename Token>
   detail::AsyncResultReturn<Token, ContainerVersion> DeleteContainer(
-      std::string key, RetrieveContainerVersion version, Token token) const {
+      const std::string& key, RetrieveContainerVersion version, Token token) const {
     namespace arg = std::placeholders;
     using Handler = detail::AsyncHandler<Token, ContainerVersion>;
+    assert(container_ != nullptr);
 
     Handler handler(std::move(token));
     asio::async_result<Handler> result(handler);
     detail::Container::UpdateLatestInstance(
         container_,
-        std::bind(RemoveContainer{}, arg::_1, std::move(key), arg::_2, std::move(version)),
+        std::bind(
+            RemoveContainer{},
+            arg::_1,
+            detail::ContainerKey{container_->network().lock(), key},
+            arg::_2,
+            std::move(version)),
         detail::MakeForwardingCallback(std::move(handler)));
     return result.get();
   }
@@ -201,15 +209,20 @@ class PosixContainer {
 
   template<typename Token>
   detail::AsyncResultReturn<Token, ContainerVersion> DeleteBlob(
-      std::string key, RetrieveBlobVersion version, Token token) const {
+      const std::string& key, RetrieveBlobVersion version, Token token) const {
     namespace arg = std::placeholders;
     using Handler = detail::AsyncHandler<Token, ContainerVersion>;
+    assert(container_ != nullptr);
 
     Handler handler(std::move(token));
     asio::async_result<Handler> result(handler);
     detail::Container::UpdateLatestInstance(
         container_,
-        std::bind(RemoveBlob{}, arg::_1, std::move(key), std::move(version)),
+        std::bind(
+            RemoveBlob{},
+            arg::_1,
+            detail::ContainerKey{container_->network().lock(), key},
+            std::move(version)),
         detail::MakeForwardingCallback(std::move(handler)));
     return result.get();
   }

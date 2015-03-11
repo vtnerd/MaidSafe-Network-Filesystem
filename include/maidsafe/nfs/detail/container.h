@@ -281,7 +281,7 @@ class Container {
         assert(coro.frame().encrypted_version);
         coro.frame().handler(
             coro.frame().container->DecryptAndCacheInstance(
-                coro.frame().container().network().lock(),
+                coro.frame().container->network().lock(),
                 std::move(coro.frame().get_version),
                 std::move(*(coro.frame().encrypted_version))));
       }

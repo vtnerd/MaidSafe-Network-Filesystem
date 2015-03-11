@@ -33,7 +33,7 @@ TEST(ContainerInfo, BEH_DifferentId) {
 
   EXPECT_NE(key1.GetId(), key2.GetId());
 }
-
+/*
 TEST(ContainerInfo, BEH_Serialize) {
   maidsafe::SerialisedData data;
   maidsafe::Identity inner_key{};
@@ -50,7 +50,7 @@ TEST(ContainerInfo, BEH_Serialize) {
 
   EXPECT_EQ(inner_key, revived_key.key());
   EXPECT_EQ(id, revived_key.GetId());
-}
+  } */
 
 TEST(ContainerInfo, BEH_CopyConstructor) {
   maidsafe::nfs::detail::ContainerInfo key1{};

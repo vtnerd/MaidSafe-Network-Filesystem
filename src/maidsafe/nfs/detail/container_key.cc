@@ -1,4 +1,4 @@
-/*  Copyright 2014 MaidSafe.net limited
+/*  Copyright 2015 MaidSafe.net limited
 
     This MaidSafe Software is licensed to you under (1) the MaidSafe.net Commercial License,
     version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -20,7 +20,8 @@
 #include "boost/throw_exception.hpp"
 
 #include "maidsafe/common/error.h"
-#include "maidsafe/nfs/detail/nfs_input_archive.h"
+#include "maidsafe/nfs/detail/network.h"
+#include "maidsafe/nfs/detail/nfs_binary_archive.h"
 
 namespace maidsafe {
 namespace nfs {
@@ -34,10 +35,11 @@ ContainerKey::ContainerKey(const std::shared_ptr<Network>& network, const std::s
 }
 
 NfsInputArchive& ContainerKey::load(NfsInputArchive& archive) {
-  assert(value_ != nullptr);
-  archive(*value);
-  value_ = Network::CacheInsert(archive.network(), std::move(*value));
-
+  {
+    std::string value{};
+    archive(value);
+    value_ = Network::CacheInsert(archive.network(), std::move(value));
+  }
   if (value_ == nullptr) {
     BOOST_THROW_EXCEPTION(MakeError(CommonErrors::null_pointer));
   }

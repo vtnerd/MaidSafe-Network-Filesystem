@@ -32,7 +32,7 @@ class BlobVersion {
   BlobVersion& operator=(const BlobVersion&) = default;
 
   template<typename HashAlgorithm>
-  void HashAppend(HashAlgorithm& hash) const { return hash(version_); }
+  void HashAppend(HashAlgorithm& hash) const { hash(version_); }
   bool Equal(const BlobVersion& other) const;
 
  private:

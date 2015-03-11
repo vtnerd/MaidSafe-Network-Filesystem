@@ -27,6 +27,7 @@
 #include "maidsafe/common/error.h"
 #include "maidsafe/common/serialisation/serialisation.h"
 #include "maidsafe/nfs/detail/blob.h"
+#include "maidsafe/nfs/detail/nfs_binary_archive.h"
 
 namespace maidsafe {
 namespace nfs {
@@ -69,7 +70,8 @@ Expected<ContainerInstance> ContainerInstance::Parse(
   try {
     ContainerInstance instance{};
     {
-      NfsInputArchive input_archive{std::move(network), InputVectorStream{serialised}};
+      InputVectorStream stream{serialised};
+      NfsInputArchive input_archive{std::move(network), stream};
       input_archive(instance);
     }
     return instance;
@@ -79,12 +81,12 @@ Expected<ContainerInstance> ContainerInstance::Parse(
 }
 
 std::vector<byte> ContainerInstance::Serialise() const {
-  std::vector<byte> serialised{};
+  OutputVectorStream stream{};
   {
-    NfsOutputArchive output_archive{OutputVectorStream{serialised}};
+    NfsOutputArchive output_archive{stream};
     output_archive(*this);
   }
-  return serialised;
+  return stream.vector();
 }
 
 template<typename Archive>

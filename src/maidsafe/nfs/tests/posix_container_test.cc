@@ -280,8 +280,6 @@ TEST_F(PosixContainerTest, BEH_MultipleBlobs) {
   }
 }
 
-
-
 TEST_F(PosixContainerTest, BEH_MultipleContainers) {
   namespace adapt = boost::adaptors;
   namespace karma = boost::spirit::karma;

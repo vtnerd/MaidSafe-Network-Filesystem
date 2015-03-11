@@ -107,11 +107,19 @@ class LocalBlobTest : public detail::test::NetworkFixture, public ::testing::Tes
     EXPECT_EQ(
         static_cast<detail::Blob>(blob),
         detail::Container::GetBlob(
-            container(), blob.key(), blob.version(), asio::use_future).get().value());
+            container(),
+            detail::ContainerKey{network(), blob.key()},
+            blob.version(),
+            asio::use_future)
+        .get().value());
     EXPECT_EQ(
         static_cast<detail::Blob>(blob),
         detail::Container::GetBlob(
-            MakeTempContainer(), blob.key(), blob.version(), asio::use_future).get().value());
+            MakeTempContainer(),
+            detail::ContainerKey{network(), blob.key()},
+            blob.version(),
+            asio::use_future)
+        .get().value());
     {
       LocalBlob local_blob{container()->network(), static_cast<detail::Blob>(blob)};
       EXPECT_EQ(expected_contents, ReadLocalBlobContents(local_blob));
@@ -343,7 +351,9 @@ TEST_F(LocalBlobTest, ExistingContainer) {
       container(),
       detail::Container::GetVersions(container(), asio::use_future).get().value().front(),
       detail::ContainerInstance{
-        detail::ContainerInstance::Entry{std::string("KEY!"), detail::ContainerInfo{}}
+        detail::ContainerInstance::Entry{
+          detail::ContainerKey{network(), "KEY!"}, detail::ContainerInfo{}
+        }
       },
       asio::use_future).get().value();
   {

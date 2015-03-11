@@ -33,6 +33,7 @@ class MetaData;
 class Network;
 class NetworkBackend;
 class NfsInputArchive;
+class NfsOutputArchive;
 class PendingBlob;
 class UserMetaData;
 

@@ -21,7 +21,7 @@
 
 namespace maidsafe {
 namespace nfs {
-Expected<std::string>  Blob::data() const {
+Expected<std::string> Blob::data() const {
   if (detail_blob_.data_map().chunks.empty()) {
     return std::string(
         detail_blob_.data_map().content.begin(),

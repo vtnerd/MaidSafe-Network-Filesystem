@@ -17,13 +17,16 @@
     use of the MaidSafe Software.                                                                 */
 #include "maidsafe/nfs/detail/blob.h"
 
+#include "cereal/types/common.hpp"
+
+#include "maidsafe/nfs/detail/network.h"
 #include "maidsafe/nfs/detail/nfs_binary_archive.h"
 
 namespace maidsafe {
 namespace nfs {
 namespace detail {
 namespace {
-void VerifyContents(const std::shared_ptr<const BlobContents&> contents) {
+void VerifyContents(const std::shared_ptr<const BlobContents>& contents) {
   if (contents == nullptr) {
     BOOST_THROW_EXCEPTION(MakeError(CommonErrors::null_pointer));
   }
@@ -37,7 +40,7 @@ Blob::Blob(const std::shared_ptr<Network>& network, const PendingBlob& pending_b
 }
 
 Blob::Blob(
-    const std::shared_ptr<Nework>& network,
+    const std::shared_ptr<Network>& network,
     const PendingBlob& pending_blob,
     Clock::time_point creation_time)
   : contents_(Network::CacheInsert(network, BlobContents{pending_blob, creation_time})) {
@@ -45,7 +48,6 @@ Blob::Blob(
 }
 
 NfsInputArchive& Blob::load(NfsInputArchive& archive) {
-  assert(contents_);
   {
     BlobContents contents{};
     archive(contents);
