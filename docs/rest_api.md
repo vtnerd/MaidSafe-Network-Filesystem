@@ -252,17 +252,23 @@ Represents the [`Container`](#container) abstraction listed above.
 ```c++
 class RestContainer {
   Future<ExpectedOperation<std::vector<Blob>>> ListBlobs(std::string prefix = std::string());
-  
+
   Future<ExpectedOperation<Blob>>              GetBlob(const std::string& key);
   Future<ExpectedOperation<std::vector<Blob>>> GetBlobHistory(const std::string& key);
-  
-  Future<ExpectedOperation<Blob>> CreateBlob(const std::string& key, std::string data, std::string meta_data);
+
+  Future<ExpectedOperation<Blob>> CreateBlob(
+      const std::string& key, std::string data, std::string meta_data);
+
   Future<ExpectedOperation<Blob>> UpdateBlobContent(const Blob& blob, std::string);
+  Future<ExpectedOperation<Blob>> UpdateBlobContent(const Blob& blob, std::string, std::uint64_t offset);
   Future<ExpectedOperation<Blob>> UpdateBlobMetadata(const Blob& blob, std::string);
+
   Future<ExpectedOperation<Blob>> GetBlobContent(const Blob& blob);
-  Future<ExpectedOperation<Blob>> GetBlobContent(const Blob& blob, std::uint64_t offset, std::uint64_t length);
+  Future<ExpectedOperation<Blob>> GetBlobContent(
+      const Blob& blob, std::uint64_t offset, std::uint64_t length);
+
   Future<ExpectedOperation<void>> DeleteBlob(const Blob& blob);
-  
+
   Future<Blob> Copy(const Blob& from, const std::string& to);
 };
 ```
