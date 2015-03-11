@@ -175,96 +175,6 @@ bool operator!=(const BlobVersion&, const BlobVersion&) noexcept;
   - Return true if *this BlobVersion is equivalent to the BlobVersion given in the parameter.
 - The non-member operator overloads call the Equal function.
 
-### ContainerVersion ###
-> maidsafe/nfs/container_version.h
-
-- [ ] Thread-safe Public Functions
-- [x] Copyable
-- [x] Movable
-
-Each time a Blob is stored, or a container pointer is modified, a new version of the parent Container is created. The ContainerVersion object allows users of the Posix API to reference specific versions of the Container.
-
-```c++
-class ContainerVersion {};
-``` 
-
-### maidsafe::nfs::ModifyBlobVersion ###
-> maidsafe/nfs/modfy_blob_version.h
-
-- [ ] Thread-safe Public Functions
-- [x] Copyable
-- [x] Movable
-
-Operations on [`PosixContainer`](#maidsafenfsposixcontainer) that change the Blob stored at a key require a ModifyBlobVersion object.
-
-```c++
-class ModifyBlobVersion {
-  static ModifyBlobVersion Create();
-  static ModifyBlobVersion Latest();
-  ModifyBlobVersion(BlobVersion);
-  
-  bool Equal(const ModifyBlobVersion&) const noexcept;
-  bool Equal(const BlobVersion&) const noexcept;
-};
-
-bool operator==(const ModifyBlobVersion&, const ModifyBlobVersion&) noexcept;
-bool operator!=(const ModifyBlobVersion&, const ModifyBlobVersion&) noexcept;
-
-bool operator==(const ModifyBlobVersion&, const BlobVersion&) noexcept;
-bool operator!=(const ModifyBlobVersion&, const BlobVersion&) noexcept;
-
-bool operator!=(const BlobVersion&, const ModifyBlobVersion&) noexcept;
-bool operator==(const BlobVersion&, const ModifyBlobVersion&) noexcept;
-```
-- **Create()**
-  - Returns an object that indicates the Posix API should only succeed if the specified key is unused.
-- **Latest()**
-  - Returns an object that indicates the Posix API should overwrite any existing Blob at the specified key.
-- **ModifyBlobVersion(BlobVersion)**
-  - Creates an object that indicates the Posix API should only overwrite the Blob at the specified key if it matches the BlobVersion.
-- **Equal(const ModifyBlobVersion&)**
-  - Return true if *this ModifyBlobVersion is equivalent to the one given in the parameter.
-- **Equal(const BlobVersion&)**
-  - Return true if *this ModifyBlobVersion was constructed with an equivalent BlobVersion given in the parameter.
-- The non-member operator overloads call the corresponding Equal functions.
-
-### maidsafe::nfs::RetrieveBlobVersion ###
-> maidsafe/nfs/retrieve_blob_version.h
-
-- [ ] Thread-safe Public Functions
-- [x] Copyable
-- [x] Movable
-
-Operations on [`PosixContainer`](#maidsafenfsposixcontainer) that retrieve a Blob stored at a key require a RetrieveBlobVersion object.
-
-```c++
-class RetrieveBlobVersion {
-  static RetrieveBlobVersion Latest();
-  RetrieveBlobVersion(BlobVersion);
-  
-  bool Equal(const RetrieveBlobVersion&) const noexcept;
-  bool Equal(const BlobVersion&) const noexcept;
-};
-
-bool operator==(const RetrieveBlobVersion&, const RetrieveBlobVersion&) noexcept;
-bool operator!=(const RetrieveBlobVersion&, const RetrieveBlobVersion&) noexcept;
-
-bool operator==(const RetrieveBlobVersion&, const BlobVersion&) noexcept;
-bool operator!=(const RetrieveBlobVersion&, const BlobVersion&) noexcept;
-
-bool operator!=(const BlobVersion&, const RetrieveBlobVersion&) noexcept;
-bool operator==(const BlobVersion&, const RetrieveBlobVersion&) noexcept;
-```
-- **Latest()**
-  - Returns an object that indicates the Posix API should retrieve the latest Blob stored at the specified key.
-- **RetrieveBlobVersion(BlobVersion)**
-  - Creates an object that indicates the Posix API needs to retrieve a specific Blob version stored at the specified key.
-- **Equal(const RetrieveBlobVersion&)**
-  - Return true if *this RetrieveBlobVersion is equivalent to the one given in the parameter.
-- **Equal(const BlobVersion&)**
-  - Return true if *this RetrieveBlobVersion was constructed with an equivalent BlobVersion given in the parameter.
-- The non-member operator overloads call the corresponding Equal functions.
-
 ### maidsafe::nfs::Blob ###
 > maidsafe/nfs/blob.h
 
@@ -284,7 +194,6 @@ class Blob {
     Clock::time_point modification_time() const noexcept;
     std::uint64_t size() const noexcept;
     const std::string& user_meta_data() const noexcept;
-    Expected<std::string> data() const;
 };
 ```
 - **version()**
@@ -299,61 +208,20 @@ class Blob {
   - Returns the size of this `Blob` in bytes.
 - **user_meta_data()**
   - Returns the user metadata being stored for this `Blob`.
-- **data()**
-  - Returns the contents of the `Blob`, if `size()` is less than 3KB. If this is not true, `CommonErrors::cannot_exceed_limit` is returned, and the `RestContainer::Get` function will have to be used instead.
 
-### ContainerOperation<T> ###
-> maidsafe/nfs/container_operation.h
-
-- [ ] Thread-safe Public Functions
-- [x] Copyable
-- [x] Movable
-
-Most REST API users should only need to invoke the result() function to retrieve a `Container` returned in a `Storage::OpenContainer` call. A version is returned for consistency with BlobOperations, and for users that wish to use the [Posix API](posix_api.md) in some situations.
-
-```c++
-template<typename T = void>
-class ContainerOperation {
-  const ContainerVersion& version() const;
-  const T& result() const; // iff T != void
-};
-```
-
-### BlobOperation<T> ###
-> maidsafe/nfs/container_operation.h
-
-- [ ] Thread-safe Public Functions
-- [x] Copyable
-- [x] Movable
-
-Every operation on Blobs return a `BlobOperation` object.
-
-```c++
-template<typename T = void>
-class BlobOperation {
-  const BlobVersion& version() const;
-  const T& result() const; // iff T != void
-};
-```
-- **version**
-  - Returns the `BlobVersion` involved in the operation.
-- **result()**
-  - If the operation is NOT void, this will return the result of the operation. Compile error on void.
-
-### OperationError<ExpectedOperation> ###
+### OperationError<T> ###
 > maidsafe/nfs/operation_error.h
 
 - [ ] Thread-safe Public Functions
 - [x] Copyable
 - [x] Movable
 
-This object is returned if a network operation fails.
 In the event of a failure, retrieving the cause of the error and a Retry attempt can be done with the `OperationError` interface. The error is a std::error_code object, and the retry attempt will return a new `Future` object with the exact type of the previous failed attempt.
 
 ```c++
-template<typename ExpectedOperation>
+template<typename T>
 class OperationError {
-  using RetryResult = Future<boost::expected<ExpectedOperation, OperationError<ExpectedOperation>>;
+  using RetryResult = Future<boost::expected<T, OperationError<T>>;
   RetryResult Retry() const;
   std::error_code code() const;
 };
@@ -380,9 +248,9 @@ using Future = boost::future<T>;
 ```
 
 ### Expected ###
-When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain a OperationError object, and on success the object will contain a BlobOperation or a ContainerOperation object depending on the operation requested. For convenience, the templated types `ExpectedContainerOperation<T>` and `ExpectedBlobOperation<T>` are provided, where `T` is the result of the operation (i.e. a std::string on a `Get` request). Both types assume `OperationError` as the error object for the operation.
+When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain a OperationError object, and on success the object will contain an object of `T` as indicated by the interface.
 
-#### ExpectedContainerOperation<T> ####
+#### ExpectedOperation<T> ####
 > maidsafe/nfs/expected_container_operation.h
 
 - [ ] Thread-safe Public Functions
@@ -391,48 +259,7 @@ When a network operation has completed, the future will return a [`boost::expect
 
 ```c++
 template<typename T = void>
-using ExpectedContainerOperation =
-    boost::expected<ContainerOperation<T>, OperationError<ContainerOperation<T>>>;
-```
-
-#### ExpectedBlobOperation<T> ####
-> maidsafe/nfs/expected_blob_operation.h
-
-- [ ] Thread-safe Public Functions
-- [x] Copyable
-- [x] Movable
-
-```c++
-template<typename T = void>
-using ExpectedBlobOperation =
-    boost::expected<BlobOperation<T>, OperationError<BlobOperation<T>>>;
-```
-
-#### Monadic ####
-The REST API returns `ExpectedContainerOperation<T>` or `ExpectedBlobOperation<T>` objects which use an error type that depends on `T`. This makes monadic programming difficult because the unwrap functions in `boost::expected` will not work as desired. The REST API includes some standalone functions that return a `boost::expected` object with a consistent error type, `std::error_code`. After removing the `OperationError<T>`, retrying the failed operation is not possible. [An example](#hello-world-monad-style) of the standalone functions in use.
-
-> maidsafe/nfs/expected_container_operation.h
-
-```c++
-template<typename T>
-boost::expected<BlobOperation<T>, std::error_code> monadic(
-    const ExpectedBlobOperation<T>& expected);
-
-template<typename T>
-boost::expected<BlobOperation<T>, std::error_code> monadic(
-    ExpectedBlobOperation<T>&& expected);
-```
-
-> maidsafe/nfs/expected_blob_operation.h
-
-```c++
-template<typename T>
-boost::expected<ContainerOperation<T>, std::error_code> monadic(
-    const ExpectedContainerOperation<T>& expected);
-
-template<typename T>
-boost::expected<ContainerOperation<T>, std::error_code> monadic(
-    ExpectedContainerOperation<T>&& expected);
+using ExpectedOperation = boost::expected<T, OperationError<T>>;
 ```
 
 ### maidsafe::nfs::RestContainer ###
@@ -450,8 +277,8 @@ Represents the [`Container`](#container) abstraction listed above.
 class RestContainer {
   Future<ExpectedOperation<std::vector<Blob>>> ListBlobs(std::string prefix = std::string());
   
-  Future<ExpectedOperation<Blob>>              GetBlob(std::string key);
-  Future<ExpectedOperation<std::vector<Blob>>> GetBlobHistory(std::string key);
+  Future<ExpectedOperation<Blob>>              GetBlob(const std::string& key);
+  Future<ExpectedOperation<std::vector<Blob>>> GetBlobHistory(const std::string& key);
   
   Future<ExpectedOperation<Blob>> CreateBlob(const std::string& key, std::string data, std::string meta_data);
   Future<ExpectedOperation<Blob>> UpdateBlobContent(const Blob& blob, std::string);
@@ -460,41 +287,38 @@ class RestContainer {
   Future<ExpectedOperation<Blob>> GetBlobContent(const Blob& blob, std::uint64_t offset, std::uint64_t length);
   Future<ExpectedOperation<Blob>> DeleteBlob(const Blob& blob);
   
-  Future<Blob> Copy(const Blob& from, std::string to);
+  Future<Blob> Copy(const Blob& from, const std::string& to);
 };
 ```
-- **GetBlobs()**
-  - Retrieves the `Blob`s currently in the Container.
-- **PutMetaData(std::string key, std::string, ModifyBlobVersion)**
-  - Stores the contents at the key as user meta data. 
-  - Maximum size is 64kB. 
-  - The new `Blob` is returned on completion.
-- **GetMetaData(std::string key, RetrieveBlobVersion)**
-  - Retrieves the user meta data for a Blob.
-- **Put(std::string key, std::string, ModifyBlobVersion)**
-  - Stores the Blob contents at the key. 
-  - The new `Blob` is returned on completion.
-- **Get(Blob)**
-  - Retrieves the `Blob` contents. 
-  - Faster than the `std::string, Version` overload because the network pointers are contained within the `Blob` object.
-- **Get(std::string key, RetrieveBlobVersion)**
-  - Retrieves the Blob contents at the key. 
-  - Slower than the `Blob` overload because the `Blob` object has to be retrieved first.
-- **Delete(std::string key, RetrieveBlobVersion)**
-  - Removes the key from the Container.
-- **ModifyRange(std::string key, std::string, std::uint64_t offset, ModifyBlobVersion)**
-  - Stores a new Blob by re-using a portion of an existing Blob. The size of the Blob is automatically extended if offset exceeds the size of the original Blob. The new `Blob` is returned on completion.
-- **GetRange(Blob, std::size_t length, std::uint64_t offset)**
-  - Retrieves a portion of the Blob contents at the key.
-  - Returned std::string is automatically truncated if length + offset exceeds Blob size. 
-  - Faster than the `std::string, Version` overload because the network pointers are contained within the Blob object.
-- **GetRange(std::string key, std::size_t length, std::uint64_t offset, RetrieveBlobVersion)**
-  - Retrieves a portion of the Blob contents at the key. 
-  - Returned std::string is automatically truncated if length + offset exceeds Blob size.
-  - Slower than the `Blob` overload because the `Blob` object has to be retrieved first.
-- **Copy(Blob from, std::string to, ModifyBlobVersion)**
-  - Copies user metadata + data from a Blob at one key to a Blob at another key.
-  - Faster than the `std::string, Version` overload because the network pointers are contained within the Blob object.
-- **Copy(std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion)**
-  - Copies user metadata + data from a Blob at one key to a Blob at another key.
-  - Slower than the `Blob` overload because the `Blob` object has to be retrieved first.
+- **ListBlobs(std::string prefix = std:string())**
+  - Retrieves the most recent Blobs stored in the Container.
+  - `prefix` will filter the returned values - only Blobs with key matching the prefix will be returned. The empty string indicates that all Blobs should be returned.
+- **GetBlob(const std::string& key)**
+  - Retrieve a handle to the most recent Blob referenced by key.
+- **GetBlobHistory(const std::string& key)**
+  - Retrieve every Blob referenced by key, stopping at the creation of the first Blob. The `front()` of the vector will contain the newest Blob, while the `back()` of the vector will contain the first Blob OR the oldest Blob known to the network (the history has a hard limit).
+- **CreateBlob(const std::string& key, std::string data, std::string meta_data)**
+  - Create a Blob at the specified key.
+  - `data` or `meta_data` can be empty.
+  - Maximum size of `meta_data` is 64KiB.
+  - `data` has no size restrictions (only local memory contraints apply).
+  - Fails if `key` curently references a Blob or nested Container (from Posix API).
+  - Returns the Blob created.
+- **UpdateBlobContent(const Blob& blob, std::string)**
+  - Update the contents of `blob`.
+  - If `blob` was updated/deleted previously, this will fail, and the newest `blob` will have to be provided.
+  - Returns the new Blob stored.
+- **UpdateBlobMetadata(const Blob& blob, std::string)**
+  - Update the user meta data of `blob`.
+  - If `blob` was updated/deleted previously, this will fail, and the newest blob will have to be provided.
+  - Returns the new Blob stored.
+- **GetBlobContent(const Blob& blob)**
+  - Retrieve the content of `blob`.
+  - Can be done at anytime, even if `blob` has been deleted from the Container.
+- **GetBlobContent(const Blob& blob, std::uint64_t offset, std::uint64_t length)**
+  - Retrieve a portion of the contents of `blob`.
+  - Can be done at anytime, even if `blob` has been popped from the history limit or been deleted.
+- **DeleteBlob(const Blob& blob)**
+  - Remove `blob` from the lastest container listings.
+  - If `blob` was updated previously, this will fail, and the newest blob will have to be provided.
+- **Copy(const Blob& from, const std::string& to)**
