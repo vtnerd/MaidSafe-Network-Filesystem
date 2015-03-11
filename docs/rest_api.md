@@ -448,34 +448,26 @@ Represents the [`Container`](#container) abstraction listed above.
 
 ```c++
 class RestContainer {
-  Future<ExpectedContainerOperation<std::vector<Blob>>> GetBlobs();
-
-  Future<ExpectedBlobOperation<Blob>>        PutMetaData(
-      std::string key, std::string, ModifyBlobVersion);
-  Future<ExpectedBlobOperation<std::string>> GetMetaData(std::string key, RetrieveBlobVersion);
-
-  Future<ExpectedBlobOperation<Blob>>        Put(std::string key, std::string, ModifyBlobVersion);
-  Future<ExpectedBlobOperation<std::string>> Get(Blob);
-  Future<ExpectedBlobOperation<std::string>> Get(std::string key, RetrieveBlobVersion);
-  Future<ExpectedBlobOperation<>>            Delete(std::string key, RetrieveBlobVersion);
-
-  Future<ExpectedBlobOperation<Blob>>        ModifyRange(
-      std::string key, ModifyBlobVersion, std::string, std::uint64_t offset);
-  Future<ExpectedBlobOperation<std::string>> GetRange(
-      Blob, std::size_t length, std::uint64_t offset);
-  Future<ExpectedBlobOperation<std::string>> GetRange(
-      std::string key, RetrieveBlobVersion, std::size_t length, std::uint64_t offset);
-
-  Future<ExpectedBlobOperation<Blob>> Copy(Blob from, std::string to, ModifyBlobVersion);
-  Future<ExpectedBlobOperation<Blob>> Copy(
-      std::string from, RetrieveBlobVersion, std::string to, ModifyBlobVersion);
+  Future<ExpectedOperation<std::vector<Blob>>> ListBlobs(std::string prefix = std::string());
+  
+  Future<ExpectedOperation<Blob>>              GetBlob(std::string key);
+  Future<ExpectedOperation<std::vector<Blob>>> GetBlobHistory(std::string key);
+  
+  Future<ExpectedOperation<Blob>> CreateBlob(const std::string& key, std::string data, std::string meta_data);
+  Future<ExpectedOperation<Blob>> UpdateBlobContent(const Blob& blob, std::string);
+  Future<ExpectedOperation<Blob>> UpdateBlobMetadata(const Blob& blob, std::string);
+  Future<ExpectedOperation<Blob>> GetBlobContent(const Blob& blob);
+  Future<ExpectedOperation<Blob>> GetBlobContent(const Blob& blob, std::uint64_t offset, std::uint64_t length);
+  Future<ExpectedOperation<Blob>> DeleteBlob(const Blob& blob);
+  
+  Future<Blob> Copy(const Blob& from, std::string to);
 };
 ```
 - **GetBlobs()**
   - Retrieves the `Blob`s currently in the Container.
 - **PutMetaData(std::string key, std::string, ModifyBlobVersion)**
   - Stores the contents at the key as user meta data. 
-  - Maximum size is 64KB. 
+  - Maximum size is 64kB. 
   - The new `Blob` is returned on completion.
 - **GetMetaData(std::string key, RetrieveBlobVersion)**
   - Retrieves the user meta data for a Blob.
