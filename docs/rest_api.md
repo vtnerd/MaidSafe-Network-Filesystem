@@ -154,27 +154,6 @@ This examples uses the `->` operator on the `boost::expected` object instead of 
 ## REST Style API ##
 All public functions listed in this API provide the strong exception guarantee. All public const methods are thread-safe.
 
-### maidsafe::nfs::BlobVersion ###
-> maidsafe/nfs/blob_version.h
-
-- [ ] Thread-safe Public Functions
-- [x] Copyable
-- [x] Movable
-
-Blobs stored at the same key are differentiated/identified by a `BlobVersion` object. The `BlobVersion` allows Posix API users to retrieve older revisions of Blobs, or place constraints on operations that change the blob associated with a key.
-
-```c++
-class BlobVersion {
-  bool Equal(const BlobVersion&) const noexcept;
-};
-
-bool operator==(const BlobVersion&, const BlobVersion&) noexcept;
-bool operator!=(const BlobVersion&, const BlobVersion&) noexcept;
-```
-- **Equal(const BlobVersion&)**
-  - Return true if *this BlobVersion is equivalent to the BlobVersion given in the parameter.
-- The non-member operator overloads call the Equal function.
-
 ### maidsafe::nfs::Blob ###
 > maidsafe/nfs/blob.h
 
@@ -182,13 +161,12 @@ bool operator!=(const BlobVersion&, const BlobVersion&) noexcept;
 - [x] Copyable
 - [x] Movable
 
-Represents a single stored Blob on the network. Can be given to any valid [`PosixContainer`](#maidsafenfsposixcontainer) so that the contents can be read - this object stores pointers to the data on the network for quicker access. Object is immutable.
+Represents a single stored Blob on the network.
 
 > The network currently has no time server of its own, so the timestamps are from the clients. If a client has a misconfigured clock, the timestamps stored will also be incorrect.
 
 ```c++
 class Blob {
-    const BlobVersion& version() const noexcept;
     const std::string& key() const noexcept;
     Clock::time_point creation_time() const noexcept;
     Clock::time_point modification_time() const noexcept;
@@ -227,7 +205,7 @@ class OperationError {
 };
 ```
 - **Retry**
-  - Return a Future to another attempt at the failed operation. Be careful of infinite loops - some operations could fail indefinitely (ModifyBlobVersion::Create() for example). If the retry returns an error code `std::errc::not_supported`, then a retry is not possible.
+  - Return a Future to another attempt at the failed operation. Be careful of infinite loops - some operations could fail indefinitely. If the retry returns an error code `std::errc::not_supported`, then a retry is not possible.
 - **code()**
   - Return error code for the failed operation.
 
@@ -248,7 +226,7 @@ using Future = boost::future<T>;
 ```
 
 ### Expected ###
-When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain a OperationError object, and on success the object will contain an object of `T` as indicated by the interface.
+When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain an OperationError object, and on success the object will contain an object of `T` as indicated by the interface.
 
 #### ExpectedOperation<T> ####
 > maidsafe/nfs/expected_container_operation.h
@@ -285,7 +263,7 @@ class RestContainer {
   Future<ExpectedOperation<Blob>> UpdateBlobMetadata(const Blob& blob, std::string);
   Future<ExpectedOperation<Blob>> GetBlobContent(const Blob& blob);
   Future<ExpectedOperation<Blob>> GetBlobContent(const Blob& blob, std::uint64_t offset, std::uint64_t length);
-  Future<ExpectedOperation<Blob>> DeleteBlob(const Blob& blob);
+  Future<ExpectedOperation<void>> DeleteBlob(const Blob& blob);
   
   Future<Blob> Copy(const Blob& from, const std::string& to);
 };
@@ -296,7 +274,7 @@ class RestContainer {
 - **GetBlob(const std::string& key)**
   - Retrieve a handle to the most recent Blob referenced by key.
 - **GetBlobHistory(const std::string& key)**
-  - Retrieve every Blob referenced by key, stopping at the creation of the first Blob. The `front()` of the vector will contain the newest Blob, while the `back()` of the vector will contain the first Blob OR the oldest Blob known to the network (the history has a hard limit).
+  - Retrieve every Blob referenced by key, stopping at the creation of the first Blob or the end of the finite history stored by the network. The `front()` of the vector will contain the newest Blob, while the `back()` of the vector will contain the oldest known Blob.
 - **CreateBlob(const std::string& key, std::string data, std::string meta_data)**
   - Create a Blob at the specified key.
   - `data` or `meta_data` can be empty.
@@ -310,6 +288,7 @@ class RestContainer {
   - Returns the new Blob stored.
 - **UpdateBlobMetadata(const Blob& blob, std::string)**
   - Update the user meta data of `blob`.
+  - Maximum size of `meta_data` is 64KiB.
   - If `blob` was updated/deleted previously, this will fail, and the newest blob will have to be provided.
   - Returns the new Blob stored.
 - **GetBlobContent(const Blob& blob)**
@@ -322,3 +301,7 @@ class RestContainer {
   - Remove `blob` from the lastest container listings.
   - If `blob` was updated previously, this will fail, and the newest blob will have to be provided.
 - **Copy(const Blob& from, const std::string& to)**
+  - Copies the contents and user meta data of `from` to a new key referenced by `to`.
+  - `from` can be a Blob stored in _any_ container.
+  - `to` must be an unassociated key - it cannot currently reference a Blob or child Container (from the Posix API).
+  - Returns the new Blob stored. The creation time and modification will not be the same as `from`.
