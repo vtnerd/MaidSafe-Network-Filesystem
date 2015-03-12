@@ -16,17 +16,13 @@ Every REST API function call that requires a network operation returns a [`Futur
 ## Examples ##
 ### Hello World (Exception Style) ###
 ```c++
-bool HelloWorld(maidsafe::nfs::Storage& storage) {
+bool HelloWorld(maidsafe::nfs::RestContainer& container) {
   try {
-    maidsafe::nfs::Container container(
-        storage.OpenContainer("example_container").get().value().result());
+    const auto blob = container.CreateBlob(
+        "example_blob", "hello world", std::string()).get().value();
+    const auto blob_contents = container.GetBlobContents(blob).get().value();
 
-    const auto put_operation = container.Put(
-        "example_blob", "hello world", maidsafe::nfs::ModifyBlobVersion::Create()).get();
-    const auto get_operation = container.Get(
-        "example_blob", put_operation.value().version()).get();
-
-    std::cout << get_operation.value().result() << std::endl;
+    std::cout << blob_contents << std::endl;
   }
   catch (const std::runtime_error& error) {
     std::cerr << "Error : " << error.what() << std::endl;
@@ -40,18 +36,15 @@ bool HelloWorld(maidsafe::nfs::Storage& storage) {
   return true;
 }
 ```
-The `.get()` calls after `GetContainer`, `Put` and `Get` indicate that the process should wait until the SAFE network successfully completes the requested operation (the `.get()` is called on the `Future<T>` object). The `Future<T>` object allows a process to make additional requests before prior requests have completed (see [Hello World Concatenation](#hello-world-concatenation)). If the above example issued the `Get` call without waiting for the `Put` `Future<T>` to signal completion, the `Get` could've failed. So the `Future<T>` will signal when the result of that operation can be seen by calls locally or remotely.
+The `.get()` calls after `CreateBlob`, and `GetBlobContents` indicate that the process should wait until the SAFE network successfully completes the requested operation (the `.get()` is called on the `Future<T>` object). The `Future<T>` object allows a process to make additional requests before prior requests have completed (see [Hello World Concatenation](#hello-world-concatenation)).
 
 The `Future<T>` returns a `boost::expected` object. In this example, exception style error-handling was used, so `.value()` was invoked on the `boost::expected`. The `.value()` function checks the error status, and throws `std::system_error` if the `boost::expected` object has an error instead of a valid operation.
-
-The `Put` call uses `ModifyBlobVersion::Create()` to indicate that it is creating and storing a new file. If an existing file exists at `example_blob`, then an exception will be thrown in the `Get` call because `put_operation` contains an error (so after running this program once, all subsequent runs should fail). The `Get` call uses the [`BlobVersion`](#blobversion) returned by the `Put`, guaranteeing that the contents from the original `Put` ("hello world"), are retrieved. Alternatively, `RetrieveBlobVersion::Latest()` could've been used instead, but if another process or thread updated the file, the new contents would be returned, which may not be "hello world" as desired.
 
 ### Hello World Retry (Return-Code Style) ###
 ```c++
 namespace {
   template<typename Result>
-  boost::optional<maidsafe::nfs::BlobOperation<Result>> GetOperationResult(
-      maidsafe::nfs::ExpectedBlobOperation<Result> operation) {
+  boost::optional<Result> GetOperationResult(maidsafe::nfs::ExpectedOperation<Result> operation) {
     while (!operation) {
       if (operation.error().code() != std::errc::network_down) {
         std::cerr <<
@@ -65,51 +58,37 @@ namespace {
 }
 
 bool HelloWorld(maidsafe::nfs::Container& storage) {
-  const boost::optional<maidsafe::nfs::BlobOperation<>> put_operation(
+  const boost::optional<Blob> create_operation(
       GetOperationResult(
-          storage.Put(
-              "example_blob", "hello world", maidsafe::nfs::ModifyBlobVersion::Create()).get()));
-  if (put_operation) {
-    const boost::optional<maidsafe::nfs::BlobOperation<std::string>> get_operation(
-        GetOperationResult(
-            storage.Get(
-                "example_blob", put_operation->version()).get()));
+          storage.CreateBlob("example_blob", "hello world", std::string()).get()));
+  if (create_operation) {
+    const boost::optional<std::string> get_operation(
+        GetOperationResult(storage.GetBlobContents(*create_operation).get()));
     if (get_operation) {
-      std::cout << get_operation->result() << std::endl;
+      std::cout << *get_operation<< std::endl;
       return true;
     }
   }
   return false;
 }
 ```
-This example starts from the `Container` object for brevity. It is identical to the [hello world](#hello-world) example, except `Put` and `Get` operations that failed due to the network being down (no connection) are retried. In production code you may want to limit the attempts, or have a signal that indicates the return of network connectivity.
+This example is identical to the [hello world](#hello-world) example, except `CreateBlob` and `GetBlobContents` operations that failed due to the network being down (no connection) are retried. In production code you may want to limit the attempts, or have a signal that indicates the return of network connectivity.
 
-> If the retry mechanism returns std::errc::not_supported then no retry is possible. It is important that clients check the error code after a retry, or clients could continually attempt an operation that will never succeed.
+> If the retry mechanism returns `NfsErrors::no_retry` then no retry is possible. It is important that clients check the error code after a retry, or clients could continually attempt an operation that will never succeed.
 
 ### Hello World (Monad Style) ###
 ```c++
-bool HelloWorld(const maidsafe::nfs::Storage& storage) {
+bool HelloWorld(const maidsafe::nfs::Container& container) {
   namespace nfs = maidsafe::nfs;
 
-  return nfs::monadic(storage.OpenContainer("example_container").get()).bind(
-
-      [](nfs::ContainerOperation<nfs::Container> open_operation) {
-        return nfs::monadic(
-            open_operation.result().Put(
-                "example_blob", "hello world", nfs::ModifyBlobVersion::Create()).get()).bind(
-
-                [&open_operation](nfs::BlobOperation<> put_operation) {
-                  return nfs::monadic(
-                      open_operation.result().Get("example_blob", put_operation.version()).get());
-
-                }).bind([](nfs::BlobOperation<std::string> get_operation) {
-                  std::cout << get_operation.result() << std::endl;
-                });
-
-      }).catch_error([](std::error_code error) {
-        std::cerr << "Error: " << error.message() << std::endl;
-        return boost::make_unexpected(error);
-
+  return nfs::monadic(container.CreateBlob("example_blob", "hello world", std::string()).get()
+      ).bind([&](Blob blob) {
+        return nfs::monadic(container.GetBlobContents(blob).get());
+      }).bind([](std::string contents) {
+        std::cout << contents << std::endl;
+      }).catch_error([](std::error_code error) { 
+        std::cerr << error.message() << std::endl;
+        return boost::make_unexpected(error)
       }).valid();
 }
 ```
