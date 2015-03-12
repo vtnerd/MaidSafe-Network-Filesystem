@@ -142,11 +142,16 @@ Represents a single stored Blob on the network.
 ```c++
 class Blob {
     const std::string& key() const noexcept;
-    Clock::time_point creation_time() const noexcept;
-    Clock::time_point modification_time() const noexcept;
+    Clock::time_point creation_time() const;
+    Clock::time_point modification_time() const;
     std::uint64_t size() const noexcept;
     const std::string& user_meta_data() const noexcept;
+    
+    bool Equal(const Blob& other) const noexcept
 };
+
+bool operator==(const Blob&, const Blob&) const noexcept;
+bool operator!=(const Blob&, const Blob&) const noexcept;
 ```
 - **key()**
   - Returns the key associated with this `Blob`.
@@ -158,8 +163,11 @@ class Blob {
   - Returns the size of this `Blob` in bytes.
 - **user_meta_data()**
   - Returns the user metadata being stored for this `Blob`.
+- **Equal(const Blob& other)**
+  - Returns true if `other` is equivalent to `this` Blob.
+- The non-member operator overloads call the corresponding Equal function.
 
-### maidsafe::nfs::OperationError<T> ###
+### maidsafe::nfs::OperationError&lt;T> ###
 > maidsafe/nfs/operation_error.h
 
 - [ ] Thread-safe Public Functions
@@ -181,7 +189,7 @@ class OperationError {
 - **code()**
   - Return error code for the failed operation.
 
-### maidsafe::nfs::Future<T> ###
+### maidsafe::nfs::Future&lt;T> ###
 > maidafe/nfs/future.h
 
 - [x] Thread-safe Public Functions
@@ -197,7 +205,7 @@ template<typename T>
 using Future = boost::future<T>;
 ```
 
-### maidsafe::nfs::Expected<T> ###
+### maidsafe::nfs::Expected&lt;T> ###
 > maidsafe/nfs/expected.h
 
 When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain an `OperationError` object, and on success the object will contain an object of `T` as indicated by the interface.
@@ -207,7 +215,7 @@ template<typename T>
 using Expected = boost::expected<T, std::error_code>;
 ```
 
-#### maidsafe::nfs::ExpectedOperation<T> ####
+#### maidsafe::nfs::ExpectedOperation&lt;T> ####
 > maidsafe/nfs/expected_operation.h
 
 - [ ] Thread-safe Public Functions
