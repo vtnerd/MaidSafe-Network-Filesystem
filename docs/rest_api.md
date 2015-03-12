@@ -285,6 +285,7 @@ class RestContainer {
   - Can be done at anytime, even if `blob` has been deleted from the Container.
 - **GetBlobContent(const Blob& blob, std::uint64_t offset, std::uint64_t length)**
   - Retrieve from `offset` to `offset + length` of the `blob` contents.
+  - If `blob.size() < offset + length`, then the returned string is truncated to the end of the `blob` contents.
   - `blob` can be from _any_ Container.
   - Can be done at anytime, even if `blob` has been popped from the history limit or been deleted.
 - **CreateBlob(const std::string& key, std::string data, std::string meta_data)**
@@ -296,12 +297,12 @@ class RestContainer {
   - Returns the Blob created.
 - **UpdateBlobContent(const Blob& blob, std::string)**
   - Update the contents of `blob`.
-  - If `blob` was updated/deleted previously, this will fail, and the newest `blob` will have to be provided.
+  - If `blob` was updated/deleted previously, this will fail, and the newest Blob will have to be provided.
   - Returns the new Blob stored.
 - **UpdateBlobContent(const Blob& blob, std::string, std::uint64_t offset)**
   - Update the contents of `blob` starting at `offset`.
   - If `blob.size() < offset`, then zeroes are written from `blob.size()` to `offset`.
-  - If `blob was updated/deleted previously, this wil lfail, and the newest `blob` will have to be provided.
+  - If `blob` was updated/deleted previously, this will fail, and the newest Blob will have to be provided.
   - Returns the new blob stored.
 - **UpdateBlobMetadata(const Blob& blob, std::string)**
   - Update the user meta data of `blob`.
