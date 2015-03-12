@@ -94,7 +94,7 @@ bool HelloWorld(const maidsafe::nfs::Container& container) {
 ```
 This is an example of monadic programming, which is better described in the [Expected](#expected) documentation. The callbacks provided to the `bind` function calls are only invoked if the operation was successful, and the `catch_error` callback is only invoked if *any* of the previous operations failed. This eliminates the need for client code to check for errors after each operation. Also, in this example all values are *moved*, not copied, so it is efficient as well.
 
-> Using monadic programming with boost expected will require the usage of [`maidsafe::nfs::monadic`](#monadic).
+> Using monadic programming with boost expected will require the usage of [`maidsafe::nfs::monadic`](#maidsafenfsmonadic).
 
 ### Hello World Concatenation ###
 ```c++
