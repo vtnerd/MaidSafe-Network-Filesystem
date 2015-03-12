@@ -311,7 +311,7 @@ class RestContainer {
   - Fails if `blob.key()` does not currently reference `blob`.
   - Returns the new Blob stored.
 - **DeleteBlob(const Blob& blob)**
-  - Remove `blob` from the lastest container listings.
+  - Remove `blob.key()` from the lastest container listings.
   - Fails if `blob.key()` does not currently reference `blob`.
 - **Copy(const Blob& from, const std::string& to)**
   - Copies the contents and user meta data of `from` to a new key referenced by `to`.
