@@ -519,8 +519,8 @@ class LocalBlob {
   void set_offset(std::uint64_t);
 
   unspecified Read(asio::buffer, AsyncResult<std::uint64_t>);
-  unspecified Write(asio::buffer, AsyncResult<>);
-  void Truncate(std::uint64_t, AsyncResult<>);
+  unspecified Write(asio::buffer, AsyncResult<void>);
+  void Truncate(std::uint64_t, AsyncResult<void>);
 };
 ```
 - **user_meta_data()**
@@ -538,11 +538,11 @@ class LocalBlob {
   - `offset()` is immediately updated to `min(size() - offset(), offset() + buffer::size())`
   - AsyncResult is given the number of bytes actually read.
   - Cannot be invoked if a `Read`, `Write`, or `Truncate` call has not-yet completed.
-- **Write(boost::asio::buffer, AsyncResult<>)**
+- **Write(boost::asio::buffer, AsyncResult<void>)**
   - Write to the `LocalBlob` starting at `offset()` from the provided buffer. The buffer must remain valid until AsyncResult returns.
   - `offset()` is immediately updated to `offset() + buffer::size()`
   - Cannot be invoked if a `Read`, `Write`, or `Truncate` call has not-yet completed.
-- **Truncate(std::uint64_t size, AsyncResult<>)**
+- **Truncate(std::uint64_t size, AsyncResult<void>)**
   - Change the size of the `LocalBlob` to `size` bytes.
   - `offset()` is immediately updated to `size`
   - Cannot be invoked if a `Read`, `Write`, or `Truncate` call has not-yet completed.
