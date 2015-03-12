@@ -249,8 +249,8 @@ class RestContainer {
   Future<ExpectedOperation<Blob>>              GetBlob(const std::string& key);
   Future<ExpectedOperation<std::vector<Blob>>> GetBlobHistory(const std::string& key);
   
-  Future<ExpectedOperation<Blob>> GetBlobContent(const Blob& blob);
-  Future<ExpectedOperation<Blob>> GetBlobContent(
+  Future<ExpectedOperation<std::string>> GetBlobContent(const Blob& blob);
+  Future<ExpectedOperation<std::string>> GetBlobContent(
       const Blob& blob, std::uint64_t offset, std::uint64_t length);
 
   Future<ExpectedOperation<Blob>> CreateBlob(
