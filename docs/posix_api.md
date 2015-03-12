@@ -423,11 +423,11 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 ```c++
 class PosixContainer {
   // Child Container Operations
-  unspecified ListChildContainers(AsyncResult<std::vector<ContainerInfo>>);
+  unspecified ListChildContainers(AsyncResult<std::vector<ContainerInfo>> result);
       
-  unspecified    CreateChildContainer(std::string key, AsyncResult<PosixContainer>);
+  unspecified    CreateChildContainer(std::string key, AsyncResult<PosixContainer> result);
   PosixContainer OpenChildContainer(ContainerInfo);
-  unspecified    OpenChildContainer(std::string key, AsyncResult<PosixContainer>);
+  unspecified    OpenChildContainer(std::string key, AsyncResult<PosixContainer> result);
 
   unspecified DeleteChildContainer(ContainerInfo, AsyncResult<void>);
 
@@ -437,57 +437,57 @@ class PosixContainer {
   
   LocalBlob   CreateLocalBlob() const;
   LocalBlob   OpenLocalBlob(const Blob& blob) const;
-  unspecified OpenLocalBlob(std::string key, AsyncResult<LocalBlob>);
+  unspecified OpenLocalBlob(std::string key, AsyncResult<LocalBlob> result);
 
-  unspecified CopyBlob(const Blob& from, std::string to, AsyncResult<Blob>);
-  unspecified WriteBlob(LocalBlob& from, std::string to, AsyncResult<Blob>);
-  unspecified UpdateBlob(LocalBlob& from, Blob to, AsyncResult<Blob>);
+  unspecified CopyBlob(const Blob& from, std::string to, AsyncResult<Blob> result);
+  unspecified WriteBlob(LocalBlob& from, std::string to, AsyncResult<Blob> result);
+  unspecified UpdateBlob(LocalBlob& from, Blob to, AsyncResult<Blob> result);
       
   unspecified DeleteBlob(Blob blob, AsyncResult<void>);
 };
 ```
 > A key can only store a Blob or a nested Container at a given point in time.
 
-- **ListChildContainers(AsyncResult&lt;std::vector&lt;ContainerInfo>>)**
+- **ListChildContainers(AsyncResult&lt;std::vector&lt;ContainerInfo>> result)**
   - Request the list of nested child Containers.
-  - AsyncResult is given handles to the child containers. The ordering in the vector is unspecified.
-- **CreateChildContainer(std::string key, AsyncResult&lt;PosixContainer>)**
+  - `result` is given handles to the child containers. The ordering in the vector is unspecified.
+- **CreateChildContainer(std::string key, AsyncResult&lt;PosixContainer> result)**
   - Create a new child container at `key`.
   - Fails if `key` currently references a Blob or another child Container.
-  - AsyncResult is given the new child Container.
+  - `result` is given the new child Container.
 - **OpenChildContainer(ContainerInfo)**
   - Open the container referenced by the ContainerInfo handle.
-- **OpenChildContainer(std::string key, AsyncResult&lt;PosixContainer>)**
+- **OpenChildContainer(std::string key, AsyncResult&lt;PosixContainer> result)**
   - Make a request to open a container at `key`.
-  - AsyncResult is given the child Container.
-- **DeleteChildContainer(ContainerInfo child, AsyncResult&lt;void>)**
+  - `result` is given the child Container.
+- **DeleteChildContainer(ContainerInfo child, AsyncResult&lt;void> result)**
   - Make a request to delete the Container.
   - Fails if `child.key()` does not currently reference `child`.
-  - AsyncResult is given nothing on completion.
-- **ListBlobs(AsyncResult&lt;std::vector&lt;Blob>>)**
+  - `result` is given nothing on completion.
+- **ListBlobs(AsyncResult&lt;std::vector&lt;Blob>> result)**
   - Request the list of Blobs.
-  - AsyncResult is given handles to the Blob objects. The ordering is unspecified.
+  - `result` is given handles to the Blob objects. The ordering is unspecified.
 - **CreateLocalBlob()**
   - A LocalBlob is returned with `size() == 0` and `user_meta_data().empty()`.
 - **OpenLocalBlob(const Blob& blob)**
   - Immediately returns a LocalBlob whose initial contents are identical to `blob`.
-- **OpenLocalBlob(std::string key, AsyncResult&lt;LocalBlob>)**
+- **OpenLocalBlob(std::string key, AsyncResult&lt;LocalBlob> result)**
   - Make a request to open a Blob.
-  - AsyncResult is given a `LocalBlob` that has the contents and user meta data referenced by `key`.
-- **Copy(const Blob& from, std::string to, ModifyBlobVersion, AsyncResult&lt;Blob>)**
+  - `result` is given a `LocalBlob` that has the contents and user meta data referenced by `key`.
+- **Copy(const Blob& from, std::string to, ModifyBlobVersion, AsyncResult&lt;Blob> result)**
   - Make a request to copy the contents and user meta data of `blob` to a new key referenced by `to`.
   - Fails if `to` currently references a Blob or child Container.
-  - AsyncResult is given a handle to the Blob that was stored on the network.
-- **WriteBlob(LocalBlob& from, std::string to, AsyncResult&lt;Blob>)**
+  - `result` is given a handle to the Blob that was stored on the network.
+- **WriteBlob(LocalBlob& from, std::string to, AsyncResult&lt;Blob> result)**
   - Make a request to write the contents and user meta data of `from` to a new key referenced by `to`.
   - Fails if `to` currently references a Blob or child Container.
   - Do not invoke if Read, Write, or Truncate calls have not completed on `from`.
-  - AsyncResult is given a handle to the Blob that was stored on the network.
-- **UpdateBlob(LocalBlob& from, Blob to, AsyncResult&lt;Blob>)**
+  - `result` is given a handle to the Blob that was stored on the network.
+- **UpdateBlob(LocalBlob& from, Blob to, AsyncResult&lt;Blob> result)**
   - Make a request to replace `to` with the contents and user meta data of `from`.
   - Do not invoke if Read, Write, or Truncate calls have not completed on `from`.
   - Fails if `to.key()` does not currently reference `to`.
-  - AsyncResult is given a handle to the Blob that was stred on the network.
+  - `result` is given a handle to the Blob that was stred on the network.
 - **DeleteBlob(Blob blob, AsyncResult&lt;void>)**
   - Make a request that `blob.key()` be removed from the ListBlobs.
   - Fails if `blob.key()` does not currently reference `blob`.
