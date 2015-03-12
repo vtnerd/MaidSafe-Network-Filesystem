@@ -425,9 +425,9 @@ class PosixContainer {
   // Child Container Operations
   unspecified ListChildContainers(AsyncResult<std::vector<ContainerInfo>>);
       
-  unspecified    CreateChildContainer(std::string, AsyncResult<PosixContainer>);
+  unspecified    CreateChildContainer(std::string key, AsyncResult<PosixContainer>);
   PosixContainer OpenChildContainer(ContainerInfo);
-  unspecified    OpenChildContainer(std::string, AsyncResult<PosixContainer>);
+  unspecified    OpenChildContainer(std::string key, AsyncResult<PosixContainer>);
 
   unspecified DeleteChildContainer(ContainerInfo, AsyncResult<void>);
 
@@ -437,62 +437,60 @@ class PosixContainer {
   
   LocalBlob   CreateLocalBlob() const;
   LocalBlob   OpenLocalBlob(const Blob& blob) const;
-  unspecified OpenLocalBlob(std::string, AsyncResult<LocalBlob>);
+  unspecified OpenLocalBlob(std::string key, AsyncResult<LocalBlob>);
 
   unspecified CopyBlob(const Blob& from, std::string to, AsyncResult<Blob>);
-  unspecified WriteLocalBlob(LocalBlob& from, std::string to, AsyncResult<Blob>);
-  unspecified OverWriteBlob(LocalBlob& from, Blob to, AsyncResult<Blob>);
+  unspecified WriteBlob(LocalBlob& from, std::string to, AsyncResult<Blob>);
+  unspecified UpdateBlob(LocalBlob& from, Blob to, AsyncResult<Blob>);
       
-  unspecified DeleteBlob(Blob, AsyncResult<void>);
+  unspecified DeleteBlob(Blob blob, AsyncResult<void>);
 };
 ```
-> - A key can only store a Blob or a nested Container at a given point in time.
-> - The network only stores the last 100 versions of a Container. This theoretically makes it possible for a the history of the Blob to be completely "erased" if other entries in the container are rapidly changing. Storing the original `Blob` object until a Write has completed is recommended (or for as long as possible) - a `Blob` object stores the network addresses of the data and can always be opened later. `BlobVersion` takes up less memory (64-bytes - a SHA512 hash), and can fetch a blob at anytime (provided the history hasn't aged out).
+> A key can only store a Blob or a nested Container at a given point in time.
 
-- **GetThisContainerHistory(AsyncResult<std::vector<ContainerVersion>>)**
-  - Request the version history of this Container.
-  - The network stores only the last 100 versions.
-  - AsyncResult is given the version history of this Container, where front() is the newest version, and back() is the oldest known version. A Container will always have at least one version.
-- **ListChildContainers(RetrieveContainerVersion, AsyncResult<std::vector<ContainerInfo>>)**
+- **ListChildContainers(AsyncResult<std::vector<ContainerInfo>>)**
   - Request the list of nested child Containers.
   - AsyncResult is given handles to the child containers. The ordering in the vector is unspecified.
 - **CreateChildContainer(std::string key, AsyncResult<PosixContainer>)**
   - Create a new child container at `key`.
+  - Fails if `key` currently references a Blob or another child Container.
   - AsyncResult is given the new child Container.
 - **OpenChildContainer(ContainerInfo)**
-  - Open a container refereneced by the ContainerInfo handle.
-  - Faster than the overload that takes a `std::string, ContainerVersion` because the network addresses are stored in the ContainerInfo object.
-- **OpenChildContainer(std::string, AsyncResult<PosixContainer>)**
-  - Make a request to open a container at the specified key.
-  - AsyncResult is given the nested Container with the specified name.
-  - Slower than the overload that takes a `ContainerInfo` object, since that object has to be found first.
-- **DeleteChildContainer(ContainerInfo, AsyncResult<ContainerVersion>)**
-  - Make a request to delete the Container at the specified key.
-  - Fails if a Blob is stored at the key.
-  - AsyncResult is given the new version stored with an empty key.
-- **ListBlobs(RetrieveContainerVersion, AsyncResult<std::vector<Blob>>)**
+  - Open the container referenced by the ContainerInfo handle.
+- **OpenChildContainer(std::string key, AsyncResult<PosixContainer>)**
+  - Make a request to open a container at `key`.
+  - AsyncResult is given the child Container.
+- **DeleteChildContainer(ContainerInfo child, AsyncResult<void>)**
+  - Make a request to delete the Container.
+  - Fails if `child.key()` does not currently reference `child`.
+  - AsyncResult is given nothing on completion.
+- **ListBlobs(AsyncResult<std::vector<Blob>>)**
   - Request the list of Blobs.
-  - AsyncResult is given handles to the Blob objects that can be used to read the contents. The ordering in the vector is unspecified.
+  - AsyncResult is given handles to the Blob objects. The ordering is unspecified.
 - **CreateLocalBlob()**
   - A LocalBlob is returned with `size() == 0` and `user_meta_data().empty()`.
-- **OpenBlob(const Blob&)**
-  - Immediately returns a LocalBlob whose initial contents are identical to Blob.
-- **OpenBlob(std::string, RetrieveBlobVersion, AsyncResult<LocalBlob>)**
-  - Make a request to open a Blob at the specified key.
-  - AsyncResult is given a `LocalBlob` that has the data and user meta data at the specified key.
-  - Slower than the overload that takes a Blob object, since that object has to be found first.
+- **OpenLocalBlob(const Blob& blob)**
+  - Immediately returns a LocalBlob whose initial contents are identical to `blob`.
+- **OpenLocalBlob(std::string key, AsyncResult<LocalBlob>)**
+  - Make a request to open a Blob.
+  - AsyncResult is given a `LocalBlob` that has the contents and user meta data referenced by `key`.
 - **Copy(const Blob& from, std::string to, ModifyBlobVersion, AsyncResult<Blob>**
-  - Make a reques to copy the data and user meta data of `Blob` to the specified key.
-  - The data chunks for the Blob are never re-uploaded, only the Container has to be updated.
-  - AsyncResult is given a handle to the `Blob` that was stored on the network.
-- **Write(LocalBlob& from, std::string to, ModifyBlobVersion, AsyncResult<Blob>)**
-  - Make a request to write the data and user meta data of the `LocalBlob` to the specified key.
-  - Do not invoke if Read, Write, or Truncate calls have not completed on the `LocalBlob`.
-  - AsyncResult is given a handle to the `Blob` that was stored on the network.
-- **DeleteBlob(std:string, ModifyBlobVersion, AsyncResult<ContainerVersion>)**
-  - Make a request to delete the Blob at the specified key.
-  - Fails if a Container is stored at the key.
-  - AsyncResult is given the new version stored with an empty key.
+  - Make a request to copy the contents and user meta data of `blob` to a new key referenced by `to`.
+  - Fails if `to` currently references a Blob or child Container.
+  - AsyncResult is given a handle to the Blob that was stored on the network.
+- **WriteBlob(LocalBlob& from, std::string to, AsyncResult<Blob>)**
+  - Make a request to write the contents and user meta data of `from` to a new key referenced by `to`.
+  - Fails if `to` currently references a Blob or child Container.
+  - Do not invoke if Read, Write, or Truncate calls have not completed on `from`.
+  - AsyncResult is given a handle to the Blob that was stored on the network.
+- **UpdateBlob(LocalBlob& from, Blob to, AsyncResult<Blob>)**
+  - Make a request to replace `to` with the contents and user meta data of `from`.
+  - Do not invoke if Read, Write, or Truncate calls have not completed on `from`.
+  - Fails if `to.key()` does not currently reference `to`.
+  - AsyncResult is given a handle to the Blob that was stred on the network.
+- **DeleteBlob(Blob blob, AsyncResult<void>)**
+  - Make a request that `blob.key()` be removed from the ListBlobs.
+  - Fails if `blob.key()` does not currently reference `blob`.
 
 ### maidsafe::nfs::LocalBlob ###
 > maidsafe/nfs/local_blob.h
