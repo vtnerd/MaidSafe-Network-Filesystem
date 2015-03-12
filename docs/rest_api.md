@@ -255,18 +255,18 @@ class RestContainer {
 
   Future<ExpectedOperation<Blob>>              GetBlob(const std::string& key);
   Future<ExpectedOperation<std::vector<Blob>>> GetBlobHistory(const std::string& key);
+  
+  Future<ExpectedOperation<Blob>> GetBlobContent(const Blob& blob);
+  Future<ExpectedOperation<Blob>> GetBlobContent(
+      const Blob& blob, std::uint64_t offset, std::uint64_t length);
 
   Future<ExpectedOperation<Blob>> CreateBlob(
       const std::string& key, std::string data, std::string meta_data);
 
   Future<ExpectedOperation<Blob>> UpdateBlobContent(const Blob& blob, std::string);
-  Future<ExpectedOperation<Blob>> UpdateBlobContent(const Blob& blob, std::string, std::uint64_t offset);
+  Future<ExpectedOperation<Blob>> UpdateBlobContent(
+      const Blob& blob, std::string, std::uint64_t offset);
   Future<ExpectedOperation<Blob>> UpdateBlobMetadata(const Blob& blob, std::string);
-
-  Future<ExpectedOperation<Blob>> GetBlobContent(const Blob& blob);
-  Future<ExpectedOperation<Blob>> GetBlobContent(
-      const Blob& blob, std::uint64_t offset, std::uint64_t length);
-
   Future<ExpectedOperation<void>> DeleteBlob(const Blob& blob);
 
   Future<Blob> Copy(const Blob& from, const std::string& to);
@@ -276,11 +276,19 @@ class RestContainer {
   - Retrieves the most recent Blobs stored in the Container.
   - `prefix` will filter the returned values - only Blobs with key matching the prefix will be returned. The empty string indicates that all Blobs should be returned.
 - **GetBlob(const std::string& key)**
-  - Retrieve a handle to the most recent Blob referenced by key.
+  - Retrieve a handle to the most recent Blob referenced by `key`.
 - **GetBlobHistory(const std::string& key)**
-  - Retrieve every Blob referenced by key, stopping at the creation of the first Blob or the end of the finite history stored by the network. The `front()` of the vector will contain the newest Blob, while the `back()` of the vector will contain the oldest known Blob.
+  - Retrieve every Blob referenced by key, stopping at the creation of the first Blob or the end of the finite history stored by the network. The front() of the std::vector will contain the newest Blob, while the back() of the vector will contain the oldest known Blob.
+- **GetBlobContent(const Blob& blob)**
+  - Retrieve the content of `blob`.
+  - `blob` can be from _any_ Container.
+  - Can be done at anytime, even if `blob` has been deleted from the Container.
+- **GetBlobContent(const Blob& blob, std::uint64_t offset, std::uint64_t length)**
+  - Retrieve from `offset` to `offset + length` of the `blob` contents.
+  - `blob` can be from _any_ Container.
+  - Can be done at anytime, even if `blob` has been popped from the history limit or been deleted.
 - **CreateBlob(const std::string& key, std::string data, std::string meta_data)**
-  - Create a Blob at the specified key.
+  - Create a Blob at the specified `key`.
   - `data` or `meta_data` can be empty.
   - Maximum size of `meta_data` is 64KiB.
   - `data` has no size restrictions (only local memory contraints apply).
@@ -290,17 +298,16 @@ class RestContainer {
   - Update the contents of `blob`.
   - If `blob` was updated/deleted previously, this will fail, and the newest `blob` will have to be provided.
   - Returns the new Blob stored.
+- **UpdateBlobContent(const Blob& blob, std::string, std::uint64_t offset)**
+  - Update the contents of `blob` starting at `offset`.
+  - If `blob.size() < offset`, then zeroes are written from `blob.size()` to `offset`.
+  - If `blob was updated/deleted previously, this wil lfail, and the newest `blob` will have to be provided.
+  - Returns the new blob stored.
 - **UpdateBlobMetadata(const Blob& blob, std::string)**
   - Update the user meta data of `blob`.
   - Maximum size of `meta_data` is 64KiB.
   - If `blob` was updated/deleted previously, this will fail, and the newest blob will have to be provided.
   - Returns the new Blob stored.
-- **GetBlobContent(const Blob& blob)**
-  - Retrieve the content of `blob`.
-  - Can be done at anytime, even if `blob` has been deleted from the Container.
-- **GetBlobContent(const Blob& blob, std::uint64_t offset, std::uint64_t length)**
-  - Retrieve a portion of the contents of `blob`.
-  - Can be done at anytime, even if `blob` has been popped from the history limit or been deleted.
 - **DeleteBlob(const Blob& blob)**
   - Remove `blob` from the lastest container listings.
   - If `blob` was updated previously, this will fail, and the newest blob will have to be provided.
