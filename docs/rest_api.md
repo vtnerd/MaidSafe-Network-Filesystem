@@ -207,7 +207,7 @@ class OperationError {
 - **code()**
   - Return error code for the failed operation.
 
-### Future<T> ###
+### maidsafe::nfs::Future<T> ###
 > maidafe/nfs/future.h
 
 - [x] Thread-safe Public Functions
