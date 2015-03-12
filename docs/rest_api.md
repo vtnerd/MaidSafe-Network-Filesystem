@@ -226,7 +226,7 @@ using Future = boost::future<T>;
 ### Expected ###
 > maidsafe/nfs/expected.h
 
-When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain an OperationError object, and on success the object will contain an object of `T` as indicated by the interface.
+When a network operation has completed, the future will return a [`boost::expected`](https://github.com/ptal/std-expected-proposal) object. On network errors, the `boost::expected` object will contain an `OperationError` object, and on success the object will contain an object of `T` as indicated by the interface.
 
 ```c++
 template<typename T>
@@ -248,7 +248,7 @@ using ExpectedOperation = boost::expected<T, OperationError<T>>;
 #### Monadic ####
 > maidsafe/nfs/expected_operation.h
 
-The REST API returns ExpectedOperation<T> objects which use an error type that depends on T. This makes monadic programming difficult because the unwrap functions in boost::expected will not work as desired. The REST API includes some standalone functions that return a boost::expected object with a consistent error type, std::error_code. After removing the OperationError<T>, retrying the failed operation is not possible.
+The REST API returns `ExpectedOperation<T>` objects which use an error type that depends on `T`. This makes monadic programming difficult because the unwrap functions in boost::expected will not work as desired. The REST API includes some standalone functions that return a `boost::expected `object with a consistent error type, `std::error_code`. After removing the `OperationError<T>`, retrying the failed operation is not possible.
 
 ```c++
 template<typename T>
