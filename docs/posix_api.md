@@ -282,7 +282,7 @@ class PosixContainer {
   - Make a request to open a container at `key`.
   - `result` is given the child Container.
 - **DeleteChildContainer(ContainerInfo child, AsyncResult&lt;void>)**
-  - Make a request to delete the Container.
+  - Make a request to remove `child.key()` from the latest Container listings.
   - Fails if `child.key()` does not currently reference `child`.
 - **ListBlobs(AsyncResult&lt;std::vector&lt;Blob>> result)**
   - Request the list of Blobs.
@@ -309,7 +309,7 @@ class PosixContainer {
   - Fails if `to.key()` does not currently reference `to`.
   - `result` is given a handle to the Blob that was stred on the network.
 - **DeleteBlob(Blob blob, AsyncResult&lt;void>)**
-  - Make a request that `blob.key()` be removed from the ListBlobs.
+  - Make a request to remove `blob.key()` from the latest Container listings.
   - Fails if `blob.key()` does not currently reference `blob`.
 
 ### maidsafe::nfs::LocalBlob ###
