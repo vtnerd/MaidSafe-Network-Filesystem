@@ -99,26 +99,21 @@ This is an example of monadic programming, which is better described in the [Exp
 ### Hello World Concatenation ###
 ```c++
 bool HelloWorld(maidsafe::nfs::Container& container) {
-  auto put_part1 = container.Put(
-      "split_example/part1", "hello ", maidsafe::nfs::ModifyBlobVersion::Create());
-  auto put_part2 = container.Put(
-      "split_example/part2", "world", maidsafe::nfs::ModifyBlobVersion::Create());
+  auto create_part1 = container.CreateBlob("split_example/part1", "hello ", std::string());
+  auto create_part2 = container.CreateBlob("split_example/part2", "world", std::string());
 
-  const auto put_part1_result = put_part1.get();
-  const auto put_part2_result = put_part2.get();
+  const auto blob1 = create_part1.get();
+  const auto blob2 = create_part2.get();
 
-  if (put_part1_result && put_part2_result) {
-    auto get_part1 = container.Get("split_example/part1", put_part1_result->version());
-    auto get_part2 = container.Get("split_example/part2", put_part2_result->version());
+  if (blob1 && blob2) {
+    auto get_part1 = container.GetBlobContents(*blob1);
+    auto get_part2 = container.GetBlobContents(*blob2);
 
-    const auto get_part1_result = get_part1.get();
-    const auto get_part2_result = get_part2.get();
+    const auto contents1 = get_part1.get();
+    const auto contents2 = get_part2.get();
 
-    if (get_part1_result && get_part2_result) {
-      std::cout <<
-        get_part1_result->result() <<
-        get_part2_result->result() <<
-        std::endl;
+    if (contents1 && contents2) {
+      std::cout << *contents1 << *contents2 << std::endl;
       return true;
     }
   }
@@ -126,9 +121,9 @@ bool HelloWorld(maidsafe::nfs::Container& container) {
   return false;
 }
 ```
-In this example, both `Put` calls are done in parallel, and both `Get` calls are done in parallel. Each `Get` call cannot be requested until the corresponding `Put` operation completes. Also, these files are **not** stored in a child `Container` called "split_example", but are stored in the `container` object directly.
+In this example, both `CreateBlob` calls are done in parallel, and both `GetBlobContent` calls are done in parallel. These blobs are **not** stored in a child `Container` called "split_example", but are stored in the `container` object directly.
 
-This examples uses the `->` operator on the `boost::expected` object instead of `.value()` like in the [exception example](#hello-world-exception-style). The `->` operator does not check if the `boost::expected` has an error (similar to `->` being unchecked for `boost::optional`); the conversion to bool in the if statement is the check for validity.
+This examples uses the `*` operator on the `boost::expected` object instead of `.value()` like in the [exception example](#hello-world-exception-style). The `*` operator does not check if the `boost::expected` has an error (similar to `*` being unchecked for `boost::optional`); the conversion to bool in the if statement is the check for validity.
 
 ## REST Style API ##
 All public functions listed in this API provide the strong exception guarantee. All public const methods are thread-safe.
