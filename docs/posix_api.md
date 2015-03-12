@@ -388,7 +388,7 @@ class Blob {
 - **data()**
   - Returns the contents of the `Blob`, if `size()` is less than 3KiB. If this is not true, `CommonErrors::cannot_exceed_limit` is returned, and the `PosixContainer::OpenBlob` function will have to be used instead.
 
-### maidsafe::nfs::Future<T> ###
+### maidsafe::nfs::Future&lt;T> ###
 > maidsafe/nfs/future.h
 
 - [x] Thread-safe Public Functions
