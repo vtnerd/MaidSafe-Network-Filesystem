@@ -290,21 +290,21 @@ class RestContainer {
   - Returns the Blob created.
 - **UpdateBlobContent(const Blob& blob, std::string)**
   - Update the contents of `blob`.
-  - If `blob` was updated/deleted previously, this will fail, and the newest Blob will have to be provided.
+  - Fails if `blob.key()` does not reference `blob`.
   - Returns the new Blob stored.
 - **UpdateBlobContent(const Blob& blob, std::string, std::uint64_t offset)**
   - Update the contents of `blob` starting at `offset`.
   - If `blob.size() < offset`, then zeroes are written from `blob.size()` to `offset`.
-  - If `blob` was updated/deleted previously, this will fail, and the newest Blob will have to be provided.
+  - Fails if `blob.key()` does not currently reference `blob`.
   - Returns the new blob stored.
 - **UpdateBlobMetadata(const Blob& blob, std::string)**
   - Update the user meta data of `blob`.
   - Maximum size of `meta_data` is 64KiB.
-  - If `blob` was updated/deleted previously, this will fail, and the newest blob will have to be provided.
+  - Fails if `blob.key()` does not currently reference `blob`.
   - Returns the new Blob stored.
 - **DeleteBlob(const Blob& blob)**
   - Remove `blob` from the lastest container listings.
-  - If `blob` was updated previously, this will fail, and the newest blob will have to be provided.
+  - Fails if `blob.key()` does not currently reference `blob`.
 - **Copy(const Blob& from, const std::string& to)**
   - Copies the contents and user meta data of `from` to a new key referenced by `to`.
   - `from` can be a Blob stored in _any_ container.
