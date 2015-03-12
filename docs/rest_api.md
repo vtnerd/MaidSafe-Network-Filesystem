@@ -202,9 +202,9 @@ class OperationError {
   std::error_code code() const;
 };
 ```
-- **Retry -> RetryResult**
-  - Return a Future to another attempt at the failed operation. Be careful of infinite loops - some operations could fail indefinitely. If the retry returns an error code `std::errc::not_supported`, then a retry is not possible.
-- **code() -> std::error_code**
+- **Retry**
+  - Return a Future to another attempt at the failed operation. Be careful of infinite loops - some operations could fail indefinitely. If the retry returns an error code `NfsErrors::no_retry`, then a retry is not possible.
+- **code()**
   - Return error code for the failed operation.
 
 ### Future<T> ###
