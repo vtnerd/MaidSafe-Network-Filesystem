@@ -243,7 +243,7 @@ using ExpectedOperation = boost::expected<T, OperationError<T>>;
 
 - [x] Thread-safe Public Functions
 - [x] Copyable
-- [ ] Movable
+- [x] Movable
 
 > This object has a single `shared_ptr`, and is shallow-copied. This makes it extremely quick to copy.
 
