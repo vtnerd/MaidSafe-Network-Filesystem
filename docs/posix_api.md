@@ -149,7 +149,7 @@ All public functions in this API provide the strong exception guarantee. All pub
 
 - [x] Thread-safe Public Functions
 - [x] Copyable
-- [x] Movable
+- [ ] Movable
 
 References a Container stored on the network. Allows for quicker opening of child containers, than using `std::string` because the network locations are already known. Object is immutable.
 
@@ -164,16 +164,16 @@ bool operator!=(const ContainerInfo&, const ContainerInfo&) noexcept;
 ```
 - **key()**
   - Returns the key associated with `this` ContainerInfo.
-- **Equal(const ContainerInfo& other) const noexcept**
-  = Returns true if `other` is equivalent to `this` ContainerInfo.
-- The non-member operator overloads call the corresponding Equal functions.
+- **Equal(const ContainerInfo& other)**
+  - Returns true if `other` is equivalent to `this` ContainerInfo.
+- The non-member operator overloads call the corresponding Equal function.
 
 ### maidsafe::nfs::Blob ###
 > maidsafe/nfs/blob.h
 
 - [x] Thread-safe Public Functions
 - [x] Copyable
-- [x] Movable
+- [ ] Movable
 
 Represents a single stored Blob on the network. Can be given to any valid [`PosixContainer`](#maidsafenfsposixcontainer) so that the contents can be read - this object stores pointers to the data on the network for quicker access. Object is immutable.
 
@@ -184,13 +184,14 @@ class Blob {
     const BlobVersion& version() const noexcept;
     const std::string& key() const noexcept;
     std::uint64_t size() const noexcept;
-    
     Clock::time_point creation_time() const;
     Clock::time_point modification_time() const;
-    
-    Expected<std::string> data() const;
     const std::string& user_meta_data() const noexcept;
+    
+    bool Equal(const Blob& other) const noexcept;
 };
+
+bool operator==(const Blob&, const blob&) noexcept;
 ```
 - **version()**
   - Returns the version that uniquely references this `Blob`.
@@ -204,8 +205,9 @@ class Blob {
   - Returns the size of this `Blob` in bytes.
 - **user_meta_data()**
   - Returns the user metadata being stored for this `Blob`.
-- **data()**
-  - Returns the contents of the `Blob`, if `size()` is less than 3KiB. If this is not true, `CommonErrors::cannot_exceed_limit` is returned, and the `PosixContainer::OpenBlob` function will have to be used instead.
+- **Equal(const Blob& other)**
+  - Returns true if `other` is equivalent to `this` Blob.
+- The non-member operator overloads call the corresponding Equal function.
 
 ### maidsafe::nfs::Future&lt;T> ###
 > maidsafe/nfs/future.h
