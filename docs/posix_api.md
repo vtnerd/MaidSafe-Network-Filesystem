@@ -460,7 +460,7 @@ class PosixContainer {
 - **OpenChildContainer(std::string key, AsyncResult&lt;PosixContainer>)**
   - Make a request to open a container at `key`.
   - AsyncResult is given the child Container.
-- **DeleteChildContainer(ContainerInfo child, AsyncResult&ltvoid>)**
+- **DeleteChildContainer(ContainerInfo child, AsyncResult&lt;void>)**
   - Make a request to delete the Container.
   - Fails if `child.key()` does not currently reference `child`.
   - AsyncResult is given nothing on completion.
@@ -474,7 +474,7 @@ class PosixContainer {
 - **OpenLocalBlob(std::string key, AsyncResult&lt;LocalBlob>)**
   - Make a request to open a Blob.
   - AsyncResult is given a `LocalBlob` that has the contents and user meta data referenced by `key`.
-- **Copy(const Blob& from, std::string to, ModifyBlobVersion, AsyncResult&lt;Blob>**
+- **Copy(const Blob& from, std::string to, ModifyBlobVersion, AsyncResult&lt;Blob>)**
   - Make a request to copy the contents and user meta data of `blob` to a new key referenced by `to`.
   - Fails if `to` currently references a Blob or child Container.
   - AsyncResult is given a handle to the Blob that was stored on the network.
