@@ -276,10 +276,12 @@ class RestContainer {
 - **ListBlobs(std::string prefix = std:string())**
   - Retrieves the most recent Blobs stored in the Container.
   - `prefix` will filter the returned values - only Blobs with key matching the prefix will be returned. The empty string indicates that all Blobs should be returned.
+  - The ordering is unspecified.
 - **GetBlob(const std::string& key)**
   - Retrieve a handle to the most recent Blob referenced by `key`.
 - **GetBlobHistory(const std::string& key)**
-  - Retrieve every Blob referenced by key, stopping at the creation of the first Blob or the end of the finite history stored by the network. The front() of the std::vector will contain the newest Blob, while the back() of the vector will contain the oldest known Blob.
+  - Retrieve every Blob referenced by key, stopping at the creation of the first Blob or the end of the finite history stored by the network. 
+  - The front() of the std::vector will contain the newest Blob, while the back() of the vector will contain the oldest known Blob.
 - **GetBlobContent(const Blob& blob)**
   - Retrieve the content of `blob`.
   - `blob` can be from _any_ Container.
