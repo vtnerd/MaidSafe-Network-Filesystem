@@ -422,54 +422,55 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 
 ```c++
 class PosixContainer {
-  unspecified GetVersions(AsyncResult<std::vector<ContainerVersion>>);
-
   // Child Container Operations
-  unspecified GetContainers(
-      RetrieveContainerVersion, AsyncResult<std::vector<ContainerInfo>>);
+  unspecified ListChildContainers(AsyncResult<std::vector<ContainerInfo>>);
+      
+  unspecified    CreateChildContainer(std::string, AsyncResult<PosixContainer>);
+  PosixContainer OpenChildContainer(ContainerInfo);
+  unspecified    OpenChildContainer(std::string, AsyncResult<PosixContainer>);
 
-  PosixContainer OpenContainer(ContainerInfo);
-  unspecified OpenContainer(std::string, ModifyContainerVersion, AsyncResult<Container>);
-
-  unspecified DeleteContainer(
-      std::string, RetrieveContainerVersion, AsyncResult<ContainerVersion>);
+  unspecified DeleteChildContainer(ContainerInfo, AsyncResult<void>);
 
 
   // Blob Operations
-  unspecified GetBlobs(RetrieveContainerVersion, AsyncResult<std::vector<Blob>>);
+  unspecified ListBlobs(AsyncResult<std::vector<Blob>>);
   
-  LocalBlob CreateLocalBlob() const;
-  LocalBlob OpenBlob(const Blob& blob);
-  unspecified OpenBlob(std::string, ModifyBlobVersion, AsyncResult<LocalBlob>);
+  LocalBlob   CreateLocalBlob() const;
+  LocalBlob   OpenLocalBlob(const Blob& blob) const;
+  unspecified OpenLocalBlob(std::string, AsyncResult<LocalBlob>);
 
-  unspecified Copy(const Blob& from, std::string to, ModifyBlobVersion, AsyncResult<Blob>);
-  unspecified Write(LocalBlob& from, std::string to, ModifyBlobVersion, AsyncResult<Blob>);
+  unspecified CopyBlob(const Blob& from, std::string to, AsyncResult<Blob>);
+  unspecified WriteLocalBlob(LocalBlob& from, std::string to, AsyncResult<Blob>);
+  unspecified OverWriteBlob(LocalBlob& from, Blob to, AsyncResult<Blob>);
       
-  unspecified DeleteBlob(std:string, ModifyBlobVersion, AsyncResult<ContainerVersion>);
+  unspecified DeleteBlob(Blob, AsyncResult<void>);
 };
 ```
 > - A key can only store a Blob or a nested Container at a given point in time.
 > - The network only stores the last 100 versions of a Container. This theoretically makes it possible for a the history of the Blob to be completely "erased" if other entries in the container are rapidly changing. Storing the original `Blob` object until a Write has completed is recommended (or for as long as possible) - a `Blob` object stores the network addresses of the data and can always be opened later. `BlobVersion` takes up less memory (64-bytes - a SHA512 hash), and can fetch a blob at anytime (provided the history hasn't aged out).
 
-- **GetVersions(AsyncResult<std::vector<ContainerVersion>>)**
+- **GetThisContainerHistory(AsyncResult<std::vector<ContainerVersion>>)**
   - Request the version history of this Container.
   - The network stores only the last 100 versions.
   - AsyncResult is given the version history of this Container, where front() is the newest version, and back() is the oldest known version. A Container will always have at least one version.
-- **GetContainers(RetrieveContainerVersion, AsyncResult<std::vector<ContainerInfo>>)**
-  - Request the list of nested (child) Containers.
-  - AsyncResult is given handles that represent the child containers. The ordering in the vector is unspecified.
-- **OpenContainer(ContainerInfo)**
+- **ListChildContainers(RetrieveContainerVersion, AsyncResult<std::vector<ContainerInfo>>)**
+  - Request the list of nested child Containers.
+  - AsyncResult is given handles to the child containers. The ordering in the vector is unspecified.
+- **CreateChildContainer(std::string key, AsyncResult<PosixContainer>)**
+  - Create a new child container at `key`.
+  - AsyncResult is given the new child Container.
+- **OpenChildContainer(ContainerInfo)**
   - Open a container refereneced by the ContainerInfo handle.
   - Faster than the overload that takes a `std::string, ContainerVersion` because the network addresses are stored in the ContainerInfo object.
-- **OpenContainer(std::string, ModifyContainerVersion, AsyncResult<PosixContainer>)**
+- **OpenChildContainer(std::string, AsyncResult<PosixContainer>)**
   - Make a request to open a container at the specified key.
   - AsyncResult is given the nested Container with the specified name.
   - Slower than the overload that takes a `ContainerInfo` object, since that object has to be found first.
-- **DeleteContainer(std::string, RetrieveContainerVersion, AsyncResult<ContainerVersion>)**
+- **DeleteChildContainer(ContainerInfo, AsyncResult<ContainerVersion>)**
   - Make a request to delete the Container at the specified key.
   - Fails if a Blob is stored at the key.
   - AsyncResult is given the new version stored with an empty key.
-- **GetBlobs(RetrieveContainerVersion, AsyncResult<std::vector<Blob>>)**
+- **ListBlobs(RetrieveContainerVersion, AsyncResult<std::vector<Blob>>)**
   - Request the list of Blobs.
   - AsyncResult is given handles to the Blob objects that can be used to read the contents. The ordering in the vector is unspecified.
 - **CreateLocalBlob()**
