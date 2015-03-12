@@ -426,7 +426,7 @@ class PosixContainer {
   unspecified ListChildContainers(AsyncResult<std::vector<ContainerInfo>> result);
       
   unspecified    CreateChildContainer(std::string key, AsyncResult<PosixContainer> result);
-  PosixContainer OpenChildContainer(ContainerInfo);
+  PosixContainer OpenChildContainer(ContainerInfo child);
   unspecified    OpenChildContainer(std::string key, AsyncResult<PosixContainer> result);
 
   unspecified DeleteChildContainer(ContainerInfo, AsyncResult<void>);
@@ -455,15 +455,14 @@ class PosixContainer {
   - Create a new child container at `key`.
   - Fails if `key` currently references a Blob or another child Container.
   - `result` is given the new child Container.
-- **OpenChildContainer(ContainerInfo)**
-  - Open the container referenced by the ContainerInfo handle.
+- **OpenChildContainer(ContainerInfo child)**
+  - Open the container referenced by `child`.
 - **OpenChildContainer(std::string key, AsyncResult&lt;PosixContainer> result)**
   - Make a request to open a container at `key`.
   - `result` is given the child Container.
-- **DeleteChildContainer(ContainerInfo child, AsyncResult&lt;void> result)**
+- **DeleteChildContainer(ContainerInfo child, AsyncResult&lt;void>)**
   - Make a request to delete the Container.
   - Fails if `child.key()` does not currently reference `child`.
-  - `result` is given nothing on completion.
 - **ListBlobs(AsyncResult&lt;std::vector&lt;Blob>> result)**
   - Request the list of Blobs.
   - `result` is given handles to the Blob objects. The ordering is unspecified.
@@ -474,8 +473,8 @@ class PosixContainer {
 - **OpenLocalBlob(std::string key, AsyncResult&lt;LocalBlob> result)**
   - Make a request to open a Blob.
   - `result` is given a `LocalBlob` that has the contents and user meta data referenced by `key`.
-- **Copy(const Blob& from, std::string to, ModifyBlobVersion, AsyncResult&lt;Blob> result)**
-  - Make a request to copy the contents and user meta data of `blob` to a new key referenced by `to`.
+- **CopyBlob(const Blob& from, std::string to, ModifyBlobVersion, AsyncResult&lt;Blob> result)**
+  - Make a request to copy the contents and user meta data of `from` to a new key referenced by `to`.
   - Fails if `to` currently references a Blob or child Container.
   - `result` is given a handle to the Blob that was stored on the network.
 - **WriteBlob(LocalBlob& from, std::string to, AsyncResult&lt;Blob> result)**
