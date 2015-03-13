@@ -31,12 +31,12 @@ namespace detail {
 
 namespace {
 std::shared_ptr<NetworkData::Buffer> MakeValidLocalBuffer(
-    std::shared_ptr<NetworkData::Buffer> local_buffer, std::weak_ptr<Network> network) {
+    std::shared_ptr<NetworkData::Buffer> local_buffer, const std::weak_ptr<Network>& network) {
   if (local_buffer != nullptr) {
     return local_buffer;
   }
 
-  return NetworkData::MakeBuffer(std::move(network));
+  return NetworkData::MakeBuffer(network);
 }
 
 struct GetChunkCallback {
@@ -53,20 +53,19 @@ private:
   std::shared_ptr<NetworkData::Buffer> buffer_;
   std::weak_ptr<Network> network_;
 };
-
 }  // namespace
 
 std::shared_ptr<NetworkData::Buffer> NetworkData::MakeBuffer(const std::weak_ptr<Network>& network) {
   return std::make_shared<Buffer>(
-      MemoryUsage(Bytes(MegaBytes(5)).count()),
-      DiskUsage(Bytes(MegaBytes(100)).count()),
+      MemoryUsage(Bytes(MebiBytes(5)).count()),
+      DiskUsage(Bytes(MebiBytes(100)).count()),
       [network](const std::string&, const NonEmptyString& data) {
         Network::PutChunk(network.lock(), ImmutableData{data}, asio::use_future).get().value();
       });
 }
 
 Expected<ImmutableData> NetworkData::GetChunk(
-    Buffer& buffer, std::weak_ptr<Network> network, std::string raw_key) {
+    Buffer& buffer, const std::weak_ptr<Network>& network, std::string raw_key) {
   ImmutableData::Name key{Identity{std::move(raw_key)}};
   try {
     return ImmutableData{buffer.Get(key.value.string())};

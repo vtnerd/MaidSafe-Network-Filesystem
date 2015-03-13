@@ -18,13 +18,12 @@
 #ifndef MAIDSAFE_NFS_DETAIL_BLOB_H_
 #define MAIDSAFE_NFS_DETAIL_BLOB_H_
 
-#include <cstdint>
 #include <memory>
-#include <mutex>
+#include <utility>
 
+#include "maidsafe/common/clock.h"
 #include "maidsafe/common/config.h"
 #include "maidsafe/encrypt/data_map.h"
-#include "maidsafe/nfs/blob_version.h"
 #include "maidsafe/nfs/detail/blob_contents.h"
 #include "maidsafe/nfs/detail/detail_fwd.h"
 #include "maidsafe/nfs/detail/network_data.h"

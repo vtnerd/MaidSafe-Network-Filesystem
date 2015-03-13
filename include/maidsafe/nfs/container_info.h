@@ -33,18 +33,10 @@ class ContainerInfo {
       detail_info_(std::move(info)) {
   }
 
+  // No move construction/assignment. This would create null-pointers in
+  // detail::ContainerKey and detail::Info. Do not give clients the bullet.
   ContainerInfo(const ContainerInfo&) = default;
-  ContainerInfo(ContainerInfo&& other) MAIDSAFE_NOEXCEPT
-    : key_(std::move(other.key_)),
-      detail_info_(std::move(other.detail_info_)) {
-  }
-
   ContainerInfo& operator=(const ContainerInfo&) = default;
-  ContainerInfo& operator=(ContainerInfo&& other) MAIDSAFE_NOEXCEPT {
-    key_ = std::move(other.key_);
-    detail_info_ = std::move(other.detail_info_);
-    return *this;
-  }
 
   void swap(ContainerInfo& other) MAIDSAFE_NOEXCEPT {
     using std::swap;

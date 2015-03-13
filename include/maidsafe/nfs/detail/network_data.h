@@ -51,7 +51,7 @@ class NetworkData {
 
   static std::shared_ptr<Buffer> MakeBuffer(const std::weak_ptr<Network>& network);
   static Expected<ImmutableData> GetChunk(
-      Buffer& buffer, std::weak_ptr<Network> network, std::string raw_key);
+      Buffer& buffer, const std::weak_ptr<Network>& network, std::string raw_key);
 
   // New/empty network data
   explicit NetworkData(std::weak_ptr<Network> network);

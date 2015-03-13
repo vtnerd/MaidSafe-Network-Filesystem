@@ -37,18 +37,10 @@ class Blob {
       detail_blob_(std::move(blob)) {
   }
 
+  // No move construction/assignment. This would create null-pointers in
+  // detail::ContainerKey and detail::Blob. Do not give clients the bullet.
   Blob(const Blob&) = default;
-  Blob(Blob&& other) MAIDSAFE_NOEXCEPT
-    : key_(std::move(other.key_)),
-      detail_blob_(std::move(other.detail_blob_)) {
-  }
-
   Blob& operator=(const Blob&) = default;
-  Blob& operator=(Blob&& other) MAIDSAFE_NOEXCEPT {
-    key_ = std::move(other.key_);
-    detail_blob_ = std::move(other.detail_blob_);
-    return *this;
-  }
 
   void swap(Blob& other) MAIDSAFE_NOEXCEPT {
     using std::swap;

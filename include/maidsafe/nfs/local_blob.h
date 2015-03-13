@@ -196,7 +196,7 @@ class LocalBlob {
               std::bind(
                   UpdateBlob{},
                   std::placeholders::_1,
-                  coro.frame().container->network().lock(),
+                  coro.frame().container->network(),
                   std::cref(coro.frame().key),
                   std::cref(coro.frame().replace),
                   std::cref(coro.frame().pending_blob),
@@ -219,7 +219,7 @@ class LocalBlob {
   struct UpdateBlob {
     Expected<void> operator()(
         detail::ContainerInstance& instance,
-        const std::shared_ptr<detail::Network>& network,
+        const std::weak_ptr<detail::Network>& network,
         const detail::ContainerKey& key,
         const ModifyBlobVersion& replace,
         const detail::PendingBlob& pending,

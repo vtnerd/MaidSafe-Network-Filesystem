@@ -48,7 +48,7 @@ std::uint64_t LocalBlob::size() const {
 
 Expected<void> LocalBlob::UpdateBlob::operator()(
     detail::ContainerInstance& instance,
-    const std::shared_ptr<detail::Network>& network,
+    const std::weak_ptr<detail::Network>& network,
     const detail::ContainerKey& key,
     const ModifyBlobVersion& replace,
     const detail::PendingBlob& pending_blob,
@@ -66,7 +66,7 @@ Expected<void> LocalBlob::UpdateBlob::operator()(
                         replace == ModifyBlobVersion::Latest()) {
                       new_blob =
                         detail::Blob{
-                          network, pending_blob, current_blob.meta_data().creation_time()};
+                          network.lock(), pending_blob, current_blob.meta_data().creation_time()};
                       entry->second = new_blob;
                       return Expected<void>{boost::expect};
                     } else {
@@ -79,7 +79,7 @@ Expected<void> LocalBlob::UpdateBlob::operator()(
 
                   if (error == CommonErrors::no_such_element &&
                       replace == ModifyBlobVersion::Create()) {
-                    new_blob = detail::Blob{network, pending_blob};
+                    new_blob = detail::Blob{network.lock(), pending_blob};
                     entries[key] = new_blob;
                     return Expected<void>{boost::expect};
                   } else {
