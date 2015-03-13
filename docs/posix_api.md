@@ -248,7 +248,7 @@ class PosixContainer {
       AsyncResult<std::vector<ContainerInfo>> result, std::string prefix = std::string());
       
   unspecified    CreateChildContainer(const std::string& key, AsyncResult<PosixContainer> result);
-  PosixContainer OpenChildContainer(ContainerInfo child);
+  PosixContainer OpenChildContainer(const ContainerInfo& child);
   unspecified    OpenChildContainer(const std::string& key, AsyncResult<PosixContainer> result);
 
   unspecified DeleteChildContainer(ContainerInfo, AsyncResult<void>);
@@ -261,7 +261,7 @@ class PosixContainer {
   
   LocalBlob   CreateLocalBlob() const;
   LocalBlob   OpenLocalBlob(const Blob& blob) const;
-  unspecified OpenLocalBlob(std::string key, AsyncResult<LocalBlob> result);
+  unspecified OpenLocalBlob(const std::string& key, AsyncResult<LocalBlob> result);
 
   unspecified CopyBlob(const Blob& from, const std::string& to, AsyncResult<Blob> result);
   unspecified WriteBlob(LocalBlob& from, const std::string& to, AsyncResult<Blob> result);
@@ -280,12 +280,12 @@ class PosixContainer {
   - Create a new child container at `key`.
   - Fails if `key` currently references a Blob or another child Container.
   - `result` is given the new child Container.
-- **OpenChildContainer(ContainerInfo child)**
+- **OpenChildContainer(const ContainerInfo& child)**
   - Open the container referenced by `child`.
-- **OpenChildContainer(std::string key, AsyncResult&lt;PosixContainer> result)**
+- **OpenChildContainer(const std::string& key, AsyncResult&lt;PosixContainer> result)**
   - Make a request to open a container at `key`.
   - `result` is given the child Container.
-- **DeleteChildContainer(ContainerInfo child, AsyncResult&lt;void>)**
+- **DeleteChildContainer(const ContainerInfo& child, AsyncResult&lt;void>)**
   - Make a request to remove `child.key()` from the latest Container listings.
   - Fails if `child.key()` does not currently reference `child`.
 - **ListBlobs(AsyncResult&lt;std::vector&lt;Blob>> result, std::string prefix)**
@@ -300,7 +300,7 @@ class PosixContainer {
   - A LocalBlob is returned with `size() == 0` and `user_meta_data().empty()`.
 - **OpenLocalBlob(const Blob& blob)**
   - Immediately returns a LocalBlob whose initial contents are identical to `blob`.
-- **OpenLocalBlob(std::string key, AsyncResult&lt;LocalBlob> result)**
+- **OpenLocalBlob(const std::string& key, AsyncResult&lt;LocalBlob> result)**
   - Make a request to open a Blob.
   - `result` is given a `LocalBlob` that has the contents and user meta data referenced by `key`.
 - **CopyBlob(const Blob& from, std::string to, ModifyBlobVersion, AsyncResult&lt;Blob> result)**
