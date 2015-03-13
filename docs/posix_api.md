@@ -276,7 +276,7 @@ class PosixContainer {
   - Request the list of nested child Containers.
   - `prefix` will filter the returned values - only child Containers whose key has the same prefix as `prefix` will be returned. The empty string indicates that all child Containers should be returned.
   - `result` is given handles to the child containers. The ordering in the vector is unspecified.
-- **CreateChildContainer(std::string key, AsyncResult&lt;PosixContainer> result)**
+- **CreateChildContainer(const std::string& key, AsyncResult&lt;PosixContainer> result)**
   - Create a new child container at `key`.
   - Fails if `key` currently references a Blob or another child Container.
   - `result` is given the new child Container.
@@ -285,7 +285,7 @@ class PosixContainer {
 - **OpenChildContainer(const std::string& key, AsyncResult&lt;PosixContainer> result)**
   - Make a request to open a container at `key`.
   - `result` is given the child Container.
-- **DeleteChildContainer(const ContainerInfo& child, AsyncResult&lt;void>)**
+- **DeleteChildContainer(ContainerInfo child, AsyncResult&lt;void>)**
   - Make a request to remove `child.key()` from the latest Container listings.
   - Fails if `child.key()` does not currently reference `child`.
 - **ListBlobs(AsyncResult&lt;std::vector&lt;Blob>> result, std::string prefix)**
