@@ -275,7 +275,7 @@ class RestContainer {
 ```
 - **ListBlobs(std::string prefix)**
   - Retrieves the most recent Blobs stored in the Container.
-  - `prefix` will filter the returned values - only Blobs with a key matching the prefix will be returned. The empty string indicates that all Blobs should be returned.
+  - `prefix` will filter the returned values - only Blobs whose key has the same prefix as `prefix` will be returned. The empty string indicates that all Blobs should be returned.
   - The ordering is unspecified.
 - **GetBlob(const std::string& key)**
   - Retrieve a handle to the most recent Blob referenced by `key`.
