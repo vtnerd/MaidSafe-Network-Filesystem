@@ -244,24 +244,27 @@ Parameters labeled as `AsyncResult<T>` affect the return type of the function, a
 ```c++
 class PosixContainer {
   // Child Container Operations
-  unspecified ListChildContainers(AsyncResult<std::vector<ContainerInfo>> result);
+  unspecified ListChildContainers(
+      AsyncResult<std::vector<ContainerInfo>> result, std::string prefix = std::string());
       
-  unspecified    CreateChildContainer(std::string key, AsyncResult<PosixContainer> result);
+  unspecified    CreateChildContainer(const std::string& key, AsyncResult<PosixContainer> result);
   PosixContainer OpenChildContainer(ContainerInfo child);
-  unspecified    OpenChildContainer(std::string key, AsyncResult<PosixContainer> result);
+  unspecified    OpenChildContainer(const std::string& key, AsyncResult<PosixContainer> result);
 
   unspecified DeleteChildContainer(ContainerInfo, AsyncResult<void>);
 
 
   // Blob Operations
-  unspecified ListBlobs(AsyncResult<std::vector<Blob>>);
+  unspecified ListBlobs(AsyncResult<std::vector<Blob>> result, std::string prefix = std::string());
+  
+  unspecified GetBlobHistory(const std::string& key, AsyncResult<std::vector<Blob>> result);
   
   LocalBlob   CreateLocalBlob() const;
   LocalBlob   OpenLocalBlob(const Blob& blob) const;
   unspecified OpenLocalBlob(std::string key, AsyncResult<LocalBlob> result);
 
-  unspecified CopyBlob(const Blob& from, std::string to, AsyncResult<Blob> result);
-  unspecified WriteBlob(LocalBlob& from, std::string to, AsyncResult<Blob> result);
+  unspecified CopyBlob(const Blob& from, const std::string& to, AsyncResult<Blob> result);
+  unspecified WriteBlob(LocalBlob& from, const std::string& to, AsyncResult<Blob> result);
   unspecified UpdateBlob(LocalBlob& from, Blob to, AsyncResult<Blob> result);
       
   unspecified DeleteBlob(Blob blob, AsyncResult<void>);
@@ -269,8 +272,9 @@ class PosixContainer {
 ```
 > A key can only store a Blob or a nested Container at a given point in time.
 
-- **ListChildContainers(AsyncResult&lt;std::vector&lt;ContainerInfo>> result)**
+- **ListChildContainers(AsyncResult&lt;std::vector&lt;ContainerInfo>> result, std::string prefix)**
   - Request the list of nested child Containers.
+  - `prefix` will filter the returned values - only child Containers whose key has the same prefix as `prefix` will be returned. The empty string indicates that all child Containers should be returned.
   - `result` is given handles to the child containers. The ordering in the vector is unspecified.
 - **CreateChildContainer(std::string key, AsyncResult&lt;PosixContainer> result)**
   - Create a new child container at `key`.
@@ -284,9 +288,14 @@ class PosixContainer {
 - **DeleteChildContainer(ContainerInfo child, AsyncResult&lt;void>)**
   - Make a request to remove `child.key()` from the latest Container listings.
   - Fails if `child.key()` does not currently reference `child`.
-- **ListBlobs(AsyncResult&lt;std::vector&lt;Blob>> result)**
+- **ListBlobs(AsyncResult&lt;std::vector&lt;Blob>> result, std::string prefix)**
   - Request the list of Blobs.
+  - `prefix` will filter the returned values - only Blobs whose key has the same prefix as `prefix` will be returned. The empty string indicates that all Blobs should be returned.
   - `result` is given handles to the Blob objects. The ordering is unspecified.
+- **GetBlobHistory(const std::string& key, AsyncResult&lt;std::vector&lt;Blob>> result)**
+  - Retrieve every Blob referenced by `key`, stopping at the creation of the first Blob or the end of the finite history stored by the network. 
+  - `result` is given the history for `key`.
+    - The front() of the std::vector will contain the newest Blob, while the back() of the vector will contain the oldest known Blob.
 - **CreateLocalBlob()**
   - A LocalBlob is returned with `size() == 0` and `user_meta_data().empty()`.
 - **OpenLocalBlob(const Blob& blob)**
