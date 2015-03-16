@@ -251,7 +251,7 @@ class PosixContainer {
   PosixContainer OpenChildContainer(const ContainerInfo& child);
   unspecified    OpenChildContainer(const std::string& key, AsyncResult<PosixContainer> result);
 
-  unspecified DeleteChildContainer(ContainerInfo, AsyncResult<void>);
+  unspecified DeleteChildContainer(const ContainerInfo& child, AsyncResult<void>);
 
 
   // Blob Operations
@@ -265,9 +265,9 @@ class PosixContainer {
 
   unspecified CopyBlob(const Blob& from, const std::string& to, AsyncResult<Blob> result);
   unspecified WriteBlob(LocalBlob& from, const std::string& to, AsyncResult<Blob> result);
-  unspecified UpdateBlob(LocalBlob& from, Blob to, AsyncResult<Blob> result);
+  unspecified UpdateBlob(LocalBlob& from, const Blob& to, AsyncResult<Blob> result);
       
-  unspecified DeleteBlob(Blob blob, AsyncResult<void>);
+  unspecified DeleteBlob(const Blob& blob, AsyncResult<void>);
 };
 ```
 > A key can only store a Blob or a nested Container at a given point in time.
@@ -285,7 +285,7 @@ class PosixContainer {
 - **OpenChildContainer(const std::string& key, AsyncResult&lt;PosixContainer> result)**
   - Make a request to open a container at `key`.
   - `result` is given the child Container.
-- **DeleteChildContainer(ContainerInfo child, AsyncResult&lt;void>)**
+- **DeleteChildContainer(const ContainerInfo& child, AsyncResult&lt;void>)**
   - Make a request to remove `child.key()` from the latest Container listings.
   - Fails if `child.key()` does not currently reference `child`.
 - **ListBlobs(AsyncResult&lt;std::vector&lt;Blob>> result, std::string prefix)**
@@ -312,12 +312,12 @@ class PosixContainer {
   - Fails if `to` currently references a Blob or child Container.
   - Do not invoke if Read, Write, or Truncate calls have not completed on `from`.
   - `result` is given a handle to the Blob that was stored on the network.
-- **UpdateBlob(LocalBlob& from, Blob to, AsyncResult&lt;Blob> result)**
+- **UpdateBlob(LocalBlob& from, const Blob& to, AsyncResult&lt;Blob> result)**
   - Make a request to replace `to` with the contents and user meta data of `from`.
   - Do not invoke if Read, Write, or Truncate calls have not completed on `from`.
   - Fails if `to.key()` does not currently reference `to`.
   - `result` is given a handle to the Blob that was stred on the network.
-- **DeleteBlob(Blob blob, AsyncResult&lt;void>)**
+- **DeleteBlob(const Blob& blob, AsyncResult&lt;void>)**
   - Make a request to remove `blob.key()` from the latest Container listings.
   - Fails if `blob.key()` does not currently reference `blob`.
 
