@@ -463,8 +463,8 @@ TEST_F(DetailContainerTest, FUNC_LargeBlob) {
      on the network when actually storing the Blob. A thread-safe callback needs
      to be given to DataBuffer to track the popped values, which will
      reduce the number of network calls. */
-  EXPECT_CALL(GetNetworkMock(), DoPutChunk(_)).Times(399);
-  EXPECT_CALL(GetNetworkMock(), DoGetChunk(_)).Times(395);
+  EXPECT_CALL(GetNetworkMock(), DoPutChunk(_)).Times(395);
+  EXPECT_CALL(GetNetworkMock(), DoGetChunk(_)).Times(391);
   EXPECT_CALL(GetNetworkMock(), DoGetBranches(_)).Times(0);
   EXPECT_CALL(GetNetworkMock(), DoGetBranchVersions(_, _)).Times(0);
 

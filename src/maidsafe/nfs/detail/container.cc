@@ -100,7 +100,7 @@ boost::optional<std::vector<ContainerVersion>> Container::GetCachedVersions() co
 
 void Container::UpdateCachedVersions(std::vector<ContainerVersion> remote_versions) {
   const std::lock_guard<std::mutex> lock{data_mutex_};
-  on_scope_exit purge_cache([this, &lock]() {
+  on_scope_exit purge_cache([this, &lock] {
       PurgeInstanceCache(lock);
       PurgeVersionCache(lock);
     });
@@ -191,8 +191,9 @@ void Container::AddCachedInstance(
     ContainerVersion new_version,
     ContainerInstance instance,
     const std::lock_guard<std::mutex>& data_mutex_lock) {
-  on_scope_exit purge_cache(
-      [this, &data_mutex_lock]() { PurgeInstanceCache(data_mutex_lock); });
+  on_scope_exit purge_cache([this, &data_mutex_lock] {
+      PurgeInstanceCache(data_mutex_lock);
+    });
 
   cached_instances_.insert(std::make_pair(std::move(new_version), std::move(instance)));
   purge_cache.Release();

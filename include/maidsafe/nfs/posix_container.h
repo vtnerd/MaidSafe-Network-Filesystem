@@ -342,7 +342,7 @@ class PosixContainer {
                 arg::_1,
                 std::move(coro.frame().new_key),
                 std::move(coro.frame().new_container)),
-            std::move(coro.frame().handler));
+            detail::MakeForwardingCallback(std::move(coro.frame().handler)));
       }
     }
   };

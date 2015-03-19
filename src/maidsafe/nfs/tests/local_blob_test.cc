@@ -147,21 +147,21 @@ TEST_F(LocalBlobTest, Commit) {
   const auto blob_contents = "the contents of the test blob";
 
   EXPECT_CALL(GetNetworkMock(), DoCreateSDV(_, _, _, _)).Times(0);
-  EXPECT_CALL(GetNetworkMock(), DoGetBranches(_)).Times(2);
-  EXPECT_CALL(GetNetworkMock(), DoGetBranchVersions(_, _)).Times(2);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranches(_)).Times(1);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranchVersions(_, _)).Times(1);
   EXPECT_CALL(GetNetworkMock(), DoPutSDVVersion(_, _, _)).Times(1);
   EXPECT_CALL(GetNetworkMock(), DoPutChunk(_)).Times(1);
-  EXPECT_CALL(GetNetworkMock(), DoGetChunk(_)).Times(1);
+  EXPECT_CALL(GetNetworkMock(), DoGetChunk(_)).Times(0);
 
   LocalBlob local_blob{container()->network()};
   OverWriteLocalBlob(local_blob, blob_contents);
   const Blob blob = Commit(local_blob, "my blob", boost::none).get().value();
-  /*  VerifyBlobContents(blob, blob_contents);
+  VerifyBlobContents(blob, blob_contents);
 
   EXPECT_STREQ("my blob", blob.key().c_str());
   EXPECT_EQ(blob.creation_time(), blob.modification_time());
   EXPECT_TRUE(blob.user_meta_data().empty());
-  EXPECT_EQ(std::string(blob_contents).size(), blob.size());*/
+  EXPECT_EQ(std::string(blob_contents).size(), blob.size());
 }
 
 TEST_F(LocalBlobTest, CommitTwoBlobs) {
@@ -181,8 +181,8 @@ TEST_F(LocalBlobTest, CommitTwoBlobs) {
     *shared_future = put_promise.get_future();
 
     EXPECT_CALL(GetNetworkMock(), DoCreateSDV(_, _, _, _)).Times(0);
-    EXPECT_CALL(GetNetworkMock(), DoGetBranches(_)).Times(5);
-    EXPECT_CALL(GetNetworkMock(), DoGetBranchVersions(_, _)).Times(5);
+    EXPECT_CALL(GetNetworkMock(), DoGetBranches(_)).Times(3);
+    EXPECT_CALL(GetNetworkMock(), DoGetBranchVersions(_, _)).Times(3);
     EXPECT_CALL(
         GetNetworkMock(), DoPutSDVVersion(_, _, _)).Times(3).WillOnce(
             Invoke(
@@ -194,7 +194,7 @@ TEST_F(LocalBlobTest, CommitTwoBlobs) {
                   return shared_future;
                 }));
     EXPECT_CALL(GetNetworkMock(), DoPutChunk(_)).Times(3);
-    EXPECT_CALL(GetNetworkMock(), DoGetChunk(_)).Times(2);
+    EXPECT_CALL(GetNetworkMock(), DoGetChunk(_)).Times(0);
   }
   {
     LocalBlob local_blob1{container()->network()};
@@ -210,6 +210,7 @@ TEST_F(LocalBlobTest, CommitTwoBlobs) {
     put_promise.set_exception(MakeError(CommonErrors::cannot_exceed_limit));
     blobs.push_back(commit_future.get().value());
   }
+
   VerifyBlobContents(blobs[1], blob1_contents);
   VerifyBlobContents(blobs[0], blob2_contents);
 

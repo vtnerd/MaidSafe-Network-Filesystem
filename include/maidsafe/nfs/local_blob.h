@@ -187,10 +187,9 @@ class LocalBlob {
 
         coro.frame().store_data.reset();
 
-        ASIO_CORO_YIELD
-          detail::Container::UpdateLatestInstance(
-              coro.frame().container,
-              std::bind(
+        detail::Container::UpdateLatestInstance(
+            coro.frame().container,
+            std::bind(
                 UpdateBlob{},
                 std::placeholders::_1,
                 coro.frame().container->network(),
@@ -199,7 +198,7 @@ class LocalBlob {
                 std::move(coro.frame().new_user_meta_),
                 std::move(coro.frame().new_data_map_),
                 std::move(coro.frame().buffer_)),
-              std::move(coro.frame().handler));
+            detail::MakeForwardingCallback(std::move(coro.frame().handler)));
       }
     }
   };

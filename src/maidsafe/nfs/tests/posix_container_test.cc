@@ -110,10 +110,20 @@ TEST_F(PosixContainerTest, BEH_WriteBlob) {
   const std::string key("\xFF KEY \xFF");
 
   std::vector<Blob> blobs{};
+  std::vector<std::weak_ptr<detail::NetworkData::Buffer>> buffers{};
   {
     LocalBlob local_blob{container().CreateLocalBlob()};
     WriteBlobContents(local_blob, random_data);
     blobs.push_back(container().WriteBlob(local_blob, key, asio::use_future).get().value());
+
+    buffers.push_back(Blob::Detail::blob(blobs.back()).GetBuffer(network()));
+    EXPECT_FALSE(buffers.back().expired());
+  }
+
+  // LocalBlob keeps the local cache of a file active.
+  // The thread handling the async op is the last owner.
+  for (const auto& buffer : buffers) {
+    while (!buffer.expired());
   }
 
   EXPECT_EQ(key, blobs[0].key());
@@ -141,11 +151,13 @@ TEST_F(PosixContainerTest, BEH_CopyBlob) {
   const auto random_data = RandomString(Bytes(MebiBytes(4) + KiloBytes(100)).count());
 
   std::vector<Blob> blobs{};
+
   {
     LocalBlob local_blob{container().CreateLocalBlob()};
     WriteBlobContents(local_blob, random_data);
 
     blobs.push_back(container().WriteBlob(local_blob, "key<-->", asio::use_future).get().value());
+
   }
   {
     auto child_container =
@@ -154,7 +166,7 @@ TEST_F(PosixContainerTest, BEH_CopyBlob) {
         child_container.CopyBlob(blobs.back(), "second key!", asio::use_future).get().value());
   }
   EXPECT_NE(blobs[0], blobs[1]);
-  
+
   EXPECT_STREQ("key<-->", blobs[0].key().c_str());
   EXPECT_STREQ("second key!", blobs[1].key().c_str());
 
@@ -208,14 +220,16 @@ TEST_F(PosixContainerTest, BEH_MultipleBlobs) {
   const auto reverse_indexes = adapt::reverse(indexes);
 
   EXPECT_CALL(GetNetworkMock(), DoCreateSDV(_, _, _, _)).Times(0);
-  EXPECT_CALL(GetNetworkMock(), DoGetBranches(_)).Times(container_count * 4);
-  EXPECT_CALL(GetNetworkMock(), DoGetBranchVersions(_, _)).Times(container_count * 4);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranches(_)).Times((container_count * 4) + 1);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranchVersions(_, _)).Times((container_count * 4) + 1);
   EXPECT_CALL(GetNetworkMock(), DoPutSDVVersion(_, _, _)).Times(container_count * 2);
   EXPECT_CALL(GetNetworkMock(), DoPutChunk(_)).Times(container_count * 2);
   EXPECT_CALL(GetNetworkMock(), DoGetChunk(_)).Times(0);
 
   // Create 20 blobs
   for (unsigned i : indexes) {
+    verify_blobs(i);
+
     const std::string key = std::to_string(i);
     const std::string data(i, 'L');
 
@@ -234,15 +248,14 @@ TEST_F(PosixContainerTest, BEH_MultipleBlobs) {
     ASSERT_FALSE(create_result.valid());
     EXPECT_EQ(NfsErrors::bad_modify_version, create_result.error());
 
-    verify_blobs(i);
+    verify_blobs(i + 1);
   }
 
   // Delete 20 blobs
   for (unsigned i : reverse_indexes) {
-    const std::string key = std::to_string(i);
+    verify_blobs(i + 1);
 
-    const auto blob = container().GetBlob(key, asio::use_future).get().value();
-
+    const auto blob = container().GetBlob(std::to_string(i), asio::use_future).get().value();
     EXPECT_TRUE(container().DeleteBlob(blob, asio::use_future).get().valid());
 
     auto create_result = container().DeleteBlob(blob, asio::use_future).get();
@@ -281,14 +294,16 @@ TEST_F(PosixContainerTest, BEH_MultipleContainers) {
   const auto container_indexes = boost::counting_range(0u, container_count);
 
   EXPECT_CALL(GetNetworkMock(), DoCreateSDV(_, _, _, _)).Times(container_count * 2);
-  EXPECT_CALL(GetNetworkMock(), DoGetBranches(_)).Times(container_count * 4);
-  EXPECT_CALL(GetNetworkMock(), DoGetBranchVersions(_, _)).Times(container_count * 4);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranches(_)).Times((container_count * 4) + 1);
+  EXPECT_CALL(GetNetworkMock(), DoGetBranchVersions(_, _)).Times((container_count * 4) + 1);
   EXPECT_CALL(GetNetworkMock(), DoPutSDVVersion(_, _, _)).Times(container_count * 2);
   EXPECT_CALL(GetNetworkMock(), DoPutChunk(_)).Times(container_count * 4);
   EXPECT_CALL(GetNetworkMock(), DoGetChunk(_)).Times(0);
 
   // Create 20 containers
   for (unsigned i : container_indexes) {
+    verify_child_containers(i);
+
     EXPECT_TRUE(
         container().CreateChildContainer(std::to_string(i), asio::use_future).get().valid());
 
@@ -297,14 +312,16 @@ TEST_F(PosixContainerTest, BEH_MultipleContainers) {
     ASSERT_FALSE(create_result.valid());
     EXPECT_EQ(NfsErrors::bad_modify_version, create_result.error());
 
-    verify_child_containers(i);
+    verify_child_containers(i + 1);
   }
 
   // Delete 20 containers
   for (unsigned i : adapt::reverse(container_indexes)) {
+    verify_child_containers(i + 1);
+
     const auto container_info =
       container().GetChildContainerInfo(std::to_string(i), asio::use_future).get().value();
-    
+
     EXPECT_TRUE(container().DeleteChildContainer(container_info, asio::use_future).get().valid());
 
     auto create_result = container().DeleteChildContainer(
