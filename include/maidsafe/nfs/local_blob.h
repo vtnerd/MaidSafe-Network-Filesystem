@@ -1,4 +1,4 @@
-/*  Copyright 2014 MaidSafe.net limited
+/*  Copyright 2015 MaidSafe.net limited
 
     This MaidSafe Software is licensed to you under (1) the MaidSafe.net Commercial License,
     version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -43,11 +43,9 @@
 #include "maidsafe/nfs/detail/forwarding_callback.h"
 #include "maidsafe/nfs/detail/network_data.h"
 #include "maidsafe/nfs/detail/operation_handler.h"
-#include "maidsafe/nfs/detail/pending_blob.h"
 #include "maidsafe/nfs/detail/user_meta_data.h"
 #include "maidsafe/nfs/blob.h"
 #include "maidsafe/nfs/expected.h"
-#include "maidsafe/nfs/modify_blob_version.h"
 
 namespace maidsafe {
 namespace nfs {
@@ -129,8 +127,8 @@ class LocalBlob {
   template<typename Token>
   detail::AsyncResultReturn<Token, Blob> Commit(
       std::shared_ptr<detail::Container> container,
-      std::string key,
-      ModifyBlobVersion replace,
+      detail::ContainerKey update_key,
+      boost::optional<detail::Blob> replace,
       Token token) {
     using Handler = detail::AsyncHandler<Token, Blob>;
 
@@ -144,16 +142,14 @@ class LocalBlob {
     auto original_data = FlushData(container->network());
     assert(original_data != nullptr);
     
-    detail::PendingBlob pending_blob{
-      user_meta_data_, original_data->encryptor().data_map(), original_data->buffer()};
-    
     auto coro = detail::MakeCoroutine<CommitRoutine<Handler>>(
         std::move(container),
-        detail::ContainerKey{container->network().lock(), std::move(key)},
+        std::move(update_key),
         std::move(replace),
         std::move(original_data),
-        std::move(pending_blob),
-        detail::Blob{},
+        user_meta_data_,
+        original_data->encryptor().data_map(),
+        original_data->buffer(),
         std::move(handler));
     coro.Execute();
 
@@ -165,11 +161,12 @@ class LocalBlob {
   struct CommitRoutine {
     struct Frame {
       std::shared_ptr<detail::Container> container;
-      detail::ContainerKey key;
-      ModifyBlobVersion replace;
+      const detail::ContainerKey update_key;
+      boost::optional<detail::Blob> replace;
       std::unique_ptr<detail::NetworkData> store_data;
-      detail::PendingBlob pending_blob;
-      detail::Blob new_blob;
+      detail::UserMetaData new_user_meta_;
+      encrypt::DataMap new_data_map_;
+      std::shared_ptr<detail::NetworkData::Buffer> buffer_;
       Handler handler;
     };
 
@@ -188,25 +185,21 @@ class LocalBlob {
                 .OnSuccess(action::Ignore<encrypt::DataMap>().Then(action::Resume(coro)))
                 .OnFailure(action::Abort(coro)));
 
-        coro.frame().store_data.release();
+        coro.frame().store_data.reset();
 
         ASIO_CORO_YIELD
           detail::Container::UpdateLatestInstance(
               coro.frame().container,
               std::bind(
-                  UpdateBlob{},
-                  std::placeholders::_1,
-                  coro.frame().container->network(),
-                  std::cref(coro.frame().key),
-                  std::cref(coro.frame().replace),
-                  std::cref(coro.frame().pending_blob),
-                  std::ref(coro.frame().new_blob)),
-              operation
-                .OnSuccess(action::Ignore<ContainerVersion>().Then(action::Resume(coro)))
-                .OnFailure(action::Abort(coro)));
-
-        coro.frame().handler(
-            Blob{std::move(coro.frame().key), std::move(coro.frame().new_blob)});
+                UpdateBlob{},
+                std::placeholders::_1,
+                coro.frame().container->network(),
+                std::move(coro.frame().update_key),
+                std::move(coro.frame().replace),
+                std::move(coro.frame().new_user_meta_),
+                std::move(coro.frame().new_data_map_),
+                std::move(coro.frame().buffer_)),
+              std::move(coro.frame().handler));
       }
     }
   };
@@ -217,13 +210,14 @@ class LocalBlob {
 
  private:
   struct UpdateBlob {
-    Expected<void> operator()(
+    Expected<Blob> operator()(
         detail::ContainerInstance& instance,
         const std::weak_ptr<detail::Network>& network,
         const detail::ContainerKey& key,
-        const ModifyBlobVersion& replace,
-        const detail::PendingBlob& pending,
-        detail::Blob& new_blob) const;
+        const boost::optional<detail::Blob>& replace,
+        const detail::UserMetaData& new_user_meta,
+        const encrypt::DataMap& new_data_map,
+        const std::shared_ptr<detail::NetworkData::Buffer>& buffer) const;
   };
 
   static std::system_error MakeNullPointerException();
@@ -274,82 +268,6 @@ class LocalBlob {
   std::uint64_t offset_;
   detail::UserMetaData user_meta_data_;
 };
-/*
-  template<typename Token>
-  detail::AsyncResultReturn<Token, std::vector<BlobVersion>> GetVersions(Token token) {
-    using Handler = detail::AsyncHandler<Token, std::vector<BlobVersion>>;
-
-    if (local_blob == nullptr) {
-      BOOST_THROW_EXCEPTION(MakeNullPointerException());
-    }
-
-    Handler handler{std::move(token)};
-    asio::async_result<Handler> result{handler};
-
-    auto coro = MakeCoroutine<GetVersionsRoutine<Handler>>(
-        std::move(local_blob),
-        std::vector<ContainerVersion>{},
-        detail::ContainerInstance{},
-        std::vector<BlobVersion>{},
-        std::move(handler));
-    coro.Execute();
-
-    return result.get();
-  }
-
-
-  template<typename Handler>
-  struct GetVersionsRoutine {
-    struct Frame {
-      std::shared_ptr<detail::LocalBlob> local_blob;
-      std::vector<ContainerVersion> container_versions;
-      detail::ContainerInstance instance;
-      std::vector<BlobVersion> result;
-      Handler handler;
-    };
-
-    void operator()(detail::Coroutine<GetVersionsRoutine, Frame>& coro) const {
-      assert(coro.frame().local_blob != nullptr);
-
-      ASIO_CORO_REENTER(coro) {
-        ASIO_CORO_YIELD
-          Container::GetVersions(
-              coro.frame().local_blob->container(),
-              operation
-                .OnSuccess(
-                    action::Store(std::ref(coro.frame().container_versions))
-                    .Then(action::Resume(coro)))
-                .OnFailure(action::Abort(coro)));
-
-        while (!coro.frame().container_versions.empty()) {
-          ASIO_CORO_YIELD
-            Container::GetInstance(
-                coro.frame().local_blob->container(),
-                std::move(coro.frame().container_versions.front()),
-                operation
-                  .OnSuccess(
-                      action::Store(std::ref(coro.frame().instance))
-                      .Then(action::Resume(coro)))
-                  .OnFailure(action::Abort(coro)));
-
-          auto blob_version = BlobVersion::Defunct();
-          const auto blob =
-            std::move(coro.frame().instance).GetBlob(coro.frame().local_blob->key());
-          if (blob) {
-            blob_version = blob->version();
-          }
-
-          if (coro.frame().result.empty() || coro.frame().result.back() != blob_version) {
-            coro.frame().result.push_back(blob_version);
-          }
-
-          coro.frame().container_versions.erase(coro.frame().container_versions.begin());
-        }
-
-        coro.frame().handler(std::move(coro.frame().result));
-      }
-    }
-    }; */
 }  // nfs
 }  // maidsafe
 

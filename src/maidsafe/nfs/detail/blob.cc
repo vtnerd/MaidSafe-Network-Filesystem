@@ -1,4 +1,4 @@
-/*  Copyright 2014 MaidSafe.net limited
+/*  Copyright 2015 MaidSafe.net limited
 
     This MaidSafe Software is licensed to you under (1) the MaidSafe.net Commercial License,
     version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -32,18 +32,29 @@ void VerifyContents(const std::shared_ptr<const BlobContents>& contents) {
   }
 }
 }  // namespace
-  
+
 Blob::Blob() : contents_(std::make_shared<BlobContents>()) {}
-Blob::Blob(const std::shared_ptr<Network>& network, const PendingBlob& pending_blob)
-  : contents_(Network::CacheInsert(network, BlobContents{pending_blob})) {
+Blob::Blob(
+    const std::shared_ptr<Network>& network,
+    UserMetaData user,
+    encrypt::DataMap data_map,
+    std::shared_ptr<NetworkData::Buffer> buffer)
+  : contents_(
+      Network::CacheInsert(
+          network, BlobContents{std::move(user), std::move(data_map), std::move(buffer)})) {
   VerifyContents(contents_);
 }
 
 Blob::Blob(
     const std::shared_ptr<Network>& network,
-    const PendingBlob& pending_blob,
-    Clock::time_point creation_time)
-  : contents_(Network::CacheInsert(network, BlobContents{pending_blob, creation_time})) {
+    Clock::time_point creation_time,
+    UserMetaData user,
+    encrypt::DataMap data_map,
+    std::shared_ptr<NetworkData::Buffer> buffer)
+  : contents_(
+      Network::CacheInsert(
+          network,
+          BlobContents{creation_time, std::move(user), std::move(data_map), std::move(buffer)})) {
   VerifyContents(contents_);
 }
 

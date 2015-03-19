@@ -113,24 +113,17 @@ TEST_F(PosixContainerTest, BEH_WriteBlob) {
   {
     LocalBlob local_blob{container().CreateLocalBlob()};
     WriteBlobContents(local_blob, random_data);
-
-    blobs.push_back(
-        container().Write(
-            local_blob, key, ModifyBlobVersion::Create(), asio::use_future).get().value());
+    blobs.push_back(container().WriteBlob(local_blob, key, asio::use_future).get().value());
   }
+
   EXPECT_EQ(key, blobs[0].key());
-  EXPECT_NE(BlobVersion{}, blobs[0].version());
   EXPECT_EQ(blobs[0].creation_time(), blobs[0].modification_time());
   EXPECT_EQ(random_data.size(), blobs[0].size());
   EXPECT_TRUE(blobs[0].user_meta_data().empty());
-  EXPECT_FALSE(blobs[0].data().valid());
 
-  EXPECT_EQ(
-      blobs,
-      container().GetBlobs(RetrieveContainerVersion::Latest(), asio::use_future).get().value());
+  EXPECT_EQ(blobs, container().ListBlobs(asio::use_future).get().value());
   {
-    LocalBlob local_blob{
-      container().OpenBlob(key, blobs[0].version(), asio::use_future).get().value()};
+    LocalBlob local_blob{container().OpenLocalBlob(key, asio::use_future).get().value()};
     EXPECT_EQ(random_data, ReadBlobContents(local_blob));
   }
 }
@@ -152,24 +145,15 @@ TEST_F(PosixContainerTest, BEH_CopyBlob) {
     LocalBlob local_blob{container().CreateLocalBlob()};
     WriteBlobContents(local_blob, random_data);
 
-    blobs.push_back(
-        container().Write(
-            local_blob, "key<-->", ModifyBlobVersion::Create(), asio::use_future).get().value());
+    blobs.push_back(container().WriteBlob(local_blob, "key<-->", asio::use_future).get().value());
   }
   {
     auto child_container =
-      container().OpenContainer(
-          "child container", ModifyContainerVersion::Create(), asio::use_future).get().value();
+      container().CreateChildContainer("child container", asio::use_future).get().value();
     blobs.push_back(
-        child_container.Copy(
-            blobs.back(),
-            "second key!",
-            ModifyBlobVersion::Create(),
-            asio::use_future)
-        .get().value());
+        child_container.CopyBlob(blobs.back(), "second key!", asio::use_future).get().value());
   }
   EXPECT_NE(blobs[0], blobs[1]);
-  EXPECT_NE(blobs[0].version(), blobs[1].version());
   
   EXPECT_STREQ("key<-->", blobs[0].key().c_str());
   EXPECT_STREQ("second key!", blobs[1].key().c_str());
@@ -182,11 +166,8 @@ TEST_F(PosixContainerTest, BEH_CopyBlob) {
   EXPECT_EQ(blobs[0].size(), blobs[1].size());
   EXPECT_EQ(blobs[0].user_meta_data(), blobs[1].user_meta_data());
   EXPECT_EQ(
-      static_cast<detail::Blob>(blobs[0]).data_map(),
-      static_cast<detail::Blob>(blobs[1]).data_map());
-
-  EXPECT_FALSE(blobs[0].data().valid());
-  EXPECT_FALSE(blobs[1].data().valid());
+      Blob::Detail::blob(blobs[0]).data_map(),
+      Blob::Detail::blob(blobs[1]).data_map());
 }
 
 TEST_F(PosixContainerTest, BEH_MultipleBlobs) {
@@ -194,6 +175,33 @@ TEST_F(PosixContainerTest, BEH_MultipleBlobs) {
   namespace karma = boost::spirit::karma;
   namespace range = boost::range;
   using ::testing::_;
+
+  const auto verify_blobs = [this] (const unsigned expected_count) {
+    std::set<std::string> expected_keys;
+    for (unsigned i : boost::counting_range(0u, expected_count)) {
+      expected_keys.insert(std::to_string(i));
+    }
+
+    auto blobs = container().ListBlobs(asio::use_future).get().value();
+    range::sort(blobs, Sort::KeyAscending{});
+
+    for (const auto& blob : blobs) {
+      const auto size = std::stoul(blob.key());
+      const std::string data(size, 'L');
+
+      EXPECT_EQ(size, blob.size());
+      EXPECT_EQ(blob.creation_time(), blob.modification_time());
+      EXPECT_TRUE(blob.user_meta_data().empty());
+    }
+
+    const auto actual_keys = adapt::transform(blobs, Transform::Key{});
+    const auto print_keys = (karma::right_align(2, ' ')[karma::string]) % ", ";
+    EXPECT_TRUE(range::equal(expected_keys, actual_keys)) <<
+      karma::format(
+          ("Expected Containers:\t" << print_keys << karma::eol <<
+           "Actual Containers:  \t" << print_keys),
+          std::tie(expected_keys, actual_keys));
+  };
 
   const unsigned container_count = 20;
   const auto indexes = boost::counting_range(0u, container_count);
@@ -215,68 +223,33 @@ TEST_F(PosixContainerTest, BEH_MultipleBlobs) {
     WriteBlobContents(local_blob, data);
     EXPECT_EQ(i, local_blob.size());
 
-    const auto blob = container().Write(
-        local_blob, key, ModifyBlobVersion::Create(), asio::use_future).get().value();
+    const auto blob = container().WriteBlob(local_blob, key, asio::use_future).get().value();
 
     EXPECT_EQ(key, blob.key());
     EXPECT_EQ(i, blob.size());
     EXPECT_EQ(blob.creation_time(), blob.modification_time());
     EXPECT_TRUE(blob.user_meta_data().empty());
-    EXPECT_EQ(data, blob.data().value());
 
-    auto create_result = container().Write(
-        local_blob, key, ModifyBlobVersion::Create(), asio::use_future).get();
+    auto create_result = container().WriteBlob(local_blob, key, asio::use_future).get();
     ASSERT_FALSE(create_result.valid());
     EXPECT_EQ(NfsErrors::bad_modify_version, create_result.error());
+
+    verify_blobs(i);
   }
 
   // Delete 20 blobs
   for (unsigned i : reverse_indexes) {
     const std::string key = std::to_string(i);
 
-    EXPECT_TRUE(
-        container().DeleteBlob(key, RetrieveBlobVersion::Latest(), asio::use_future).get().valid());
+    const auto blob = container().GetBlob(key, asio::use_future).get().value();
 
-    auto create_result = container().DeleteBlob(
-        key, RetrieveBlobVersion::Latest(), asio::use_future).get();
+    EXPECT_TRUE(container().DeleteBlob(blob, asio::use_future).get().valid());
+
+    auto create_result = container().DeleteBlob(blob, asio::use_future).get();
     ASSERT_FALSE(create_result.valid());
     EXPECT_EQ(CommonErrors::no_such_element, create_result.error());
-  }
 
-  const auto history = container().GetVersions(asio::use_future).get().value();
-  ASSERT_EQ((container_count * 2) + 1, history.size());
-
-  unsigned count = 0;
-  for (const auto& version : history) {
-    const unsigned expected_count =
-      (container_count - std::abs(container_count - static_cast<long>(count)));
-
-    std::set<std::string> expected_keys;
-    for (unsigned i : boost::counting_range(0u, expected_count)) {
-      expected_keys.insert(std::to_string(i));
-    }
-
-    auto blobs = container().GetBlobs(version, asio::use_future).get().value();
-    range::sort(blobs, Sort::KeyAscending{});
-
-    for (const auto& blob : blobs) {
-      const auto size = std::stoul(blob.key());
-      const std::string data(size, 'L');
-
-      EXPECT_EQ(size, blob.size());
-      EXPECT_EQ(blob.creation_time(), blob.modification_time());
-      EXPECT_TRUE(blob.user_meta_data().empty());
-      EXPECT_EQ(data, blob.data().value());
-    }
-
-    const auto actual_keys = adapt::transform(blobs, Transform::Key{});
-    const auto print_keys = (karma::right_align(2, ' ')[karma::string]) % ", ";
-    EXPECT_TRUE(range::equal(expected_keys, actual_keys)) <<
-      karma::format(
-          ("Expected Containers:\t" << print_keys << karma::eol <<
-           "Actual Containers:  \t" << print_keys),
-          std::tie(expected_keys, actual_keys));
-    ++count;
+    verify_blobs(i);
   }
 }
 
@@ -285,6 +258,24 @@ TEST_F(PosixContainerTest, BEH_MultipleContainers) {
   namespace karma = boost::spirit::karma;
   namespace range = boost::range;
   using ::testing::_;
+
+  const auto verify_child_containers = [this](unsigned expected_count) {
+    std::set<std::string> expected_keys;
+    for (unsigned i : boost::counting_range(0u, expected_count)) {
+      expected_keys.insert(std::to_string(i));
+    }
+
+    auto containers = container().ListChildContainers(asio::use_future).get().value();
+    range::sort(containers, Sort::KeyAscending{});
+
+    const auto actual_keys = adapt::transform(containers, Transform::Key{});
+    const auto print_keys = (karma::right_align(2, ' ')[karma::string]) % ", ";
+    EXPECT_TRUE(range::equal(expected_keys, actual_keys)) <<
+      karma::format(
+          ("Expected Containers:\t" << print_keys << karma::eol <<
+           "Actual Containers:  \t" << print_keys),
+          std::tie(expected_keys, actual_keys));
+  };
 
   const unsigned container_count = 20;
   const auto container_indexes = boost::counting_range(0u, container_count);
@@ -299,54 +290,31 @@ TEST_F(PosixContainerTest, BEH_MultipleContainers) {
   // Create 20 containers
   for (unsigned i : container_indexes) {
     EXPECT_TRUE(
-        container().OpenContainer(
-            std::to_string(i), ModifyContainerVersion::Create(), asio::use_future).get().valid());
+        container().CreateChildContainer(std::to_string(i), asio::use_future).get().valid());
 
-    auto create_result = container().OpenContainer(
-        std::to_string(i), ModifyContainerVersion::Create(), asio::use_future).get();
+    auto create_result = container().CreateChildContainer(
+        std::to_string(i), asio::use_future).get();
     ASSERT_FALSE(create_result.valid());
     EXPECT_EQ(NfsErrors::bad_modify_version, create_result.error());
+
+    verify_child_containers(i);
   }
 
   // Delete 20 containers
   for (unsigned i : adapt::reverse(container_indexes)) {
-    EXPECT_TRUE(
-        container().DeleteContainer(
-            std::to_string(i), RetrieveContainerVersion::Latest(), asio::use_future).get().valid());
+    const auto container_info =
+      container().GetChildContainerInfo(std::to_string(i), asio::use_future).get().value();
+    
+    EXPECT_TRUE(container().DeleteChildContainer(container_info, asio::use_future).get().valid());
 
-    auto create_result = container().DeleteContainer(
-        std::to_string(i), RetrieveContainerVersion::Latest(), asio::use_future).get();
+    auto create_result = container().DeleteChildContainer(
+        container_info, asio::use_future).get();
     ASSERT_FALSE(create_result.valid());
     EXPECT_EQ(CommonErrors::no_such_element, create_result.error());
-  }
 
-  const auto history = container().GetVersions(asio::use_future).get().value();
-  ASSERT_EQ((container_count * 2) + 1, history.size());
-
-  unsigned count = 0;
-  for (const auto& version : history) {
-    const unsigned expected_count =
-      (container_count - std::abs(container_count - static_cast<long>(count)));
-
-    std::set<std::string> expected_keys;
-    for (unsigned i : boost::counting_range(0u, expected_count)) {
-      expected_keys.insert(std::to_string(i));
-    }
-
-    auto containers = container().GetContainers(version, asio::use_future).get().value();
-    range::sort(containers, Sort::KeyAscending{});
-
-    const auto actual_keys = adapt::transform(containers, Transform::Key{});
-    const auto print_keys = (karma::right_align(2, ' ')[karma::string]) % ", ";
-    EXPECT_TRUE(range::equal(expected_keys, actual_keys)) <<
-      karma::format(
-          ("Expected Containers:\t" << print_keys << karma::eol <<
-           "Actual Containers:  \t" << print_keys),
-          std::tie(expected_keys, actual_keys));
-    ++count;
+    verify_child_containers(i);
   }
 }
-
 }  // namespace test
 }  // namespace nfs
 }  // namespace maidsafe

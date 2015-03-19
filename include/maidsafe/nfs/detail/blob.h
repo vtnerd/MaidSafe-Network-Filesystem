@@ -1,4 +1,4 @@
-/*  Copyright 2014 MaidSafe.net limited
+/*  Copyright 2015 MaidSafe.net limited
 
     This MaidSafe Software is licensed to you under (1) the MaidSafe.net Commercial License,
     version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -38,11 +38,21 @@ class Blob {
   friend class cereal::access;
 
   Blob();
-  Blob(const std::shared_ptr<Network>& network, const detail::PendingBlob& pending_blob);
+
+  // For new blob, shared_ptr can be nullptr
   Blob(
       const std::shared_ptr<Network>& network,
-      const detail::PendingBlob& pending_blob,
-      Clock::time_point creation_time);
+      UserMetaData user,
+      encrypt::DataMap data_map,
+      std::shared_ptr<NetworkData::Buffer> buffer);
+
+  // For updating blob, shared_ptr can be nullptr
+  Blob(
+      const std::shared_ptr<Network>& network,
+      Clock::time_point creation_time,
+      UserMetaData user,
+      encrypt::DataMap data_map,
+      std::shared_ptr<NetworkData::Buffer> buffer);
 
   Blob(const Blob&) = default;
   Blob(Blob&& other) MAIDSAFE_NOEXCEPT
@@ -57,13 +67,12 @@ class Blob {
 
   const MetaData& meta_data() const MAIDSAFE_NOEXCEPT { return contents().meta_data(); }
   const encrypt::DataMap& data_map() const MAIDSAFE_NOEXCEPT { return contents().data_map(); }
-  const BlobVersion& version() const MAIDSAFE_NOEXCEPT { return contents().version(); }
 
   std::shared_ptr<NetworkData::Buffer> GetBuffer(const std::weak_ptr<Network>& network) const {
     return contents().GetBuffer(network);
   }
 
-  bool Equal(const Blob& other) const {
+  bool Equal(const Blob& other) const MAIDSAFE_NOEXCEPT {
     return contents_ == other.contents_ || contents() == other.contents();
   }
 
@@ -86,11 +95,11 @@ class Blob {
   std::shared_ptr<const BlobContents> contents_;
 };
 
-inline bool operator==(const Blob& lhs, const Blob& rhs) {
+inline bool operator==(const Blob& lhs, const Blob& rhs) MAIDSAFE_NOEXCEPT {
    return lhs.Equal(rhs);
 }
 
-inline bool operator!=(const Blob& lhs, const Blob& rhs) {
+inline bool operator!=(const Blob& lhs, const Blob& rhs) MAIDSAFE_NOEXCEPT {
   return !lhs.Equal(rhs);
 }
 }  // detail

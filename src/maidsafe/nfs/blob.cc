@@ -1,4 +1,4 @@
-/*  Copyright 2014 MaidSafe.net limited
+/*  Copyright 2015 MaidSafe.net limited
 
     This MaidSafe Software is licensed to you under (1) the MaidSafe.net Commercial License,
     version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -21,14 +21,5 @@
 
 namespace maidsafe {
 namespace nfs {
-Expected<std::string> Blob::data() const {
-  if (detail_blob_.data_map().chunks.empty()) {
-    return std::string(
-        detail_blob_.data_map().content.begin(),
-        detail_blob_.data_map().content.end());
-  }
-
-  return boost::make_unexpected(make_error_code(CommonErrors::cannot_exceed_limit));
-}
 }  // namespace nfs
 }  // namespace maidsafe

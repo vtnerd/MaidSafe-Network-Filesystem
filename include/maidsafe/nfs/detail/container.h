@@ -22,6 +22,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -31,9 +32,7 @@
 #include "maidsafe/common/config.h"
 #include "maidsafe/common/error.h"
 #include "maidsafe/common/unordered_map.h"
-#include "maidsafe/common/unordered_set.h"
 #include "maidsafe/encrypt/data_map.h"
-#include "maidsafe/nfs/blob_version.h"
 #include "maidsafe/nfs/container_version.h"
 #include "maidsafe/nfs/detail/action/action_abort.h"
 #include "maidsafe/nfs/detail/action/action_store.h"
@@ -60,6 +59,11 @@ class Container {
  private:
   static MAIDSAFE_CONSTEXPR_OR_CONST std::uint16_t kRefreshInterval = 30;
 
+  template<typename Update>
+  using UpdatedResult =
+    typename std::decay<
+      typename std::result_of<Update(ContainerInstance&, ContainerVersion)>::type>::type;
+
  public:
   static MAIDSAFE_CONSTEXPR std::chrono::seconds GetRefreshInterval() {
     return std::chrono::seconds(kRefreshInterval);
@@ -69,7 +73,8 @@ class Container {
   Container(std::weak_ptr<Network> network, ContainerInfo parent_info);
 
   // Construct existing container
-  Container(std::weak_ptr<Network> network, ContainerInfo parent_info, ContainerInfo container_info);
+  Container(
+      std::weak_ptr<Network> network, ContainerInfo parent_info, ContainerInfo container_info);
 
   const std::weak_ptr<Network>& network() const { return network_; }
   const ContainerInfo& parent_info() const { return parent_info_; }
@@ -153,20 +158,21 @@ class Container {
     coro.Execute();
 
     return result.get();
-  }
+  } 
 
   /*
     The signature of Update must be:
-       Expected<void>(ContainerInstance, ContainerVersion)
+       Expected<unspecified>(ContainerInstance, ContainerVersion)
 
     The function should update ContainerInstance referenced by ContainerVersion,
     and return unexpected on error. This function will retry updates if an
-    unrelated change was made to the container.
+    unrelated change was made to the container. The value returned by the Update
+    function is forwarded to the Token on success.
   */
   template<typename Update, typename Token>
-  static AsyncResultReturn<Token, ContainerVersion> UpdateLatestInstance(
-      std::shared_ptr<detail::Container> container, Update update, Token token) {
-    using Handler = AsyncHandler<Token, ContainerVersion>;
+  static AsyncResultReturn<Token, typename UpdatedResult<Update>::value_type> UpdateLatestInstance(
+        std::shared_ptr<detail::Container> container, Update update, Token token) {
+    using Handler = AsyncHandler<Token, typename UpdatedResult<Update>::value_type>;
 
     if (container == nullptr) {
       BOOST_THROW_EXCEPTION(MakeNullPointerException());
@@ -175,46 +181,15 @@ class Container {
     Handler handler{std::move(token)};
     asio::async_result<Handler> result{handler};
 
-    auto coro = MakeCoroutine<UpdateLatestInstanceRoutine<Update, Handler>>(
+    auto coro = MakeCoroutine<UpdateInstanceRoutine<Update, Handler>>(
         std::move(container),
         std::vector<ContainerVersion>{},
         ContainerInstance{},
+        UpdatedResult<Update>{},
         Expected<ContainerVersion>{},
         std::move(update),
         std::move(handler));
     coro.Execute();
-
-    return result.get();
-  }
-
-  template<typename Token>
-  static AsyncResultReturn<Token, detail::Blob> GetBlob(
-      const std::shared_ptr<Container>& container,
-      const detail::ContainerKey& key,
-      const BlobVersion& get_version,
-      Token token) {
-    using Handler = AsyncHandler<Token, detail::Blob>;
-
-    if (container == nullptr) {
-      BOOST_THROW_EXCEPTION(MakeNullPointerException());
-    }
-
-    Handler handler{std::move(token)};
-    asio::async_result<Handler> result{handler};
-
-    auto cached_blob = container->GetCachedBlob(key, get_version);
-    if (cached_blob) {
-      handler(std::move(*cached_blob));
-    } else {
-      auto coro = MakeCoroutine<GetBlobRoutine<Handler>>(
-          container,
-          key,
-          get_version,
-          std::vector<ContainerVersion>{},
-          ContainerInstance{},
-          std::move(handler));
-      coro.Execute();
-    }
 
     return result.get();
   }
@@ -373,17 +348,18 @@ class Container {
   };
 
   template<typename Update, typename Handler>
-  struct UpdateLatestInstanceRoutine {
+  struct UpdateInstanceRoutine {    
     struct Frame {
       std::shared_ptr<detail::Container> container;
       std::vector<ContainerVersion> history;
       ContainerInstance instance;
+      UpdatedResult<Update> update_result;
       Expected<ContainerVersion> put_result;
       Update update;
       Handler handler;
     };
 
-    void operator()(Coroutine<UpdateLatestInstanceRoutine, Frame>& coro) const {
+    void operator()(Coroutine<UpdateInstanceRoutine, Frame>& coro) const {
       assert(coro.frame().container != nullptr);
 
       ASIO_CORO_REENTER(coro) {
@@ -411,12 +387,12 @@ class Container {
                   .OnSuccess(
                       action::Store(std::ref(coro.frame().instance)).Then(action::Resume(coro)))
                   .OnFailure(action::Abort(coro)));
-          {
-            auto update = coro.frame().update(coro.frame().instance, coro.frame().history.front());
-            if (!update) {
-              coro.frame().handler(boost::make_unexpected(update.error()));
-              return;
-            }
+          
+          coro.frame().update_result =
+            coro.frame().update(coro.frame().instance, coro.frame().history.front());
+          if (!coro.frame().update_result) {
+            coro.frame().handler(std::move(coro.frame().update_result));
+            return;
           }
 
           ASIO_CORO_YIELD
@@ -429,62 +405,12 @@ class Container {
 
           // If version error, retry the update because it could be unrelated
           if (!coro.frame().put_result && !IsVersionError(coro.frame().put_result.error())) {
-            coro.frame().handler(std::move(coro.frame().put_result));
+            coro.frame().handler(boost::make_unexpected(coro.frame().put_result.error()));
             return;
           }
         } while (!coro.frame().put_result);
 
-        coro.frame().handler(std::move(coro.frame().put_result));
-      }
-    }
-  };
-
-  template<typename Handler>
-  struct GetBlobRoutine {
-    struct Frame {
-      std::shared_ptr<Container> container;
-      detail::ContainerKey key;
-      BlobVersion get_version;
-      std::vector<ContainerVersion> version_history;
-      ContainerInstance current_instance;
-      Handler handler;
-    };
-
-    void operator()(Coroutine<GetBlobRoutine, Frame>& coro) const {
-      assert(coro.frame().container != nullptr);
-
-      ASIO_CORO_REENTER(coro) {
-        ASIO_CORO_YIELD
-          Container::GetVersions(
-              coro.frame().container,
-              operation
-                .OnSuccess(
-                    action::Store(std::ref(coro.frame().version_history))
-                    .Then(action::Resume(coro)))
-                .OnFailure(action::Abort(coro)));
-
-        while (!coro.frame().version_history.empty()) {
-          ASIO_CORO_YIELD
-            Container::GetInstance(
-                coro.frame().container,
-                std::move(coro.frame().version_history.front()),
-                operation
-                  .OnSuccess(
-                      action::Store(std::ref(coro.frame().current_instance))
-                      .Then(action::Resume(coro)))
-                  .OnFailure(action::Abort(coro)));
-
-          auto blob = std::move(coro.frame().current_instance).GetBlob(coro.frame().key);
-          if (blob && blob->version() == coro.frame().get_version) {
-            coro.frame().handler(std::move(*blob));
-            return;
-          }
-
-          coro.frame().version_history.erase(coro.frame().version_history.begin());
-        }
-
-        coro.frame().handler(
-            boost::make_unexpected(make_error_code(CommonErrors::no_such_element)));
+        coro.frame().handler(std::move(coro.frame().update_result));
       }
     }
   };
@@ -497,8 +423,8 @@ class Container {
   Container& operator=(Container&&) = delete;
 
  private:
-  static bool IsVersionError(const std::error_code& error);
   static std::system_error MakeNullPointerException();
+  static bool IsVersionError(const std::error_code& error);
 
   boost::optional<std::vector<ContainerVersion>> GetCachedVersions() const;
   void UpdateCachedVersions(std::vector<ContainerVersion> versions);
@@ -508,13 +434,11 @@ class Container {
       ContainerVersion new_version,
       ContainerInstance instance);
   void AddCachedInstance(
-    ContainerVersion new_version,
-    ContainerInstance instance,
-    const std::lock_guard<std::mutex>& data_mutex_lock);
+      ContainerVersion new_version,
+      ContainerInstance instance,
+      const std::lock_guard<std::mutex>& data_mutex_lock);
 
   boost::optional<ContainerInstance> GetCachedInstance(const ContainerVersion& version) const;
-  boost::optional<detail::Blob> GetCachedBlob(
-      const detail::ContainerKey& key, const BlobVersion& version) const;
 
   Expected<ImmutableData> EncryptVersion(const encrypt::DataMap& data_map) const;
   Expected<ContainerInstance> DecryptAndCacheInstance(
@@ -533,7 +457,6 @@ class Container {
 
   std::vector<ContainerVersion> cached_versions_;
   maidsafe::unordered_map<ContainerVersion, const ContainerInstance> cached_instances_;
-  maidsafe::unordered_map<BlobVersion, maidsafe::unordered_set<ContainerVersion>> cached_blobs_;
 
   const ContainerInfo parent_info_;
   const ContainerInfo container_info_;

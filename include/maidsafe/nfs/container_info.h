@@ -18,7 +18,8 @@
 #ifndef MAIDSAFE_NFS_CONTAINER_INFO_H_
 #define MAIDSAFE_NFS_CONTAINER_INFO_H_
 
-#include <cstdint>
+#include <string>
+#include <utility>
 
 #include "maidsafe/common/config.h"
 #include "maidsafe/nfs/detail/container_info.h"
@@ -30,7 +31,7 @@ class ContainerInfo {
  public:
   ContainerInfo(detail::ContainerKey key, detail::ContainerInfo info) MAIDSAFE_NOEXCEPT
     : key_(std::move(key)),
-      detail_info_(std::move(info)) {
+      info_(std::move(info)) {
   }
 
   // No move construction/assignment. This would create null-pointers in
@@ -41,17 +42,20 @@ class ContainerInfo {
   void swap(ContainerInfo& other) MAIDSAFE_NOEXCEPT {
     using std::swap;
     swap(key_, other.key_);
-    swap(detail_info_, other.detail_info_);
+    swap(info_, other.info_);
   }
 
   const std::string& key() const { return key_.value(); }
 
-  // Intended for internal usage only
-  explicit operator const detail::ContainerInfo&() const { return detail_info_; }
+  // Not for client usage, but no harm leaving public exposure
+  struct Detail {
+    static const detail::ContainerKey& key(const ContainerInfo& info) { return info.key_; }
+    static const detail::ContainerInfo& info(const ContainerInfo& info) { return info.info_; }
+  };
 
  private:
   detail::ContainerKey key_;
-  detail::ContainerInfo detail_info_;
+  detail::ContainerInfo info_;
 };
 
 inline void swap(ContainerInfo& lhs, ContainerInfo& rhs) MAIDSAFE_NOEXCEPT {

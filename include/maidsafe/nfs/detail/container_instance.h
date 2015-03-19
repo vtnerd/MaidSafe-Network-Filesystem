@@ -83,10 +83,14 @@ class ContainerInstance {
   Expected<detail::Blob> GetBlob(const ContainerKey& key) const;
   Expected<detail::ContainerInfo> GetContainerInfo(const ContainerKey& key) const;
 
-  // Update callback must have syntax Expected<void>(ContainerInstance::Entries&)
+  // Update callback must have syntax Expected<unspecified>(ContainerInstance::Entries&)
   template<typename Update>
-  Expected<void> UpdateEntries(const Update& update) {
-    return update(entries_).bind([this] { meta_data_.UpdateModificationTime(); });
+  typename std::result_of<Update(Entries&)>::type UpdateEntries(const Update& update) {
+    const auto result = update(entries_);
+    if (result) {
+      meta_data_.UpdateModificationTime();
+    }
+    return result;
   }
 
  private:

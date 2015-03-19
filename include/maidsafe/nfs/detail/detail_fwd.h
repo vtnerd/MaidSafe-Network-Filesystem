@@ -34,7 +34,6 @@ class Network;
 class NetworkBackend;
 class NfsInputArchive;
 class NfsOutputArchive;
-class PendingBlob;
 class UserMetaData;
 
 }  // namespace detail

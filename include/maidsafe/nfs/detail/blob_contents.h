@@ -18,11 +18,13 @@
 #ifndef MAIDSAFE_NFS_DETAIL_BLOB_CONTENTS_H_
 #define MAIDSAFE_NFS_DETAIL_BLOB_CONTENTS_H_
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 
 #include "maidsafe/common/config.h"
+#include "maidsafe/common/types.h"
 #include "maidsafe/encrypt/data_map.h"
 #include "maidsafe/nfs/blob_version.h"
 #include "maidsafe/nfs/detail/detail_fwd.h"
@@ -41,19 +43,41 @@ class BlobContents {
   friend class cereal::access;
 
   BlobContents();
-  BlobContents(const PendingBlob& pending_blob);
-  BlobContents(const PendingBlob& pending_blob, Clock::time_point creation_time);
 
-  BlobContents(BlobContents&& other)
-    : version_(std::move(other.version_)),
-      meta_data_(std::move(other.meta_data_)),
-      data_map_(std::move(other.data_map_)),
-      buffer_(std::move(other.buffer_)),
-      buffer_mutex_() {
+  // For new blob, shared_ptr can be nullptr
+  BlobContents(
+      UserMetaData user,
+      encrypt::DataMap data_map,
+      std::shared_ptr<NetworkData::Buffer> buffer);
+
+  // For updating blob, shared_ptr can be nullptr
+  BlobContents(
+      Clock::time_point creation_time,
+      UserMetaData user,
+      encrypt::DataMap data_map,
+      std::shared_ptr<NetworkData::Buffer> buffer);
+
+  BlobContents(BlobContents&& other);
+
+  template<typename HashAlgorithm>
+  void HashAppend(HashAlgorithm& hash) const {
+    hash(version());
   }
 
-  // Re-calculates version, clears buffer
-  void Refresh();
+  bool Equal(const BlobContents& other) const MAIDSAFE_NOEXCEPT;
+
+  const MetaData& meta_data() const MAIDSAFE_NOEXCEPT { return meta_data_; }
+  const encrypt::DataMap& data_map() const MAIDSAFE_NOEXCEPT { return data_map_; }
+
+  std::shared_ptr<NetworkData::Buffer> GetBuffer(const std::weak_ptr<Network>& network) const;
+
+ private:
+  BlobContents(const BlobContents&) = delete;
+
+  BlobContents& operator=(const BlobContents&) = delete;
+  BlobContents& operator=(BlobContents&&) = delete;
+
+  const std::array<byte, 64>& version() const MAIDSAFE_NOEXCEPT { return version_; }
 
   template<typename Archive>
   Archive& load(Archive& ar, const std::uint32_t /*version*/) {
@@ -67,40 +91,22 @@ class BlobContents {
     return archive(meta_data_, data_map_);
   }
 
-  template<typename HashAlgorithm>
-  void HashAppend(HashAlgorithm& hash) const {
-    hash(version());
-  }
-
-  bool Equal(const BlobContents& other) const {
-    return version() == other.version();
-  }
-
-  const BlobVersion& version() const MAIDSAFE_NOEXCEPT { return version_; }
-  const MetaData& meta_data() const MAIDSAFE_NOEXCEPT { return meta_data_; }
-  const encrypt::DataMap& data_map() const MAIDSAFE_NOEXCEPT { return data_map_; }
-
-  std::shared_ptr<NetworkData::Buffer> GetBuffer(const std::weak_ptr<Network>& network) const;
+  // Re-calculates version, clears buffer
+  void Refresh();
 
  private:
-  BlobContents(const BlobContents&) = delete;
-
-  BlobContents& operator=(const BlobContents&) = delete;
-  BlobContents& operator=(BlobContents&&) = delete;
-
- private:
-  BlobVersion version_;  // unique SHA-512 id
+  mutable std::weak_ptr<NetworkData::Buffer> buffer_;
   MetaData meta_data_;
   encrypt::DataMap data_map_;
-  mutable std::weak_ptr<NetworkData::Buffer> buffer_;
+  std::array<byte, 64> version_;  // unique SHA-512 id
   mutable std::mutex buffer_mutex_;
 };
 
-inline bool operator==(const BlobContents& lhs, const BlobContents& rhs) {
+inline bool operator==(const BlobContents& lhs, const BlobContents& rhs) MAIDSAFE_NOEXCEPT {
   return lhs.Equal(rhs);
 }
 
-inline bool operator!=(const BlobContents& lhs, const BlobContents& rhs) {
+inline bool operator!=(const BlobContents& lhs, const BlobContents& rhs) MAIDSAFE_NOEXCEPT {
   return !lhs.Equal(rhs);
 }
 }  // namespace detail

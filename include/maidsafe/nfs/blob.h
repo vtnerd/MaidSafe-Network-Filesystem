@@ -22,7 +22,6 @@
 
 #include "maidsafe/common/clock.h"
 #include "maidsafe/common/config.h"
-#include "maidsafe/nfs/blob_version.h"
 #include "maidsafe/nfs/detail/blob.h"
 #include "maidsafe/nfs/detail/container_key.h"
 #include "maidsafe/nfs/detail/meta_data.h"
@@ -34,7 +33,7 @@ class Blob {
  public:
   Blob(detail::ContainerKey key, detail::Blob blob) MAIDSAFE_NOEXCEPT
     : key_(std::move(key)),
-      detail_blob_(std::move(blob)) {
+      blob_(std::move(blob)) {
   }
 
   // No move construction/assignment. This would create null-pointers in
@@ -45,33 +44,34 @@ class Blob {
   void swap(Blob& other) MAIDSAFE_NOEXCEPT {
     using std::swap;
     swap(key_, other.key_);
-    swap(detail_blob_, other.detail_blob_);
+    swap(blob_, other.blob_);
   }
 
   const std::string& key() const MAIDSAFE_NOEXCEPT { return key_.value(); }
-  const BlobVersion& version() const MAIDSAFE_NOEXCEPT { return detail_blob_.version(); }
-  std::uint64_t size() const MAIDSAFE_NOEXCEPT { return detail_blob_.data_map().size(); }
+  std::uint64_t size() const MAIDSAFE_NOEXCEPT { return blob_.data_map().size(); }
 
-  Clock::time_point creation_time() const { return detail_blob_.meta_data().creation_time(); }
+  Clock::time_point creation_time() const { return blob_.meta_data().creation_time(); }
   Clock::time_point modification_time() const {
-    return detail_blob_.meta_data().modification_time();
+    return blob_.meta_data().modification_time();
   }
 
-  Expected<std::string> data() const;
   const std::string& user_meta_data() const MAIDSAFE_NOEXCEPT {
-    return detail_blob_.meta_data().user_meta_data().value();
+    return blob_.meta_data().user_meta_data().value();
   }
 
   bool Equal(const Blob& other) const MAIDSAFE_NOEXCEPT {
-    return key_ == other.key_ && detail_blob_ == other.detail_blob_;
+    return key_ == other.key_ && blob_ == other.blob_;
   }
 
-  // Intended for internal usage only
-  explicit operator const detail::Blob&() const { return detail_blob_; }
+  // Not for client usage, but no harm leaving public exposure
+  struct Detail {
+    static const detail::ContainerKey& key(const Blob& blob) { return blob.key_; }
+    static const detail::Blob& blob(const Blob& blob) { return blob.blob_; }
+  };
 
  private:
   detail::ContainerKey key_;
-  detail::Blob detail_blob_;
+  detail::Blob blob_;
 };
 
 inline void swap(Blob& lhs, Blob& rhs) MAIDSAFE_NOEXCEPT {
@@ -85,7 +85,6 @@ inline bool operator==(const Blob& lhs, const Blob& rhs) MAIDSAFE_NOEXCEPT {
 inline bool operator!=(const Blob& lhs, const Blob& rhs) MAIDSAFE_NOEXCEPT {
   return !lhs.Equal(rhs);
 }
-
 }  // nfs
 }  // maidsafe
 

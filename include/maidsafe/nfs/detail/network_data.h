@@ -157,6 +157,7 @@ class NetworkData {
 
         // queue all put requests, then yield
         ASIO_CORO_YIELD {
+          const auto network = coro.frame().network.lock();
           auto fail_handler = action::CallOnce(std::ref(coro.frame().once), action::Abort(coro));
 
           for (auto& chunk_name : coro.frame().new_chunks) {
@@ -175,7 +176,7 @@ class NetworkData {
             }
 
             Network::PutChunk(
-                coro.frame().network.lock(),
+                network,
                 std::move(*chunk),
                 operation.OnSuccess(action::Resume(coro)).OnFailure(fail_handler));
           }

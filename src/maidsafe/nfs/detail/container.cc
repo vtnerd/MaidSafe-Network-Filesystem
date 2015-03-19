@@ -72,21 +72,20 @@ Container::Container(
   : network_(std::move(network)),
     cached_versions_(),
     cached_instances_(),
-    cached_blobs_(),
     parent_info_(std::move(parent_info)),
     container_info_(std::move(container_info)),
     last_update_(),
     data_mutex_() {
 }
 
+std::system_error Container::MakeNullPointerException() {
+  return MakeError(CommonErrors::null_pointer);
+}
+
 bool Container::IsVersionError(const std::error_code& error) {
   // Cannot_exceed_limit is the error code because the
   // SDV branch limit was set to 1 (which was exceeded).
   return error == CommonErrors::cannot_exceed_limit;
-}
-
-std::system_error Container::MakeNullPointerException() {
-  return MakeError(CommonErrors::null_pointer);
 }
 
 boost::optional<std::vector<ContainerVersion>> Container::GetCachedVersions() const {
@@ -195,13 +194,6 @@ void Container::AddCachedInstance(
   on_scope_exit purge_cache(
       [this, &data_mutex_lock]() { PurgeInstanceCache(data_mutex_lock); });
 
-  for (const auto& entry : instance.entries()) {
-    detail::ContainerInstance::ExpectBlob(entry.second).bind(
-        [&] (const detail::Blob blob) {
-          cached_blobs_[blob.version()].insert(new_version);
-        });
-  }
-
   cached_instances_.insert(std::make_pair(std::move(new_version), std::move(instance)));
   purge_cache.Release();
 }
@@ -212,28 +204,6 @@ boost::optional<ContainerInstance> Container::GetCachedInstance(
   const auto cached_version = cached_instances_.find(version);
   if (cached_version != cached_instances_.end()) {
     return ContainerInstance{cached_version->second};
-  }
-
-  return boost::none;
-}
-
-boost::optional<detail::Blob> Container::GetCachedBlob(
-    const detail::ContainerKey& key, const BlobVersion& version) const {
-  const std::lock_guard<std::mutex> lock{data_mutex_};
-
-  const auto blob_instances = cached_blobs_.find(version);
-  if (blob_instances == cached_blobs_.end()) {
-    return boost::none;
-  }
-
-  for (const auto& container_version : blob_instances->second) {
-    const auto cached_instance = cached_instances_.find(container_version);
-    if (cached_instance != cached_instances_.end()) {
-      const auto cached_blob = cached_instance->second.GetBlob(key);
-      if (cached_blob) {
-        return std::move(*cached_blob);
-      }
-    }
   }
 
   return boost::none;
@@ -280,22 +250,6 @@ maidsafe::unordered_map<ContainerVersion, const ContainerInstance>::iterator Con
     maidsafe::unordered_map<ContainerVersion, const ContainerInstance>::iterator prune_entry,
     const std::lock_guard<std::mutex>& /*data_mutex_*/) {
   if (prune_entry != cached_instances_.end()) {
-    for (const auto& entry : prune_entry->second.entries()) {
-
-      detail::ContainerInstance::ExpectBlob(entry.second).bind(
-          [&] (const detail::Blob blob) {
-
-            const auto cached = cached_blobs_.find(blob.version());
-            if (cached != cached_blobs_.end()) {
-              cached->second.erase(prune_entry->first);
-
-              if (cached->second.empty()) {
-                cached_blobs_.erase(cached);
-              }
-            }
-          });
-    }
-
     return cached_instances_.erase(prune_entry);
   }
 
@@ -309,7 +263,6 @@ void Container::PurgeVersionCache(const std::lock_guard<std::mutex>& /*data_mute
 
 void Container::PurgeInstanceCache(const std::lock_guard<std::mutex>& /*data_mutex_*/) MAIDSAFE_NOEXCEPT {
   cached_instances_.clear();
-  cached_blobs_.clear();
 }
 
 }  // namespace detail

@@ -1,4 +1,4 @@
-/*  Copyright 2013 MaidSafe.net limited
+/*  Copyright 2015 MaidSafe.net limited
 
     This MaidSafe Software is licensed to you under (1) the MaidSafe.net Commercial License,
     version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -17,6 +17,8 @@
     use of the MaidSafe Software.                                                                 */
 #include "maidsafe/nfs/posix_container.h"
 
+#include "boost/algorithm/string/predicate.hpp"
+
 namespace maidsafe {
 namespace nfs {
 PosixContainer::PosixContainer(std::shared_ptr<detail::Container> container)
@@ -26,25 +28,25 @@ PosixContainer::PosixContainer(std::shared_ptr<detail::Container> container)
   }
 }
 
-PosixContainer PosixContainer::OpenContainer(ContainerInfo child_container_info) const {
+PosixContainer PosixContainer::OpenChildContainer(const ContainerInfo& child_info) const {
   assert(container_ != nullptr);
   return PosixContainer{
     std::make_shared<detail::Container>(
         container_->network(),
         container_->container_info(),
-        static_cast<detail::ContainerInfo>(std::move(child_container_info)))};
+        ContainerInfo::Detail::info(child_info))};
 }
 
 LocalBlob PosixContainer::CreateLocalBlob() const {
   return LocalBlob{container_->network()};
 }
 
-LocalBlob PosixContainer::OpenBlob(const Blob& blob) const {
-  return {container_->network(), static_cast<detail::Blob>(blob)};
+LocalBlob PosixContainer::OpenLocalBlob(const Blob& blob) const {
+  return {container_->network(), Blob::Detail::blob(blob)};
 }
 
-std::vector<ContainerInfo> PosixContainer::ExtractContainers::operator()(
-    const detail::ContainerInstance& instance) const {
+std::vector<ContainerInfo> PosixContainer::GetContainers::operator()(
+    const detail::ContainerInstance& instance, const std::string& prefix) const {
 
   std::vector<ContainerInfo> containers{};
   containers.reserve(instance.entries().size());
@@ -52,14 +54,24 @@ std::vector<ContainerInfo> PosixContainer::ExtractContainers::operator()(
   for (const auto& entry : instance.entries()) {
     detail::ContainerInstance::ExpectContainerInfo(entry.second).bind(
         [&] (detail::ContainerInfo info) {
-          containers.emplace_back(entry.first, std::move(info));
+          if (prefix.empty() || boost::algorithm::starts_with(entry.first.value(), prefix)) {
+            containers.emplace_back(entry.first, std::move(info));
+          }
         });
   }
 
   return containers;
 }
 
-Expected<PosixContainer> PosixContainer::GetContainer::operator()(
+Expected<ContainerInfo> PosixContainer::GetContainerInfo::operator()(
+    const detail::ContainerInstance& instance, const detail::ContainerKey& key) const {
+  return instance.GetContainerInfo(key).bind(
+      [&] (const detail::ContainerInfo child_info) {
+        return ContainerInfo{key, std::move(child_info)};
+      });
+}
+
+Expected<PosixContainer> PosixContainer::GetPosixContainer::operator()(
     const std::shared_ptr<detail::Container>& container,
     const detail::ContainerInstance& instance,
     const detail::ContainerKey& key) const {
@@ -71,17 +83,23 @@ Expected<PosixContainer> PosixContainer::GetContainer::operator()(
       });
 }
 
-Expected<void> PosixContainer::AddContainer::operator()(
+Expected<PosixContainer> PosixContainer::AddContainer::operator()(
     detail::ContainerInstance& instance,
-    const detail::ContainerKey& key,
-    const detail::ContainerInfo& new_container) const {
+    detail::ContainerKey new_key,
+    const std::shared_ptr<detail::Container>& new_container) const {
+  assert(new_container != nullptr);
+
   return instance.UpdateEntries(
-      [&] (detail::ContainerInstance::Entries& entries) -> Expected<void> {
+      [&] (detail::ContainerInstance::Entries& entries) -> Expected<PosixContainer> {
 
         const auto insert_attempt =
-          entries.insert(detail::ContainerInstance::Entry{key, new_container});
+          entries.insert(
+              detail::ContainerInstance::Entry{
+                std::move(new_key),
+                new_container->container_info()
+              });
         if (insert_attempt.second) {
-          return Expected<void>{boost::expect};
+          return PosixContainer{new_container};
         } else {
           return boost::make_unexpected(make_error_code(NfsErrors::bad_modify_version));
         }
@@ -89,21 +107,19 @@ Expected<void> PosixContainer::AddContainer::operator()(
 }
 
 Expected<void> PosixContainer::RemoveContainer::operator()(
-    detail::ContainerInstance& instance,
-    const detail::ContainerKey& key,
-    const ContainerVersion& current_version,
-    const RetrieveContainerVersion& replace) const {
+    detail::ContainerInstance& instance, const ContainerInfo& child_info) const {
+  using detail::ContainerInstance;
+  
   return instance.UpdateEntries(
-      [&] (detail::ContainerInstance::Entries& entries) {
+      [&] (ContainerInstance::Entries& entries) {
 
-        return detail::ContainerInstance::Get(entries, key).bind(
-            [&] (detail::ContainerInstance::Entries::iterator entry) {
+        return ContainerInstance::Get(entries, ContainerInfo::Detail::key(child_info)).bind(
+            [&] (ContainerInstance::Entries::iterator entry) {
 
-              return detail::ContainerInstance::ExpectContainerInfo(entry->second).bind(
-                  [&] (detail::ContainerInfo) -> Expected<void> {
+              return ContainerInstance::ExpectContainerInfo(entry->second).bind(
+                  [&] (detail::ContainerInfo current_info) -> Expected<void> {
 
-                    if (replace == current_version ||
-                        replace == RetrieveContainerVersion::Latest()) {
+                    if (current_info == ContainerInfo::Detail::info(child_info)) {
                       entries.erase(entry);
                       return Expected<void>{boost::expect};
                     } else {
@@ -115,36 +131,75 @@ Expected<void> PosixContainer::RemoveContainer::operator()(
       });
 }
 
-std::vector<Blob> PosixContainer::ExtractBlobs::operator()(
-    const detail::ContainerInstance& instance) const {
+std::vector<Blob> PosixContainer::GetBlobs::operator()(
+    const detail::ContainerInstance& instance, const std::string& prefix) const {
   std::vector<Blob> blobs{};
   blobs.reserve(instance.entries().size());
 
   for (const auto& entry : instance.entries()) {
     detail::ContainerInstance::ExpectBlob(entry.second).bind(
         [&] (detail::Blob blob) {
-          blobs.emplace_back(entry.first, std::move(blob));
+          if (prefix.empty() || boost::algorithm::starts_with(entry.first.value(), prefix)) {
+            blobs.emplace_back(entry.first, std::move(blob));
+          }
         });
   }
 
   return blobs;
 }
 
-Expected<void> PosixContainer::RemoveBlob::operator()(
+Expected<Blob> PosixContainer::GetBlobInternal::operator()(
+    const detail::ContainerInstance& instance,
+    const detail::ContainerKey& key) const {
+  return instance.GetBlob(key).bind([&] (detail::Blob blob) { return Blob{key, std::move(blob)}; });
+}
+  
+Expected<LocalBlob> PosixContainer::GetLocalBlob::operator()(
+    const std::shared_ptr<detail::Container>& container,
+    const detail::ContainerInstance& instance,
+    const detail::ContainerKey& key) const {
+  return instance.GetBlob(key).bind(
+      [&container] (detail::Blob blob) {
+        return LocalBlob{container->network(), std::move(blob)};
+      });
+}
+
+Expected<Blob> PosixContainer::AddBlob::operator()(
+    const std::shared_ptr<detail::Container>& container,
     detail::ContainerInstance& instance,
-    const detail::ContainerKey& key,
-    const RetrieveBlobVersion& replace) const {
+    const Blob& from,
+    detail::ContainerKey to) const {
+  return instance.UpdateEntries(
+      [&] (detail::ContainerInstance::Entries& entries) -> Expected<Blob> {
+
+        const auto& source = Blob::Detail::blob(from);
+        detail::Blob copied_blob{
+          container->network().lock(),
+          source.meta_data().user_meta_data(),
+          source.data_map(),
+          nullptr
+        };
+        const auto insert_attempt = entries.emplace(to, copied_blob);
+        if (insert_attempt.second) {
+          return Blob{std::move(to), std::move(copied_blob)};
+        } else {
+          return boost::make_unexpected(make_error_code(NfsErrors::bad_modify_version));
+        }
+      });
+}
+
+Expected<void> PosixContainer::RemoveBlob::operator()(
+    detail::ContainerInstance& instance, const Blob& remove) const {
   return instance.UpdateEntries(
       [&] (detail::ContainerInstance::Entries& entries) {
 
-        return detail::ContainerInstance::Get(entries, key).bind(
+        return detail::ContainerInstance::Get(entries, Blob::Detail::key(remove)).bind(
             [&] (detail::ContainerInstance::Entries::iterator entry) {
 
               return detail::ContainerInstance::ExpectBlob(entry->second).bind(
                   [&] (detail::Blob current_blob) -> Expected<void> {
 
-                    if (replace == current_blob.version() ||
-                        replace == RetrieveBlobVersion::Latest()) {
+                    if (current_blob == Blob::Detail::blob(remove)) {
                       entries.erase(entry);
                       return Expected<void>{boost::expect};
                     } else {

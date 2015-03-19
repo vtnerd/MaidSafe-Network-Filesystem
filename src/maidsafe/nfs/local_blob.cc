@@ -1,4 +1,4 @@
-/*  Copyright 2014 MaidSafe.net limited
+/*  Copyright 2015 MaidSafe.net limited
 
     This MaidSafe Software is licensed to you under (1) the MaidSafe.net Commercial License,
     version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -46,42 +46,45 @@ std::uint64_t LocalBlob::size() const {
   return data_->encryptor().size();
 }
 
-Expected<void> LocalBlob::UpdateBlob::operator()(
+Expected<Blob> LocalBlob::UpdateBlob::operator()(
     detail::ContainerInstance& instance,
     const std::weak_ptr<detail::Network>& network,
-    const detail::ContainerKey& key,
-    const ModifyBlobVersion& replace,
-    const detail::PendingBlob& pending_blob,
-    detail::Blob& new_blob) const {
+    const detail::ContainerKey& update_key,
+    const boost::optional<detail::Blob>& replace,
+    const detail::UserMetaData& new_user_meta,
+    const encrypt::DataMap& new_data_map,
+    const std::shared_ptr<detail::NetworkData::Buffer>& buffer) const {
   return instance.UpdateEntries(
       [&] (detail::ContainerInstance::Entries& entries) {
 
-        return detail::ContainerInstance::Get(entries, key).bind(
+        return detail::ContainerInstance::Get(entries, update_key).bind(
             [&] (detail::ContainerInstance::Entries::iterator entry) {
 
               return detail::ContainerInstance::ExpectBlob(entry->second).bind(
-                  [&] (detail::Blob current_blob) -> Expected<void> {
+                  [&] (detail::Blob current_blob) -> Expected<Blob> {
 
-                    if (replace == current_blob.version() ||
-                        replace == ModifyBlobVersion::Latest()) {
-                      new_blob =
-                        detail::Blob{
-                          network.lock(), pending_blob, current_blob.meta_data().creation_time()};
-                      entry->second = new_blob;
-                      return Expected<void>{boost::expect};
+                    if (replace && *replace == current_blob) {
+                      detail::Blob replacement_blob{
+                        network.lock(),
+                        current_blob.meta_data().creation_time(),
+                        new_user_meta,
+                        new_data_map,
+                        buffer
+                      };
+                      entry->second = replacement_blob;
+                      return Blob{update_key, replacement_blob};
                     } else {
                       return boost::make_unexpected(make_error_code(NfsErrors::bad_modify_version));
                     }
                   });
 
             }).catch_error(
-                [&] (const std::error_code error) -> Expected<void> {
+                [&] (const std::error_code error) -> Expected<Blob> {
 
-                  if (error == CommonErrors::no_such_element &&
-                      replace == ModifyBlobVersion::Create()) {
-                    new_blob = detail::Blob{network.lock(), pending_blob};
-                    entries[key] = new_blob;
-                    return Expected<void>{boost::expect};
+                  if (error == CommonErrors::no_such_element && !replace) {
+                    detail::Blob new_blob{network.lock(), new_user_meta, new_data_map, buffer};
+                    entries[update_key] = new_blob;
+                    return Blob{update_key, std::move(new_blob)};
                   } else {
                     return boost::make_unexpected(error);
                   }

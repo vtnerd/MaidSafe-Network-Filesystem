@@ -56,6 +56,10 @@ class ContainerInfo {
     swap(key_, other.key_);
   }
 
+  bool Equal(const ContainerInfo& other) const MAIDSAFE_NOEXCEPT {
+    return key_ == other.key_ && key() == other.key();
+  }
+
   ContainerId GetId() const;
   const Identity& key() const MAIDSAFE_NOEXCEPT {
     assert(key_ != nullptr);
@@ -79,6 +83,14 @@ class ContainerInfo {
 
 inline void swap(ContainerInfo& lhs, ContainerInfo& rhs) MAIDSAFE_NOEXCEPT {
   lhs.swap(rhs);
+}
+
+inline bool operator==(const ContainerInfo& lhs, const ContainerInfo& rhs) MAIDSAFE_NOEXCEPT {
+  return lhs.Equal(rhs);
+}
+
+inline bool operator!=(const ContainerInfo& lhs, const ContainerInfo& rhs) MAIDSAFE_NOEXCEPT {
+  return !lhs.Equal(rhs);
 }
 }  // namespace detail
 }  // namespace nfs

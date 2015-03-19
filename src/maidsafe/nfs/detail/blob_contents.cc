@@ -20,43 +20,57 @@
 #include "maidsafe/common/hash/algorithms/sha.h"
 #include "maidsafe/common/hash/hash_numeric.h"
 #include "maidsafe/common/hash/wrappers/unseeded_hash.h"
-#include "maidsafe/nfs/detail/pending_blob.h"
 
 namespace maidsafe {
 namespace nfs {
 namespace detail {
 BlobContents::BlobContents()
-  : version_(),
+  : buffer_(),
     meta_data_(),
-    buffer_(),
+    data_map_(),
+    version_(),
     buffer_mutex_() {
   Refresh();
 }
 
-BlobContents::BlobContents(const PendingBlob& pending_blob)
-  : version_(),
-    meta_data_(pending_blob.user_meta_data()),
-    data_map_(pending_blob.data_map()),
-    buffer_(),
+BlobContents::BlobContents(
+    UserMetaData user,
+    encrypt::DataMap data_map,
+    std::shared_ptr<NetworkData::Buffer> buffer)
+  : buffer_(),
+    meta_data_(std::move(user)),
+    data_map_(std::move(data_map)),
+    version_(),
     buffer_mutex_() {
+  // Do not delegate to other constructor, we need both metadata timestamps to be equal.
   Refresh();
-  buffer_ = pending_blob.buffer();
+  buffer_ = std::move(buffer);
 }
 
-BlobContents::BlobContents(const PendingBlob& pending_blob, Clock::time_point creation_time)
-  : version_(),
-    meta_data_(pending_blob.user_meta_data(), creation_time),
-    data_map_(pending_blob.data_map()),
-    buffer_(),
+BlobContents::BlobContents(
+    Clock::time_point creation_time,
+    UserMetaData user,
+    encrypt::DataMap data_map,
+    std::shared_ptr<NetworkData::Buffer> buffer)
+  : buffer_(),
+    meta_data_(std::move(user), creation_time),
+    data_map_(std::move(data_map)),
+    version_(),
     buffer_mutex_() {
   Refresh();
-  buffer_ = pending_blob.buffer();
+  buffer_ = std::move(buffer);
 }
 
-void BlobContents::Refresh() {
-  const std::lock_guard<std::mutex> lock{buffer_mutex_};
-  buffer_.reset();
-  version_ = BlobVersion{UnseededHash<SHA512>{}(meta_data_, data_map_)};
+BlobContents::BlobContents(BlobContents&& other)
+  : buffer_(std::move(other.buffer_)),
+    meta_data_(std::move(other.meta_data_)),
+    data_map_(std::move(other.data_map_)),
+    version_(std::move(other.version_)),
+    buffer_mutex_() {
+}
+
+bool BlobContents::Equal(const BlobContents& other) const MAIDSAFE_NOEXCEPT {
+  return version() == other.version();
 }
 
 std::shared_ptr<NetworkData::Buffer> BlobContents::GetBuffer(
@@ -70,6 +84,12 @@ std::shared_ptr<NetworkData::Buffer> BlobContents::GetBuffer(
 
   return buffer;
 }
+  
+void BlobContents::Refresh() {
+  const std::lock_guard<std::mutex> lock{buffer_mutex_};
+  buffer_.reset();
+  version_ = UnseededHash<SHA512>{}(meta_data_, data_map_);
+} 
 }  // namespace detail
 }  // namespace nfs
 }  // namespace maidsafe

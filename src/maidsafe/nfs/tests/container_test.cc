@@ -1,4 +1,4 @@
-/*  Copyright 2014 MaidSafe.net limited
+/*  Copyright 2015 MaidSafe.net limited
 
     This MaidSafe Software is licensed to you under (1) the MaidSafe.net Commercial License,
     version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -33,7 +33,6 @@
 #include "maidsafe/common/utils.h"
 #include "maidsafe/nfs/detail/container.h"
 #include "maidsafe/nfs/detail/container_info.h"
-#include "maidsafe/nfs/detail/pending_blob.h"
 
 namespace maidsafe {
 namespace nfs {
@@ -116,7 +115,9 @@ class DetailContainerTest : public ::testing::Test, public NetworkFixture {
     EXPECT_EQ(contents.size(), data_map->size());
     return detail::Blob{
       network(),
-      detail::PendingBlob{std::move(user_meta_data),  std::move(*data_map), std::move(buffer)}
+      std::move(user_meta_data),
+      std::move(*data_map),
+      std::move(buffer)
     };
   }
 
@@ -140,9 +141,6 @@ TEST_F(DetailContainerTest, BEH_NullContainer) {
   EXPECT_THROW(
       Container::UpdateLatestInstance(
           nullptr, boost::phoenix::val(Expected<void>{boost::expect}), asio::use_future),
-      std::system_error);
-  EXPECT_THROW(
-      Container::GetBlob(nullptr, ContainerKey{}, BlobVersion{}, asio::use_future),
       std::system_error);
 }
 
@@ -391,84 +389,6 @@ TEST_F(DetailContainerTest, BEH_ParsingError) {
   ASSERT_FALSE(instance_result.valid());
   EXPECT_EQ(CommonErrors::parsing_error, instance_result.error())
     << instance_result.error().message();
-}
-
-TEST_F(DetailContainerTest, BEH_GetBlob) {
-  using ::testing::_;
-
-  EXPECT_CALL(GetNetworkMock(), DoCreateSDV(_, _, _, _)).Times(1);
-  EXPECT_CALL(GetNetworkMock(), DoPutSDVVersion(_, _, _)).Times(3);
-  EXPECT_CALL(GetNetworkMock(), DoPutChunk(_)).Times(4);
-  EXPECT_CALL(GetNetworkMock(), DoGetChunk(_)).Times(26);
-  EXPECT_CALL(GetNetworkMock(), DoGetBranches(_)).Times(9);
-  EXPECT_CALL(GetNetworkMock(), DoGetBranchVersions(_, _)).Times(9);
-
-  ContainerVersion version1{};
-  ContainerVersion version2{};
-  ContainerVersion version3{};
-
-  std::pair<const char*, BlobVersion> test_data[] {
-    {std::make_pair("the first blob", BlobVersion{})},
-    {std::make_pair("the second blob", BlobVersion{})},
-    {std::make_pair("the third blob", BlobVersion{})},
-    {std::make_pair("the fourth blob", BlobVersion{})}
-  };
-
-  boost::optional<ContainerVersion> previous_version{boost::none};
-  for (auto& data : test_data) {
-    auto blob = MakeBlob(data.first);
-    data.second = blob.version();
-    previous_version = Container::PutInstance(
-        container(),
-        previous_version,
-        ContainerInstance{
-          ContainerInstance::Entry{ContainerKey{network(), "the_blob"}, std::move(blob)}
-        },
-        asio::use_future)
-      .get().value();
-  }
-
-  for (const auto& data : test_data) {
-    EXPECT_STREQ(
-        data.first,
-        ReadBlobContents{network()}(
-            Container::GetBlob(
-                container(), ContainerKey{network(), "the_blob"}, data.second, asio::use_future)
-            .get().value())
-        .c_str());
-  }
-
-  for (const auto& data : test_data) {
-    const auto get_result =
-      Container::GetBlob(
-          container(), ContainerKey{network(), "wrong_blob"}, data.second, asio::use_future).get();
-    ASSERT_FALSE(get_result.valid());
-    EXPECT_EQ(CommonErrors::no_such_element, get_result.error());
-  }
-
-  for (const auto& data : test_data) {
-    const auto empty_cache =
-      std::make_shared<detail::Container>(
-          network(), container()->parent_info(), container()->container_info());
-    EXPECT_STREQ(
-        data.first,
-        ReadBlobContents{network()}(
-            Container::GetBlob(
-                empty_cache, ContainerKey{network(), "the_blob"}, data.second, asio::use_future)
-            .get().value())
-        .c_str());
-  }
-
-  for (const auto& data : test_data) {
-    const auto empty_cache =
-      std::make_shared<detail::Container>(
-          network(), container()->parent_info(), container()->container_info());
-    const auto get_result =
-      Container::GetBlob(
-          empty_cache, ContainerKey{network(), "wrong_blob"}, data.second, asio::use_future).get();
-    ASSERT_FALSE(get_result.valid());
-    EXPECT_EQ(CommonErrors::no_such_element, get_result.error());
-  }
 }
 
 TEST_F(DetailContainerTest, BEH_MaxVersions) {
