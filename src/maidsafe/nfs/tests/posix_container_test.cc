@@ -22,7 +22,6 @@
 #include <utility>
 
 #include "asio/use_future.hpp"
-#include "boost/range/adaptor/reversed.hpp"
 #include "boost/range/adaptor/transformed.hpp"
 #include "boost/range/algorithm/equal.hpp"
 #include "boost/range/algorithm/sort.hpp"
@@ -217,7 +216,6 @@ TEST_F(PosixContainerTest, BEH_MultipleBlobs) {
 
   const unsigned container_count = 20;
   const auto indexes = boost::counting_range(0u, container_count);
-  const auto reverse_indexes = adapt::reverse(indexes);
 
   EXPECT_CALL(GetNetworkMock(), DoCreateSDV(_, _, _, _)).Times(0);
   EXPECT_CALL(GetNetworkMock(), DoGetBranches(_)).Times((container_count * 4) + 1);
@@ -252,17 +250,18 @@ TEST_F(PosixContainerTest, BEH_MultipleBlobs) {
   }
 
   // Delete 20 blobs
-  for (unsigned i : reverse_indexes) {
-    verify_blobs(i + 1);
+  for (unsigned i : indexes) {
+    const unsigned actual_i = container_count - i - 1;
+    verify_blobs(actual_i + 1);
 
-    const auto blob = container().GetBlob(std::to_string(i), asio::use_future).get().value();
+    const auto blob = container().GetBlob(std::to_string(actual_i), asio::use_future).get().value();
     EXPECT_TRUE(container().DeleteBlob(blob, asio::use_future).get().valid());
 
     auto create_result = container().DeleteBlob(blob, asio::use_future).get();
     ASSERT_FALSE(create_result.valid());
     EXPECT_EQ(CommonErrors::no_such_element, create_result.error());
 
-    verify_blobs(i);
+    verify_blobs(actual_i);
   }
 }
 
@@ -316,11 +315,12 @@ TEST_F(PosixContainerTest, BEH_MultipleContainers) {
   }
 
   // Delete 20 containers
-  for (unsigned i : adapt::reverse(container_indexes)) {
-    verify_child_containers(i + 1);
+  for (unsigned i : container_indexes) {
+    const unsigned actual_i = container_count - i - 1;
+    verify_child_containers(actual_i + 1);
 
     const auto container_info =
-      container().GetChildContainerInfo(std::to_string(i), asio::use_future).get().value();
+      container().GetChildContainerInfo(std::to_string(actual_i), asio::use_future).get().value();
 
     EXPECT_TRUE(container().DeleteChildContainer(container_info, asio::use_future).get().valid());
 
@@ -329,7 +329,7 @@ TEST_F(PosixContainerTest, BEH_MultipleContainers) {
     ASSERT_FALSE(create_result.valid());
     EXPECT_EQ(CommonErrors::no_such_element, create_result.error());
 
-    verify_child_containers(i);
+    verify_child_containers(actual_i);
   }
 }
 }  // namespace test
