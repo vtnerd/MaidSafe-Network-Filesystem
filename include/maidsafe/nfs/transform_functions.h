@@ -18,6 +18,8 @@
 #ifndef MAIDSAFE_NFS_TRANSFORM_FUNCTIONS_H_
 #define MAIDSAFE_NFS_TRANSFORM_FUNCTIONS_H_
 
+#include <string>
+
 namespace maidsafe {
 namespace nfs {
 struct Transform {
