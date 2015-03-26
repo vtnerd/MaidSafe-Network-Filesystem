@@ -18,73 +18,9 @@
 #ifndef MAIDSAFE_NFS_DETAIL_NETWORK_BACKEND_H_
 #define MAIDSAFE_NFS_DETAIL_NETWORK_BACKEND_H_
 
-#include <cstdint>
-#include <stdexcept>
-#include <vector>
-
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4702)
-#endif
-#include "boost/thread/future.hpp"
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
-
-#include "boost/throw_exception.hpp"
-
-#include "maidsafe/common/data_types/immutable_data.h"
-#include "maidsafe/common/error.h"
-#include "maidsafe/nfs/client/maid_client.h"
-#include "maidsafe/nfs/container_version.h"
-#include "maidsafe/nfs/detail/container_id.h"
-#include "maidsafe/nfs/detail/network.h"
-
 namespace maidsafe {
 namespace nfs {
 namespace detail {
-
-// For legacy reasons, the network and disk versions are not using virtual dispatch
-class NetworkBackend : public Network::Interface {
- public:
-  template<typename... Args>
-  explicit NetworkBackend(Args... args)
-    : Network::Interface(),
-      backend_(nfs_client::MaidClient::MakeShared(std::forward<Args>(args)...)) {
-    if (backend_ == nullptr) {
-      BOOST_THROW_EXCEPTION(std::system_error(make_error_code(CommonErrors::null_pointer)));
-    }
-  }
-
-  virtual ~NetworkBackend();
-
- private:
-  NetworkBackend(const NetworkBackend&) = delete;
-  NetworkBackend(NetworkBackend&&) = delete;
-
-  NetworkBackend& operator=(const NetworkBackend&) = delete;
-  NetworkBackend& operator=(NetworkBackend&&) = delete;
-
-  virtual boost::future<void> DoCreateSDV(
-      const ContainerId& container_id,
-      const ContainerVersion& initial_version,
-      std::uint32_t max_versions,
-      std::uint32_t max_branches) override final;
-  virtual boost::future<void> DoPutSDVVersion(
-      const ContainerId& container_id,
-      const ContainerVersion& old_version,
-      const ContainerVersion& new_version) override final;
-  virtual boost::future<std::vector<ContainerVersion>> DoGetBranches(
-      const ContainerId& container_id) override final;
-  virtual boost::future<std::vector<ContainerVersion>> DoGetBranchVersions(
-      const ContainerId& container_id, const ContainerVersion& tip) override final;
-
-  virtual boost::future<void> DoPutChunk(const ImmutableData& data) override final;
-  virtual boost::future<ImmutableData> DoGetChunk(const ImmutableData::Name& name) override final;
-
- private:
-  const std::shared_ptr<nfs_client::MaidClient> backend_;
-};
 
 }  // namespace detail
 }  // namespace nfs

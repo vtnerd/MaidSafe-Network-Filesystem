@@ -21,42 +21,6 @@ namespace maidsafe {
 namespace nfs {
 namespace detail {
 
-NetworkBackend::~NetworkBackend() {}
-
-boost::future<void> NetworkBackend::DoCreateSDV(
-    const ContainerId& container_id,
-    const ContainerVersion& initial_version,
-    std::uint32_t max_versions,
-    std::uint32_t max_branches) {
-  return backend_->CreateVersionTree(
-      container_id.data, initial_version, max_versions, max_branches);
-}
-
-boost::future<void> NetworkBackend::DoPutSDVVersion(
-    const ContainerId& container_id,
-    const ContainerVersion& old_version,
-    const ContainerVersion& new_version) {
-  return backend_->PutVersion(container_id.data, old_version, new_version);
-}
-
-boost::future<std::vector<ContainerVersion>> NetworkBackend::DoGetBranches(
-    const ContainerId& container_id) {
-  return backend_->GetVersions(container_id.data);
-}
-
-boost::future<std::vector<ContainerVersion>> NetworkBackend::DoGetBranchVersions(
-    const ContainerId& container_id, const ContainerVersion& tip) {
-  return backend_->GetBranch(container_id.data, tip);
-}
-
-boost::future<void> NetworkBackend::DoPutChunk(const ImmutableData& data) {
-  return backend_->Put(data);
-}
-
-boost::future<ImmutableData> NetworkBackend::DoGetChunk(const ImmutableData::Name& name) {
-  return backend_->Get(name);
-}
-
 }  // namespace detail
 }  // namespace nfs
 }  // namespace maidsafe
