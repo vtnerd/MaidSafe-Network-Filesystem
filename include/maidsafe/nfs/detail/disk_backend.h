@@ -19,19 +19,11 @@
 #define MAIDSAFE_NFS_DETAIL_DISK_BACKEND_H_
 
 #include <cstdint>
+#include <functional>
 #include <mutex>
 #include <vector>
 
 #include "boost/filesystem/path.hpp"
-
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4702)
-#endif
-#include "boost/thread/future.hpp"
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
 
 #include "maidsafe/common/data_types/immutable_data.h"
 #include "maidsafe/nfs/container_version.h"
@@ -44,7 +36,7 @@ namespace nfs {
 namespace detail {
 
 // For legacy reasons, the network and disk versions are not using virtual dispatch
-class DiskBackend : public Network::Interface {
+class DiskBackend : public Network {
  public:
   explicit DiskBackend(const boost::filesystem::path& disk_path, DiskUsage max_disk_usage);
   virtual ~DiskBackend();
@@ -56,22 +48,29 @@ class DiskBackend : public Network::Interface {
   DiskBackend& operator=(const DiskBackend&) = delete;
   DiskBackend& operator=(DiskBackend&&) = delete;
 
-  virtual boost::future<void> DoCreateSDV(
+  virtual void DoCreateSDV(
+      std::function<void(Expected<void>)> callback,
       const ContainerId& container_id,
       const ContainerVersion& initial_version,
       std::uint32_t max_versions,
       std::uint32_t max_branches) override final;
-  virtual boost::future<void> DoPutSDVVersion(
+  virtual void DoPutSDVVersion(
+      std::function<void(Expected<void>)> callback,
       const ContainerId& container_id,
       const ContainerVersion& old_version,
       const ContainerVersion& new_version) override final;
-  virtual boost::future<std::vector<ContainerVersion>> DoGetBranches(
+  virtual void DoGetBranches(
+      std::function<void(Expected<std::vector<ContainerVersion>>)> callback,
       const ContainerId& container_id) override final;
-  virtual boost::future<std::vector<ContainerVersion>> DoGetBranchVersions(
-      const ContainerId& container_id, const ContainerVersion& tip) override final;
+  virtual void DoGetBranchVersions(
+      std::function<void(Expected<std::vector<ContainerVersion>>)> callback,
+      const ContainerId& container_id,
+      const ContainerVersion& tip) override final;
 
-  virtual boost::future<void> DoPutChunk(const ImmutableData& data) override final;
-  virtual boost::future<ImmutableData> DoGetChunk(
+  virtual void DoPutChunk(
+      std::function<void(Expected<void>)> callback, const ImmutableData& data) override final;
+  virtual void DoGetChunk(
+      std::function<void(Expected<ImmutableData>)> callback,
       const ImmutableData::NameAndTypeId& name) override final;
 
  private:

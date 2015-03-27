@@ -15,7 +15,7 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#include "maidsafe/nfs/tests/network_fixture.h"
+#include "maidsafe/nfs/detail/tests/network_fixture.h"
 
 #include "maidsafe/common/error.h"
 #include "maidsafe/common/test.h"
@@ -30,20 +30,19 @@ const maidsafe::DiskUsage kDefaultMaxDiskUsage(2000);
 }
 
 NetworkFixture::NetworkFixture()
-  : mock_(std::make_shared<MockBackend>(Create())),
-    network_(std::make_shared<Network>(mock_)) {
+  : network_(std::make_shared<MockBackend>(Create())) {
   GetNetworkMock().SetDefaults();
 }
 
-std::shared_ptr<Network::Interface> NetworkFixture::Create() {
+std::shared_ptr<Network> NetworkFixture::Create() {
   // shared_ptr that erases folder when refcount == 0
   const auto disk_space = ::maidsafe::test::CreateTestPath("MaidSafe_Test_FakeStore");
 
-  auto delete_disk_backend = [disk_space] (maidsafe::nfs::detail::Network::Interface* interface) {
-    const std::unique_ptr<maidsafe::nfs::detail::Network::Interface> ptr(interface);
+  auto delete_disk_backend = [disk_space] (maidsafe::nfs::detail::Network* interface) {
+    const std::unique_ptr<maidsafe::nfs::detail::Network> ptr(interface);
   };
 
-  return std::shared_ptr<maidsafe::nfs::detail::Network::Interface>(
+  return std::shared_ptr<maidsafe::nfs::detail::Network>(
       new maidsafe::nfs::detail::DiskBackend(*disk_space, kDefaultMaxDiskUsage),
       std::move(delete_disk_backend));
 }

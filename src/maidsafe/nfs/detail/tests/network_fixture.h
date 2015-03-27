@@ -23,7 +23,7 @@
 
 #include "maidsafe/common/test.h"
 #include "maidsafe/nfs/detail/network.h"
-#include "maidsafe/nfs/tests/mock_backend.h"
+#include "maidsafe/nfs/detail/tests/mock_backend.h"
 
 namespace maidsafe {
 namespace nfs {
@@ -35,20 +35,15 @@ class NetworkFixture {
   NetworkFixture();
   virtual ~NetworkFixture();
 
-  /* Set creator for the "real" Network::Interface
-     (usually disk, or LocalNetworkControll usage). */
-  static void SetCreator(std::function<std::shared_ptr<Network::Interface>()> creator);
-
   // Create a NetworkInterface instance, as selected by command args
-  static std::shared_ptr<Network::Interface> Create();
+  static std::shared_ptr<Network> Create();
 
-  const MockBackend::Mock& GetNetworkMock() const { return mock_->mock_; }
-  MockBackend::Mock& GetNetworkMock() { return mock_->mock_; }
-  const std::shared_ptr<Network>& network() const { return network_; }
+  const MockBackend& GetNetworkMock() const { return *network_; }
+  MockBackend& GetNetworkMock() { return *network_; }
+  std::shared_ptr<Network> network() const { return network_; }
 
  private:
-  const std::shared_ptr<MockBackend> mock_;
-  const std::shared_ptr<Network> network_;
+  const std::shared_ptr<MockBackend> network_;
 };
 
 }  // namespace test

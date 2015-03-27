@@ -43,6 +43,7 @@ include(../../cmake_modules/standard_setup.cmake)
 set(NfsSourcesDir ${PROJECT_SOURCE_DIR}/src/maidsafe/nfs)
 ms_glob_dir(NfsDetail ${NfsSourcesDir}/detail "Nfs Detail")
 ms_glob_dir(NfsTests ${NfsSourcesDir}/tests Tests)
+ms_glob_dir(NfsDetailTests ${NfsSourcesDir}/detail/tests "Detail Tests")
 
 #==================================================================================================#
 # Define MaidSafe libraries and executables                                                        #
@@ -52,7 +53,7 @@ target_include_directories(maidsafe_nfs_detail PUBLIC ${PROJECT_SOURCE_DIR}/incl
 target_link_libraries(maidsafe_nfs_detail maidsafe_common)
 
 if(INCLUDE_TESTS)
-  ms_add_executable(test_nfs "Tests/NFS" ${NfsTestsAllFiles})
+  ms_add_executable(test_nfs "Tests/NFS" ${NfsTestsAllFiles} ${NfsDetailTestsAllFiles})
   target_link_libraries(test_nfs maidsafe_nfs_detail maidsafe_test)
   # TODO - Investigate why boost variant requires this warning to be disabled.
   target_compile_options(test_nfs PRIVATE $<$<AND:$<BOOL:${MSVC}>,$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>>:/wd4702>)

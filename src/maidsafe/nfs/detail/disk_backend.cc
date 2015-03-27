@@ -40,32 +40,11 @@ DiskUsage InitialiseDiskRoot(const boost::filesystem::path& disk_root) {
   }
   return DiskUsage{0};
 }
-
-/* These are temporary, it will be removed shortly when type-erased callbacks
-   are provided instead in an interface update. */
-template<typename Result, typename Expect, typename Error>
-boost::future<Result> ConvertError(const boost::expected<Expect, Error>& error) {
-  return boost::make_exceptional_future<Result>(std::system_error(error.error()));
 }
-
-template<typename Expect>
-boost::future<Expect> ConvertToFuture(const Expected<Expect>& value) {
-  if (value) {
-    return boost::make_ready_future(*value);
-  }
-  return ConvertError<Expect>(value);
-}
-
-boost::future<void> ConvertToFuture(const Expected<void>& value) {
-  if (value) {
-    return boost::make_ready_future();
-  }
-  return ConvertError<void>(value);
-}
-}  // namespace
 
 DiskBackend::DiskBackend(const boost::filesystem::path& disk_path, DiskUsage max_disk_usage)
-  : disk_path_(disk_path),
+  : Network(),
+    disk_path_(disk_path),
     max_disk_usage_(max_disk_usage),
     current_disk_usage_(InitialiseDiskRoot(disk_path_)),
     mutex_() {
@@ -73,109 +52,129 @@ DiskBackend::DiskBackend(const boost::filesystem::path& disk_path, DiskUsage max
 
 DiskBackend::~DiskBackend() {}
 
-boost::future<void> DiskBackend::DoCreateSDV(
+void DiskBackend::DoCreateSDV(
+    std::function<void(Expected<void>)> callback,
     const ContainerId& container_id,
     const ContainerVersion& initial_version,
     std::uint32_t max_versions,
     std::uint32_t max_branches) {
+  Expected<void> result{};
   StructuredDataVersions versions{max_versions, max_branches};
   versions.Put(StructuredDataVersions::VersionName{}, initial_version);
-
-  const std::lock_guard<std::mutex> lock{mutex_};
-  return ConvertToFuture(WriteVersions(container_id.data, versions, true));
+  {
+    const std::lock_guard<std::mutex> lock{mutex_};
+    result = WriteVersions(container_id.data, versions, true);
+  }
+  callback(std::move(result));
 }
 
-boost::future<void> DiskBackend::DoPutSDVVersion(
+void DiskBackend::DoPutSDVVersion(
+    std::function<void(Expected<void>)> callback,
     const ContainerId& container_id,
     const ContainerVersion& old_version,
     const ContainerVersion& new_version) {
-  const std::lock_guard<std::mutex> lock{mutex_};
-  auto versions = ReadVersions(container_id.data);
-  if (!versions) {
-    return ConvertError<void>(versions);
+  Expected<void> result{};
+  {
+    const std::lock_guard<std::mutex> lock{mutex_};
+    result = ReadVersions(container_id.data).bind(
+        [&] (std::unique_ptr<StructuredDataVersions> versions) -> Expected<void> {
+          try {
+            versions->Put(old_version, new_version);
+          } catch (const std::system_error& error) {
+            return boost::make_unexpected(error.code());
+          }
+          return WriteVersions(container_id.data, *versions, false);
+        });
   }
-
-  try {
-    (*versions)->Put(old_version, new_version);
-  } catch (const std::exception&) {
-    return boost::make_exceptional_future<void>(boost::current_exception());
-  }
-
-  return ConvertToFuture(WriteVersions(container_id.data, **versions, false));
+  callback(std::move(result));
 }
 
-boost::future<std::vector<ContainerVersion>> DiskBackend::DoGetBranches(
+void DiskBackend::DoGetBranches(
+    std::function<void(Expected<std::vector<ContainerVersion>>)> callback,
     const ContainerId& container_id) {
   Expected<std::unique_ptr<StructuredDataVersions>> versions{};
   {
     const std::lock_guard<std::mutex> lock{mutex_};
     versions = ReadVersions(container_id.data);
-    if (!versions) {
-      return ConvertError<std::vector<ContainerVersion>>(versions);
-    }
   }
 
-  try {
-    return boost::make_ready_future((*versions)->Get());
-  } catch (const std::exception&) {
-    return boost::make_exceptional_future<std::vector<ContainerVersion>>(
-        boost::current_exception());
-  }
+  callback(
+      versions.bind(
+          [] (std::unique_ptr<StructuredDataVersions> versions)
+              -> Expected<std::vector<ContainerVersion>> {
+            try {
+              return versions->Get();
+            } catch (const std::system_error& error) {
+              return boost::make_unexpected(error.code());
+            }
+          }));
 }
 
-boost::future<std::vector<ContainerVersion>> DiskBackend::DoGetBranchVersions(
-    const ContainerId& container_id, const ContainerVersion& tip) {
+void DiskBackend::DoGetBranchVersions(
+    std::function<void(Expected<std::vector<ContainerVersion>>)> callback,
+    const ContainerId& container_id,
+    const ContainerVersion& tip) {
   Expected<std::unique_ptr<StructuredDataVersions>> versions{};
   {
     const std::lock_guard<std::mutex> lock{mutex_};
     versions = ReadVersions(container_id.data);
-    if (!versions) {
-      return ConvertError<std::vector<ContainerVersion>>(versions);
-    }
   }
 
-  try {
-    return boost::make_ready_future((*versions)->GetBranch(tip));
-  } catch (const std::exception&) {
-    return boost::make_exceptional_future<std::vector<ContainerVersion>>(
-        boost::current_exception());
-  }
+  callback(
+      versions.bind(
+          [&] (std::unique_ptr<StructuredDataVersions> versions)
+              -> Expected<std::vector<ContainerVersion>> {
+            try {
+              return versions->GetBranch(tip);
+            } catch (const std::system_error& error) {
+              return boost::make_unexpected(error.code());
+            }
+          }));
 }
 
-boost::future<void> DiskBackend::DoPutChunk(const ImmutableData& data) {
+void DiskBackend::DoPutChunk(
+    std::function<void(Expected<void>)> callback, const ImmutableData& data) {
+  Expected<void> result{};
   {
     const std::lock_guard<std::mutex> lock{mutex_};
     if (!boost::filesystem::exists(disk_path_)) {
-      return boost::make_exceptional_future<void>(MakeError(CommonErrors::filesystem_io_error));
-    }
+      result = boost::make_unexpected(make_error_code(CommonErrors::filesystem_io_error));
+    } else {
+      result = KeyToFilePath(data.NameAndType(), true).bind(
+          [&] (boost::filesystem::path file_path) {
 
-    const auto file_path = KeyToFilePath(data.NameAndType(), true);
-    if (!file_path) {
-      return ConvertError<void>(file_path);
-    }
-
-    if (!boost::filesystem::exists(*file_path)) {
-      return ConvertToFuture(Write(*file_path, data.Value()));
+            if (!boost::filesystem::exists(file_path)) {
+              return Write(file_path, data.Value());
+            }
+            return Expected<void>{boost::expect};
+          });
     }
   }
-  return boost::make_ready_future();
+  callback(std::move(result));
 }
 
-boost::future<ImmutableData> DiskBackend::DoGetChunk(const ImmutableData::NameAndTypeId& name) {
-  boost::expected<std::vector<byte>, common_error> data{};
+void DiskBackend::DoGetChunk(
+    std::function<void(Expected<ImmutableData>)> callback,
+    const ImmutableData::NameAndTypeId& name) {
+  Expected<std::vector<byte>> result{};
   {
     const std::lock_guard<std::mutex> lock{mutex_};
-    const auto file_path = KeyToFilePath(name, false);
-    if (!file_path) {
-      return ConvertError<ImmutableData>(file_path);
-    }
+    result = KeyToFilePath(name, false).bind(
+        [] (boost::filesystem::path file_path) -> Expected<std::vector<byte>> {
 
-    data = ReadFile(*file_path);
-    if (!data) {
-      return ConvertError<ImmutableData>(data);
-    }
+          const auto data = ReadFile(file_path);
+          if (data) {
+            return *data;
+          }
+          return boost::make_unexpected(make_error_code(CommonErrors::no_such_element));
+        });
   }
-  return boost::make_ready_future(ImmutableData{NonEmptyString{std::move(*data)}});
+
+  callback(
+      result.bind(
+          [](std::vector<byte> data) {
+            return ImmutableData{NonEmptyString{std::move(data)}};
+          }));
 }
 
 bool DiskBackend::HasDiskSpace(std::uintmax_t required_space) const {
