@@ -215,7 +215,6 @@ Expected<std::unique_ptr<StructuredDataVersions>> DiskBackend::ReadVersions(
       const Data::NameAndTypeId& key) const {
   return KeyToFilePath(key, false).bind(
       [] (boost::filesystem::path file_path) -> Expected<std::unique_ptr<StructuredDataVersions>> {
-
         file_path += ".ver";
         if (boost::filesystem::exists(file_path)) {
           auto file_data = ReadFile(file_path);
@@ -238,7 +237,6 @@ Expected<void> DiskBackend::WriteVersions(
 
   return KeyToFilePath(key, true).bind(
       [&] (boost::filesystem::path file_path) -> Expected<void> {
-
         file_path += ".ver";
         if (boost::filesystem::exists(file_path)) {
           if (creation) {

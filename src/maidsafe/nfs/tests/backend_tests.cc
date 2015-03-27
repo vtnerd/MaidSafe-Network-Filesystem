@@ -394,7 +394,9 @@ TEST_F(BackendTest, BEH_InterfaceThrow) {
       DoPutSDVVersion(container_key.GetId(), container_version, container_version))
     .Times(1).WillOnce(Throw(test_error));
   EXPECT_CALL(GetNetworkMock(), DoPutChunk(_)).Times(1).WillOnce(Throw(test_error));
-  EXPECT_CALL(GetNetworkMock(), DoGetChunk(chunk_data.NameAndType())).Times(1).WillOnce(Throw(test_error));
+  EXPECT_CALL(
+      GetNetworkMock(),
+      DoGetChunk(chunk_data.NameAndType())).Times(1).WillOnce(Throw(test_error));
 
   EXPECT_THROW(
       network()->CreateSDV(container_key.GetId(), container_version, asio::use_future),
