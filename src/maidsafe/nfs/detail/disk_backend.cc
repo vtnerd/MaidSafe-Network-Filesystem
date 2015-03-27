@@ -97,7 +97,7 @@ boost::future<void> DiskBackend::DoPutSDVVersion(
 
   try {
     (*versions)->Put(old_version, new_version);
-  } catch (const std::exception& e) {
+  } catch (const std::exception&) {
     return boost::make_exceptional_future<void>(boost::current_exception());
   }
 
@@ -222,7 +222,7 @@ Expected<std::unique_ptr<StructuredDataVersions>> DiskBackend::ReadVersions(
           if (!file_data) {
             return boost::make_unexpected(std::error_code(file_data.error().code()));
           }
-          return make_unique<StructuredDataVersions>(
+          return maidsafe::make_unique<StructuredDataVersions>(
               StructuredDataVersions::serialised_type{NonEmptyString{std::move(*file_data)}});
         }
 
