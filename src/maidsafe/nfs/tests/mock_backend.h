@@ -164,7 +164,8 @@ class MockBackend : public Network::Interface {
       const ContainerId& container_id, const ContainerVersion& tip) override final;
 
   virtual boost::future<void> DoPutChunk(const ImmutableData& data) override final;
-  virtual boost::future<ImmutableData> DoGetChunk(const ImmutableData::NameAndTypeId& name) override final;
+  virtual boost::future<ImmutableData> DoGetChunk(
+      const ImmutableData::NameAndTypeId& name) override final;
 };
 
 }  // namespace test

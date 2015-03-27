@@ -47,7 +47,7 @@ template<typename Result, typename Expect, typename Error>
 boost::future<Result> ConvertError(const boost::expected<Expect, Error>& error) {
   return boost::make_exceptional_future<Result>(std::system_error(error.error()));
 }
-  
+
 template<typename Expect>
 boost::future<Expect> ConvertToFuture(const Expected<Expect>& value) {
   if (value) {
@@ -62,7 +62,7 @@ boost::future<void> ConvertToFuture(const Expected<void>& value) {
   }
   return ConvertError<void>(value);
 }
-}
+}  // namespace
 
 DiskBackend::DiskBackend(const boost::filesystem::path& disk_path, DiskUsage max_disk_usage)
   : disk_path_(disk_path),
@@ -148,12 +148,12 @@ boost::future<void> DiskBackend::DoPutChunk(const ImmutableData& data) {
     if (!boost::filesystem::exists(disk_path_)) {
       return boost::make_exceptional_future<void>(MakeError(CommonErrors::filesystem_io_error));
     }
-    
+
     const auto file_path = KeyToFilePath(data.NameAndType(), true);
     if (!file_path) {
       return ConvertError<void>(file_path);
     }
-    
+
     if (!boost::filesystem::exists(*file_path)) {
       return ConvertToFuture(Write(*file_path, data.Value()));
     }
@@ -169,7 +169,7 @@ boost::future<ImmutableData> DiskBackend::DoGetChunk(const ImmutableData::NameAn
     if (!file_path) {
       return ConvertError<ImmutableData>(file_path);
     }
-    
+
     data = ReadFile(*file_path);
     if (!data) {
       return ConvertError<ImmutableData>(data);
