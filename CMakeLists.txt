@@ -41,27 +41,19 @@ include(../../cmake_modules/standard_setup.cmake)
 #==================================================================================================#
 
 set(NfsSourcesDir ${PROJECT_SOURCE_DIR}/src/maidsafe/nfs)
-ms_glob_dir(Nfs ${NfsSourcesDir} Nfs)
-ms_glob_dir(NfsClient ${NfsSourcesDir}/client "Nfs Client")
 ms_glob_dir(NfsDetail ${NfsSourcesDir}/detail "Nfs Detail")
 ms_glob_dir(NfsTests ${NfsSourcesDir}/tests Tests)
 
 #==================================================================================================#
 # Define MaidSafe libraries and executables                                                        #
 #==================================================================================================#
-ms_add_static_library(maidsafe_nfs_core ${NfsAllFiles})
 ms_add_static_library(maidsafe_nfs_detail ${NfsDetailAllFiles})
-ms_add_static_library(maidsafe_nfs_client ${NfsClientAllFiles})
-target_include_directories(maidsafe_nfs_core PUBLIC ${PROJECT_SOURCE_DIR}/include PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_include_directories(maidsafe_nfs_detail PUBLIC ${PROJECT_SOURCE_DIR}/include PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_include_directories(maidsafe_nfs_client PUBLIC ${PROJECT_SOURCE_DIR}/include PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(maidsafe_nfs_core maidsafe_routing)
-target_link_libraries(maidsafe_nfs_detail maidsafe_common maidsafe_nfs_client maidsafe_encrypt maidsafe_routing)
-target_link_libraries(maidsafe_nfs_client maidsafe_nfs_core)
+target_link_libraries(maidsafe_nfs_detail maidsafe_common)
 
 if(INCLUDE_TESTS)
   ms_add_executable(test_nfs "Tests/NFS" ${NfsTestsAllFiles})
-  target_link_libraries(test_nfs maidsafe_nfs_core maidsafe_nfs_client maidsafe_nfs_detail maidsafe_passport maidsafe_test)
+  target_link_libraries(test_nfs maidsafe_nfs_detail maidsafe_test)
   # TODO - Investigate why boost variant requires this warning to be disabled.
   target_compile_options(test_nfs PRIVATE $<$<AND:$<BOOL:${MSVC}>,$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>>:/wd4702>)
 
@@ -90,7 +82,7 @@ endif()
 #==================================================================================================#
 # Package                                                                                          #
 #==================================================================================================#
-install(TARGETS maidsafe_nfs_core maidsafe_nfs_client maidsafe_nfs_detail COMPONENT Development CONFIGURATIONS Debug Release ARCHIVE DESTINATION lib)
+install(TARGETS maidsafe_nfs_detail COMPONENT Development CONFIGURATIONS Debug Release ARCHIVE DESTINATION lib)
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/ COMPONENT Development DESTINATION include)
 install(FILES ${OutputFile} COMPONENT Development DESTINATION include/maidsafe/nfs)
 
