@@ -95,7 +95,6 @@ class Network {
     network->DoGetBranches(
         [weak_network, container_id, handler]
         (Expected<std::vector<ContainerVersion>> branches) mutable {
-
           const std::shared_ptr<Network> network{weak_network.lock()};
           if (network == nullptr) {
             handler(boost::make_unexpected(make_error_code(std::errc::operation_canceled)));

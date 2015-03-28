@@ -40,7 +40,7 @@ DiskUsage InitialiseDiskRoot(const boost::filesystem::path& disk_root) {
   }
   return DiskUsage{0};
 }
-}
+}  // namespace
 
 DiskBackend::DiskBackend(const boost::filesystem::path& disk_path, DiskUsage max_disk_usage)
   : Network(),
@@ -142,7 +142,6 @@ void DiskBackend::DoPutChunk(
     } else {
       result = KeyToFilePath(data.NameAndType(), true).bind(
           [&] (boost::filesystem::path file_path) {
-
             if (!boost::filesystem::exists(file_path)) {
               return Write(file_path, data.Value());
             }
@@ -161,7 +160,6 @@ void DiskBackend::DoGetChunk(
     const std::lock_guard<std::mutex> lock{mutex_};
     result = KeyToFilePath(name, false).bind(
         [] (boost::filesystem::path file_path) -> Expected<std::vector<byte>> {
-
           const auto data = ReadFile(file_path);
           if (data) {
             return *data;

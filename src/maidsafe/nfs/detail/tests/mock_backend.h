@@ -15,8 +15,8 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#ifndef MAIDSAFE_NFS_TESTS_MOCK_BACKEND_H_
-#define MAIDSAFE_NFS_TESTS_MOCK_BACKEND_H_
+#ifndef MAIDSAFE_NFS_DETAIL_TESTS_MOCK_BACKEND_H_
+#define MAIDSAFE_NFS_DETAIL_TESTS_MOCK_BACKEND_H_
 
 #include <cstdint>
 #include <functional>
@@ -101,4 +101,4 @@ class MockBackend : public Network {
 }  // namespace nfs
 }  // namespace maidsafe
 
-#endif  // MAIDSAFE_NFS_TESTS_MOCK_BACKEND_H_
+#endif  // MAIDSAFE_NFS_DETAIL_TESTS_MOCK_BACKEND_H_

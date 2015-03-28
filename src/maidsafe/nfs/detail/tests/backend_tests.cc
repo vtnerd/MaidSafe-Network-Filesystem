@@ -104,7 +104,8 @@ TEST_F(BackendTest, BEH_CreateSDV) {
   auto sdv = network()->CreateSDV(container_key.GetId(), container_version, asio::use_future).get();
   EXPECT_TRUE(sdv.valid());
 
-  const auto versions = Network::GetSDVVersions(network(), container_key.GetId(), asio::use_future).get();
+  const auto versions =
+    Network::GetSDVVersions(network(), container_key.GetId(), asio::use_future).get();
   ASSERT_TRUE(versions.valid());
   ASSERT_EQ(1u, versions->size());
   EXPECT_EQ(container_version, versions->front());
@@ -131,7 +132,8 @@ TEST_F(BackendTest, BEH_ExistingSDVFailure) {
   ASSERT_FALSE(sdv.valid());
   EXPECT_EQ(make_error_code(VaultErrors::data_already_exists), sdv.error());
 
-  const auto versions = Network::GetSDVVersions(network(), container_key.GetId(), asio::use_future).get();
+  const auto versions =
+    Network::GetSDVVersions(network(), container_key.GetId(), asio::use_future).get();
   ASSERT_TRUE(versions.valid());
   ASSERT_EQ(1u, versions->size());
   EXPECT_EQ(container_version, versions->front());
@@ -162,7 +164,8 @@ TEST_F(BackendTest, BEH_UpdateExistingSDV) {
       container_key.GetId(), container_version1, container_version2, asio::use_future).get();
   EXPECT_TRUE(sdv.valid());
 
-  const auto versions = Network::GetSDVVersions(network(), container_key.GetId(), asio::use_future).get();
+  const auto versions =
+    Network::GetSDVVersions(network(), container_key.GetId(), asio::use_future).get();
   ASSERT_TRUE(versions.valid());
   ASSERT_EQ(2u, versions->size());
   EXPECT_EQ(container_version2, (*versions)[0]);

@@ -15,8 +15,8 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-#ifndef MAIDSAFE_NFS_TESTS_NETWORK_FIXTURE_H_
-#define MAIDSAFE_NFS_TESTS_NETWORK_FIXTURE_H_
+#ifndef MAIDSAFE_NFS_DETAIL_TESTS_NETWORK_FIXTURE_H_
+#define MAIDSAFE_NFS_DETAIL_TESTS_NETWORK_FIXTURE_H_
 
 #include <functional>
 #include <memory>
@@ -51,4 +51,4 @@ class NetworkFixture {
 }  // namespace nfs
 }  // namespace maidsafe
 
-#endif  // MAIDSAFE_NFS_TESTS_NETWORK_FIXTURE_H_
+#endif  // MAIDSAFE_NFS_DETAIL_TESTS_NETWORK_FIXTURE_H_
